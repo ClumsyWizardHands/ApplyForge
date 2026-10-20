@@ -1,0 +1,201 @@
+# answer_bank.yaml — the ~30 questions every application asks, answered once.
+# This file is what turns "fill out a form" into "glance and click."
+#
+# This is the TEMPLATE, with identity fields for a FICTIONAL person (Jordan
+# Rivera). Your own data/answer_bank.yaml is personal and gitignored. The
+# setup interview asks you each answer out loud and writes it; or copy this
+# file and fill it in. Never inherit an answer from this example.
+#
+# MATCHING: incoming form questions are matched by embedding similarity plus
+# the `aliases` list below. Anything below threshold is a NOVEL question —
+# Claude drafts it from the corpus + JD, and only those surface for review.
+
+bank_version: "1.0"
+match_threshold: 0.82
+
+# ─────────────────────────────────────────────────────────────
+# IDENTITY / CONTACT — filled verbatim
+# ─────────────────────────────────────────────────────────────
+identity:
+  first_name: "Jordan"
+  last_name: "Rivera"
+  email: "jordan.rivera@example.com"
+  phone: "+1 555 0100"
+  # Address fields on application forms should be ACCURATE — these feed
+  # background checks and payroll, not first impressions. Use the real one.
+  city: "Bristol"
+  state: "PA"
+  country: "United States"
+  linkedin: "https://linkedin.com/in/jordan-rivera-example"
+  github: ""
+  portfolio: ""
+
+# ─────────────────────────────────────────────────────────────
+# SCREENING — the questions that gate everything
+# Set during onboarding 2.7 — asked out loud, never inherited from this
+# example. A wrong answer here is misrepresentation.
+# ─────────────────────────────────────────────────────────────
+screening:
+  - id: work_auth
+    aliases:
+      - "Are you legally authorized to work in the United States?"
+      - "Do you have the right to work in the country of employment?"
+      - "Work authorization status"
+    answer: null                  # SET DURING ONBOARDING (2.7) — example was "Yes"
+    type: boolean
+
+  - id: sponsorship
+    aliases:
+      - "Will you now or in the future require sponsorship?"
+      - "Do you require visa sponsorship?"
+      - "Sponsorship required"
+    answer: null                  # SET DURING ONBOARDING (2.7) — example was "No"
+    type: boolean
+
+  - id: notice_period
+    aliases: ["What is your notice period?", "When can you start?", "Availability"]
+    answer: null                  # SET DURING ONBOARDING (2.7) — example was "Two weeks"
+    type: text
+
+  - id: start_date
+    aliases: ["Earliest start date", "Available start date"]
+    answer: null                  # SET DURING ONBOARDING (2.7) — example was "Flexible — two weeks from offer acceptance"
+    type: text
+
+  - id: comp_expectation
+    aliases:
+      - "What are your salary expectations?"
+      - "Desired compensation"
+      - "Expected base salary"
+    # Formula, not a fixed number. The autofill resolves it against the
+    # posted range so you never anchor below what's on offer.
+    # Resolution: max(floor, upper third of posted range). If the posted
+    # ceiling is below floor, flag — it should have been rejected upstream.
+    strategy: match_posted_range_upper_third
+    fallback_text: "Open to discussing based on the full scope and package."
+    floor: 100000                 # PLACEHOLDER: the lowest number you would say
+    type: text
+
+  - id: salary_history
+    aliases: ["Current salary", "Salary history", "What do you currently earn?"]
+    # Many states ban this question. Never answer it.
+    answer: ""
+    action: leave_blank_and_flag
+    note: "Do not answer. Flag for human — often illegal to ask."
+
+  - id: relocation
+    aliases: ["Are you willing to relocate?", "Open to relocation"]
+    answer: null                  # SET DURING ONBOARDING (2.7) — e.g. "No — based outside Philadelphia; open to remote or Philadelphia-area hybrid"
+    type: text
+
+  - id: onsite_ok
+    aliases: ["Can you work from our office?", "Are you able to commute to"]
+    answer: null                  # SET DURING ONBOARDING (2.7) — e.g. "Yes, within the Philadelphia area; up to 2 days per week"
+    type: text
+
+  - id: referral_source
+    aliases: ["How did you hear about us?", "Referral source", "Where did you find this role?"]
+    answer: null                  # SET DURING ONBOARDING (2.7) — example was "Company careers page"
+    type: select
+    select_preference: ["Company Website", "Other", "Job Board"]
+
+  - id: previously_employed
+    aliases: ["Have you previously worked for", "Are you a former employee?"]
+    answer: null                  # SET DURING ONBOARDING (2.7) — example was "No"
+    type: boolean
+
+  - id: non_compete
+    aliases: ["Are you subject to a non-compete?", "Any restrictive covenants?"]
+    answer: null                  # SET DURING ONBOARDING (2.7) — example was "No"
+    type: boolean
+
+  - id: background_check
+    aliases: ["Do you consent to a background check?"]
+    answer: null                  # SET DURING ONBOARDING (2.7) — example was "Yes"
+    type: boolean
+
+  - id: references
+    aliases: ["Can you provide references?", "Professional references"]
+    answer: null                  # SET DURING ONBOARDING (2.7) — example was "Available on request"
+    type: text
+
+# ─────────────────────────────────────────────────────────────
+# EEO / DEMOGRAPHIC
+# These are YOUR responses. The system never guesses.
+# If an entry is missing here, the field is left blank and flagged.
+# "Decline to self-identify" is a valid, common, and unpenalized choice.
+# ─────────────────────────────────────────────────────────────
+eeo:
+  gender: null                    # SET DURING ONBOARDING (2.7)
+  race_ethnicity: null            # SET DURING ONBOARDING (2.7)
+  veteran_status: null            # SET DURING ONBOARDING (2.7)
+  disability_status: null         # SET DURING ONBOARDING (2.7)
+  hispanic_latino: null           # SET DURING ONBOARDING (2.7)
+  # Set in onboarding 2.7. "Decline to self-identify" is a valid, common,
+  # unpenalized choice. null → field left blank and flagged — never auto-selected.
+
+# ─────────────────────────────────────────────────────────────
+# FREE-TEXT SCAFFOLDS
+# Not canned answers — skeletons the tailor fills with JD-specific detail.
+# The slop filter still applies to anything generated from these.
+# ─────────────────────────────────────────────────────────────
+scaffolds:
+  - id: why_company
+    aliases: ["Why do you want to work here?", "Why are you interested in this role?", "What draws you to"]
+    max_words: 120
+    skeleton: >
+      Open with ONE concrete, specific thing about this company or team drawn
+      from the JD or their product — not their mission statement. Connect it to
+      a specific thing I have built or shipped (cite a bullet_id). Close with
+      what I would want to work on first. Never use the words "excited,"
+      "passionate," or "mission."
+
+  - id: biggest_impact
+    aliases: ["Describe your biggest accomplishment", "Proudest achievement", "Tell us about impact you've had"]
+    max_words: 150
+    skeleton: >
+      Pull the highest-relevance STAR story from corpus stories[] matching this
+      JD's tags. Lead with the number. Situation in one sentence, action in two,
+      result with the metric. No throat-clearing.
+
+  - id: why_leaving
+    aliases: ["Why are you looking to leave?", "Reason for seeking a new role"]
+    max_words: 80
+    skeleton: >
+      Forward-looking only. What the next role offers that the current one
+      structurally cannot. Never negative about anyone. Never about compensation.
+
+  - id: relevant_experience
+    aliases: ["Describe your experience with", "Tell us about your background in"]
+    max_words: 150
+    skeleton: >
+      Identify the specific skill named in the question. Pull the 2 highest-
+      relevance corpus bullets tagged with it. If NO corpus bullet covers it,
+      do NOT generate an answer — flag as a novel question for the human.
+      This is a fabrication risk point.
+
+# ─────────────────────────────────────────────────────────────
+# NOVEL QUESTION HANDLING
+# ─────────────────────────────────────────────────────────────
+novel_questions:
+  # When a form question matches nothing above threshold:
+  on_match_failure: draft_and_flag   # draft_and_flag | leave_blank | abort
+  max_drafted_words: 150
+  never_draft_if:
+    - "requires a factual claim with no corpus support"
+    - "asks about compensation history"
+    - "asks a demographic question not in the eeo block"
+    - "requires a certification, clearance, or credential"
+  # Answered novel questions are offered for promotion into this file so
+  # the bank converges and your review surface shrinks each week.
+  promote_after_uses: 2
+
+# ─────────────────────────────────────────────────────────────
+# HARD STOPS — autofill aborts and hands to human
+# ─────────────────────────────────────────────────────────────
+abort_conditions:
+  - "CAPTCHA or Turnstile challenge detected"
+  - "form requests SSN, DOB, or government ID"
+  - "form requests bank or payment details"
+  - "assessment or timed test embedded in the application"
+  - "field labeled required that has no bank match and no safe draft"

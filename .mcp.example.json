@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "jobkit": {
+      "command": "uv",
+      "args": ["run", "--directory", "/absolute/path/to/your/jobkit/checkout", "jobkit-mcp"]
+    }
+  }
+}

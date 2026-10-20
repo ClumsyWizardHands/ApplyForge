@@ -1,0 +1,265 @@
+{
+ "_recorded": "HAND-BUILT for these tests, not recorded: an invented employer's job in the shape of GET boards-api.greenhouse.io/v1/boards/<token>/jobs/<id>?questions=true, trimmed to the keys the fetcher reads. It has a location_questions block, the part the fetcher once ignored.",
+ "id": 7004321,
+ "title": "Partner Sales Manager, Wholesale",
+ "questions": [
+  {
+   "label": "First Name",
+   "required": true,
+   "fields": [
+    {
+     "name": "first_name",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "label": "Last Name",
+   "required": true,
+   "fields": [
+    {
+     "name": "last_name",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "label": "Email",
+   "required": true,
+   "fields": [
+    {
+     "name": "email",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "label": "Phone",
+   "required": false,
+   "fields": [
+    {
+     "name": "phone",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "label": "Resume/CV",
+   "required": true,
+   "fields": [
+    {
+     "name": "resume",
+     "type": "input_file",
+     "values": []
+    },
+    {
+     "name": "resume_text",
+     "type": "textarea",
+     "values": []
+    }
+   ]
+  },
+  {
+   "label": "LinkedIn Profile",
+   "required": false,
+   "fields": [
+    {
+     "name": "question_51000000",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "label": "Are you authorized to work in the United States?",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_51000001",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "Yes",
+       "value": 1
+      },
+      {
+       "label": "No",
+       "value": 0
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "label": "Will you now or in the future need visa sponsorship to work in the United States?",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_51000002",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "Yes",
+       "value": 1
+      },
+      {
+       "label": "No",
+       "value": 0
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "label": "How did you hear about this job?",
+   "required": false,
+   "fields": [
+    {
+     "name": "question_51000003",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  }
+ ],
+ "location_questions": [
+  {
+   "label": "Longitude",
+   "required": true,
+   "fields": [
+    {
+     "name": "longitude",
+     "type": "input_hidden",
+     "values": []
+    }
+   ]
+  },
+  {
+   "label": "Latitude",
+   "required": true,
+   "fields": [
+    {
+     "name": "latitude",
+     "type": "input_hidden",
+     "values": []
+    }
+   ]
+  },
+  {
+   "label": "Location",
+   "required": true,
+   "fields": [
+    {
+     "name": "location",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  }
+ ],
+ "demographic_questions": {
+  "header": "Voluntary Self-Identification",
+  "questions": [
+   {
+    "id": 41001,
+    "label": "Gender",
+    "required": false,
+    "type": "multi_value_single_select",
+    "answer_options": [
+     {
+      "id": 52001,
+      "label": "Female",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 52002,
+      "label": "Male",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 52003,
+      "label": "Decline To Self Identify",
+      "free_form": false,
+      "decline_to_answer": true
+     }
+    ]
+   },
+   {
+    "id": 41002,
+    "label": "Race",
+    "required": false,
+    "type": "multi_value_single_select",
+    "answer_options": [
+     {
+      "id": 52011,
+      "label": "Hispanic or Latino",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 52012,
+      "label": "White (Not Hispanic or Latino)",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 52013,
+      "label": "Black or African American (Not Hispanic or Latino)",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 52014,
+      "label": "Asian (Not Hispanic or Latino)",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 52015,
+      "label": "Two or More Races (Not Hispanic or Latino)",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 52016,
+      "label": "Decline To Self Identify",
+      "free_form": false,
+      "decline_to_answer": true
+     }
+    ]
+   },
+   {
+    "id": 41003,
+    "label": "Veteran Status",
+    "required": false,
+    "type": "multi_value_single_select",
+    "answer_options": [
+     {
+      "id": 52021,
+      "label": "I am not a protected veteran",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 52022,
+      "label": "I identify as one or more of the classifications of protected veteran",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 52023,
+      "label": "Decline To Self Identify",
+      "free_form": false,
+      "decline_to_answer": true
+     }
+    ]
+   }
+  ]
+ }
+}

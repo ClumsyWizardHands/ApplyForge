@@ -1,0 +1,173 @@
+# TEST PROFILE — not a template. tests/conftest.py copies tests/fixtures/config/
+# into every test sandbox as config/, so the suite runs on a fresh clone with no
+# personal config. The values are the settings the tests were written against,
+# as the fictional example user, Jordan Rivera, would set them.
+# For your own setup, run the setup interview or copy config/filters.example.yaml.
+
+filters:
+  tracks:
+    - id: sdr_bdr_manager
+      active: true
+      title_regex: '(?i)\b(sdr|bdr|sales development|business development|account development)\b.{0,25}\b(manager|lead|leader|director|head)\b|\b(manager|director|head|lead)\b.{0,15}\b(sdr|bdr|sales development|business development|account development)\b'
+    - id: sales_exec
+      active: true
+      title_regex: '(?i)\b(director|head|vp|vice president|chief)\b.{0,30}\b(sales|revenue|gtm|go.to.market|growth)\b|\b(sales|revenue)\b.{0,20}\b(director|leader|vp|officer)\b|\bchief (revenue|sales) officer\b'
+    - id: sdr_bdr
+      active: false
+      title_regex: '(?i)\b(sdr|bdr|adr|sales development|business development|account development|market development)\b'
+    - id: account_executive
+      active: true
+      title_regex: '(?i)\b(account executive|sales executive)\b|\bae\b'
+
+  include_titles:
+    - '(?i)\b(revenue|sales|gtm|go.to.market) (operations|ops)\b'
+    - '(?i)\bdeal desk\b'
+    - '(?i)\bsales (manager|lead)\b'
+    - '(?i)\b(channel|partner|reseller) (sales|manager|lead|programs?)\b'
+    - '(?i)\b(sales )?(compensation|commissions?) (analyst|manager|lead)\b'
+    - '(?i)\b(sales|revenue|gtm|go.to.market)\b.{0,10}\benablement\b'
+    - '(?i)\b(founding|first)\b.{0,15}\b(ae|account executive|gtm|sales)\b'
+
+  exclude_titles:
+    - '(?i)\bengineer'
+    - '(?i)\b(intern|internship|apprentice)\b'
+    - '(?i)\b(contract|contractor|1099|temp)\b'
+    - '(?i)\b(door.to.door|field canvass(er|ing)?)\b'
+    - '(?i)\b(retail|store) (associate|manager)\b'
+    - '(?i)\bcall cent(er|re)\b'
+
+  locations:
+    allowed: ["Philadelphia, PA", "King of Prussia, PA", "Bristol, PA",
+              "Langhorne, PA", "Camden, NJ", "Cherry Hill, NJ",
+              "Pennsylvania", "New Jersey", "Chicago, IL", "Raleigh, NC"]
+    accept_remote: true
+    accept_hybrid_within_miles: 30
+    home_coordinates: from_corpus
+
+  comp:
+    floor: 165000
+    track_floors:
+      sdr_bdr:           { floor: 75000,  basis: ote }
+      sdr_bdr_manager:   { floor: 110000, basis: base }
+      account_executive: { floor: 140000, basis: ote }
+      sales_exec:        { floor: 190000, basis: base }
+    ote_base_share: 0.6
+    currency: USD
+    reject_when_unpublished: false
+
+  freshness:
+    max_age_days: 14
+    resurface_reposts: true
+
+  blocklist_companies: []
+
+gates:
+  min_score_to_surface: 65
+  min_score_to_tailor: 75
+  max_applications_per_company_per_quarter: 2
+  require_human_approval_before_tailor: true
+  require_human_confirmation_of_submission: true
+
+schedule:
+  nightly_at: "02:00"
+  stale_after_hours: 36
+
+followups:
+  - { days_after_submit: 7,  kind: status_check }
+  - { days_after_submit: 14, kind: hiring_manager_note, only_if_contact_known: true }
+  - { days_after_submit: 30, kind: close_as_ghosted, auto_close: true }
+
+remote_policy:
+  accept: [remote, hybrid]
+  reject_onsite: true
+  max_office_days_per_week: 2
+  max_commute_minutes: 60
+  relocation_cities: ["Chicago, IL", "Raleigh, NC"]
+  home_coordinates: from_corpus
+  on_remote_conflict: flag
+  acceptable_geo_restrictions: ["US", "USA", "U.S.", "United States", "US Remote",
+                                "North America", "AMER", "Americas",
+                                "East Coast", "West Coast",
+                                "Eastern Time", "Central Time", "Mountain Time", "Pacific Time",
+                                "EST", "ET", "CST", "MST", "PST", "PT"]
+  clearance_required: flag
+
+location_strategy:
+  mode: per_job
+  default: "Philadelphia, PA"
+  rules:
+    - { when: { job_state: NJ }, use: "Bristol, PA" }
+    - { when: { job_city_in: ["Philadelphia", "King of Prussia", "Conshohocken"] }, use: "Philadelphia, PA" }
+    - { when: { remote: true }, use: "Philadelphia, PA" }
+  forms_use_real_address: true
+
+resume:
+  recent_role_years: 5
+
+self_review:
+  max_revision_rounds: 1
+
+questions:
+  max_per_day: 3
+
+comp_sanity:
+  floor: from_filters
+  currency: USD
+  max_range_width_pct: 0.6
+  value_check: true
+  on_underpriced: flag
+  underpriced_threshold_pct: 25
+  flag_missing_range_when_required: true
+  reject_when_unpublished: false
+  flag_role_sprawl_below_headcount: 20
+
+volume_mode: high
+
+feeds:
+  usajobs:
+    enabled: false
+    keywords: ["Business Operations", "Program Analyst"]
+  adzuna:
+    enabled: true
+    country: us
+    keywords: ["revenue operations", "sales operations", "deal desk", "sales manager",
+               "director of sales", "channel sales manager", "sales enablement"]
+    max_days_old: 14
+  arbeitnow: { enabled: true, remote_only: true }
+  remotive:  { enabled: true, categories: ["sales", "business"] }
+  remoteok:  { enabled: true }
+  himalayas: { enabled: true }
+  getro:
+    enabled: false
+    keywords: ["revenue operations", "sales operations", "deal desk", "sales manager"]
+  consider:
+    enabled: true
+    categories: ["sales", "operations"]
+  cosnetwork: { enabled: false }
+  a16z:
+    enabled: false
+    keywords: ["revenue operations", "sales operations", "director of sales"]
+  # LinkedIn logged-out discovery (CLAUDE.md hard rule 11 exception): off, as
+  # in the template; tests that need it on switch it on in their own copy
+  linkedin_guest:
+    enabled: false
+    keywords: ["revenue operations", "sales operations", "sales manager", "director of sales"]
+    locations:
+      - { location: "United States", workplace: remote }
+      - { location: "Greater Philadelphia", workplace: hybrid }
+    posted_within_days: 7
+    max_search_requests_per_day: 6
+    max_detail_requests_per_day: 0
+    min_delay_seconds: 3
+
+dedup:
+  cluster_on: [normalized_company, normalized_title, location_bucket]
+  tiebreak: jd_hash
+  canonical_source_priority: [greenhouse, lever, ashby, smartrecruiters, workable,
+                              adzuna, arbeitnow, remotive, remoteok, usajobs]
+
+friction:
+  weights: { field_count: 1, required_count: 2, novel_question_count: 5, has_assessment: 40 }
+  warn_above: 60
+  skip_above: 85
+  override_score: 90

@@ -1,0 +1,150 @@
+# banned_phrases.yaml — the authenticity review of everything jobkit drafts.
+# AUTHORITATIVE: where SPEC.md §7 prose and this file disagree, this file governs.
+#
+# This is the TEMPLATE. Your own copy, config/banned_phrases.yaml, is personal
+# and gitignored (the setup interview writes it; or copy this file). The lists
+# below are a good start for anyone; grow them as you notice your own drafts
+# drifting. Editable without a code change.
+
+version: "1.3"
+
+cover_letter:
+  hard_reject:
+    - "excited to apply"
+    - "thrilled to apply"
+    - "passionate about"
+    - "fast-paced environment"
+    - "align with your mission"
+    - "aligns with my values"
+    - "leverage my skills"
+    - "proven track record"
+    - "wear many hats"
+    - "hit the ground running"
+    - "perfect fit"
+    - "I believe I would be"
+    - "as you can see from my resume"
+    - "I would love the opportunity"
+    - "thank you for your time and consideration"
+  # Regexes, matched case-insensitively — tics a fixed phrase cannot catch.
+  # Each is named for what it does, not for one wording of it. Two habits
+  # drafted letters fall into: a contrast construction (what the candidate
+  # would rather do, set against something else), and a closing paragraph
+  # that announces or apologizes for a gap instead of making the case. A
+  # letter states what the candidate has done; a missing requirement is the
+  # reader's call, not the letter's confession.
+  hard_reject_patterns:
+    - name: "contrast construction"
+      regex: "\\bI(?:['’]d| would) rather\\b[^.!?]{0,160}?\\bthan\\b"
+    - name: "gap announcement"
+      regex: "\\bhonest (?:about (?:the|my) )?gap\\b"
+    - name: "apologetic gap close"
+      regex: "\\bif (?:that|this|it)\\b[^.!?]{0,60}?\\bdisqualif"
+    - name: "candor preface"
+      regex: "\\blet me be (?:candid|frank|blunt|transparent)\\b"
+    - name: "title-never-held confession"
+      regex: "\\bI(?:['’]ve| have) never held\\b|\\bI haven['’]?t (?:ever )?held\\b"
+  soft_flag:
+    - "deeply"
+    - "truly"
+    - "incredibly"
+    - "journey"
+    - "space"          # "the fintech space"
+    - "at the intersection of"
+
+resume:
+  hard_reject:
+    - "spearheaded"
+    - "orchestrated"
+    - "championed"
+    - "utilized"
+    - "leveraged"          # as a verb
+    - "results-driven"
+    - "detail-oriented"
+    - "team player"
+    - "dynamic professional"
+    - "cross-functional synergies"
+    - "best-in-class"
+    - "actionable insights"
+    - "instrumental in"
+    - "played a key role in"
+    - "responsible for"    # says nothing about outcome
+    - "helped to"          # hedges away your own contribution
+  soft_flag:
+    - "robust"
+    - "seamless"
+    - "holistic"
+    - "streamlined"
+    - "optimized"
+    - "innovative"
+    - "strategic"          # fine once; a tell three times
+
+# ─────────────────────────────────────────────────────────────
+# PASS 2 — structural thresholds
+# These catch what phrase lists cannot: the shape of generated text.
+# ─────────────────────────────────────────────────────────────
+structural:
+  # Human resumes have ragged bullets. Machine ones are suspiciously even.
+  bullet_length_stdev_min_pct: 0.15
+  # lead/manage/direct/oversee are ONE class, not four.
+  max_bullets_per_verb_class: 2
+  em_dashes_per_100_words_max: 1.5
+  semicolons_per_100_words_max: 1.0
+  # Uniform ~18-word sentences read as generated.
+  sentence_length_stdev_min: 5.0
+  max_stacked_adjectives: 2
+  # Cover letter: any sentence equally true with another company name swapped in.
+  company_swap_test: true
+
+# ─────────────────────────────────────────────────────────────
+# PASS 2b — phrases repeated ACROSS the candidate's letters
+# One letter cannot show a tic; the same wording in letter after letter does.
+# Compares word n-grams of a new letter with the earlier final letters
+# (out/*/cover.txt). A retold fact is exempt: an n-gram whose content
+# words are all corpus, JD or target-name vocabulary (compared by stem;
+# numbers and hedges like "roughly" never count), or one that retells a
+# cited bullet with no more words of its own than of that bullet's
+# ("delivering 131% of annual quota"). The plain "I'd like to talk about" close is
+# not phrasing.
+# ─────────────────────────────────────────────────────────────
+cross_letter:
+  enabled: true
+  phrase_words: 5          # n-gram size
+  min_prior_letters: 2     # a phrase already in 2 earlier letters may not appear in a third
+  lookback_letters: 50     # newest cover.txt files compared
+  on_repeat: fail          # fail: regenerate with the phrases named | flag: soft flag only
+
+# ─────────────────────────────────────────────────────────────
+# PASS 3 — drift from your own corpus text
+# The real defense. Your bullets are text YOU wrote; the tailor is
+# supposed to reframe, not rewrite.
+# ─────────────────────────────────────────────────────────────
+drift:
+  similarity_threshold: 0.75
+  on_drift: revert_to_source      # revert_to_source | flag_only
+  # How a figure's approximation mark renders — THE one knob for hedging
+  # (it replaced enforce_hedging; metric_confidence in the corpus is unchanged
+  # either way). Read by the provenance validator (resumes), the claims
+  # validator (letters, drafted answers), this pass and the tailoring prompts.
+  #   confident: "~", "about", "approximately", "roughly", "around" may be
+  #     dropped, even on an estimate ("~19%" may read "19%"). Everything else
+  #     matches the source exactly: value, unit, no added precision (never
+  #     "19.4%"), a range stays the range ("6–10", never "10"), and "+",
+  #     "up to", "under", "over" stay where the source has them and are never
+  #     added ("up to $1.8M/yr", never "$1.8M a year").
+  #   hedged: an estimate-confidence number keeps a hedge next to it ("~40%",
+  #     "up to 9", "40+", a range); "Roughly 40%" may not become "40%".
+  # Your call; the setup interview asks. This template starts at hedged, the
+  # stricter rule (and what jobkit assumes when the key is absent).
+  estimate_style: hedged
+  # Any content word in the rendered bullet absent from its source.
+  flag_new_content_words: true
+
+# ─────────────────────────────────────────────────────────────
+# PASS 4 — adversarial critic (strong model, runs only if 1-3 clean)
+# ─────────────────────────────────────────────────────────────
+critic:
+  enabled: true
+  max_regenerations: 2
+  # The critic must be allowed to say "nothing tips me off." A critic that
+  # always finds something produces worse output, not better.
+  allow_clean_pass: true

@@ -1,0 +1,100 @@
+{
+ "_recorded": "hand-built in the shape of GET https://api.ashbyhq.com/posting-api/job-board/soylent (HTTP 200): a fictional company with two 'Sales Director' postings (London and New York) and one other; company, ids and text are invented",
+ "apiVersion": "1",
+ "jobs": [
+  {
+   "id": "3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e01",
+   "title": "Sales Director",
+   "department": "Sales",
+   "team": "Sales",
+   "employmentType": "FullTime",
+   "location": "London",
+   "secondaryLocations": [],
+   "publishedAt": "2026-08-27T10:09:30.997+00:00",
+   "isListed": true,
+   "isRemote": true,
+   "workplaceType": "Hybrid",
+   "address": {
+    "postalAddress": {
+     "addressRegion": "Greater London",
+     "addressCountry": "United Kingdom",
+     "addressLocality": "London"
+    }
+   },
+   "jobUrl": "https://jobs.ashbyhq.com/Soylent/3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e01",
+   "applyUrl": "https://jobs.ashbyhq.com/Soylent/3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e01/application",
+   "descriptionHtml": "<h2><strong>What we are building at Soylent</strong></h2><p>Soylent makes meal-planning software for hospital and university kitchens. Catering teams use it to plan menus, order stock and cut food waste across every site they run.</p><h3><strong>Why it matters</strong></h3><p>Large kitchens still plan on spreadsheets and phone calls. Orders arrive late, stock runs out and good food is thrown away. Our customers plan a week of menus in an hour.</p><h3><strong>The team you will join</strong></h3><p>You will join a small sales team that sells to catering directors and procurement leads.</p>",
+   "descriptionPlain": "WHAT WE ARE BUILDING AT SOYLENT\n\nSoylent makes meal-planning software for hospital and university kitchens. Catering teams use it to plan menus, order stock and cut food waste across every site they run.\n\n\nWHY IT MATTERS\n\nLarge kitchens still plan on spreadsheets and phone calls. Orders arrive late, stock runs out and good food is thrown away. Our customers plan a week of menus in an hour.\n\n\nTHE TEAM YOU WILL JOIN\n\nYou will join a small sales team that sells to catering directors and procurement leads."
+  },
+  {
+   "id": "3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e02",
+   "title": "Senior Product Engineer, Revenue Engine",
+   "department": "Product & Engineering",
+   "team": "Product & Engineering",
+   "employmentType": "FullTime",
+   "location": "London",
+   "secondaryLocations": [
+    {
+     "location": "Antwerp",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "Antwerp",
+       "addressCountry": "Belgium",
+       "addressLocality": "Antwerp"
+      }
+     }
+    }
+   ],
+   "publishedAt": "2026-10-01T10:27:06.953+00:00",
+   "isListed": true,
+   "isRemote": true,
+   "workplaceType": "Hybrid",
+   "address": {
+    "postalAddress": {
+     "addressRegion": "Greater London",
+     "addressCountry": "United Kingdom",
+     "addressLocality": "London"
+    }
+   },
+   "jobUrl": "https://jobs.ashbyhq.com/Soylent/3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e02",
+   "applyUrl": "https://jobs.ashbyhq.com/Soylent/3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e02/application",
+   "descriptionHtml": "<h2><strong>Hey! We're </strong><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"http://Soylent.ai\"><strong>Soylent.ai</strong></a></h2><p>Soylent is a young company in an active growth period. We started this year as a small team and are hiring across product, engineering and sales.</p><p>Our team sits within Engineering and builds the tools our sales and customer success teams use every day. You will work directly with Marketing, Sales and Customer Success.</p>",
+   "descriptionPlain": "HEY! WE'RE SOYLENT.AI http://Soylent.ai\n\nSoylent is a young company in an active growth period. We started this year as a small team and are hiring across product, engineering and sales.\n\n\n\nOur team sits within Engineering and builds the tools our sales and customer success teams use every day. You will work directly with Marketing, Sales and Customer Success."
+  },
+  {
+   "id": "3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e03",
+   "title": "Sales Director ",
+   "department": "Sales",
+   "team": "Sales",
+   "employmentType": "FullTime",
+   "location": "New York",
+   "secondaryLocations": [
+    {
+     "location": "San Francisco",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "California",
+       "addressCountry": "United States",
+       "addressLocality": "San Francisco"
+      }
+     }
+    }
+   ],
+   "publishedAt": "2026-08-12T09:01:25.522+00:00",
+   "isListed": true,
+   "isRemote": true,
+   "workplaceType": "Hybrid",
+   "address": {
+    "postalAddress": {
+     "addressRegion": "New York",
+     "addressCountry": "United States",
+     "addressLocality": "New York"
+    }
+   },
+   "jobUrl": "https://jobs.ashbyhq.com/Soylent/3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e03",
+   "applyUrl": "https://jobs.ashbyhq.com/Soylent/3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e03/application",
+   "descriptionHtml": "<h2><strong>What we are building at Soylent</strong></h2><p>Soylent makes meal-planning software for hospital and university kitchens. Catering teams use it to plan menus, order stock and cut food waste across every site they run.</p><h3><strong>Why it matters</strong></h3><p>Large kitchens still plan on spreadsheets and phone calls. Orders arrive late, stock runs out and good food is thrown away. Our customers plan a week of menus in an hour.</p><h3><strong>The team you will join</strong></h3><p>You will join a small sales team that sells to catering directors and procurement leads.</p>",
+   "descriptionPlain": "WHAT WE ARE BUILDING AT SOYLENT\n\nSoylent makes meal-planning software for hospital and university kitchens. Catering teams use it to plan menus, order stock and cut food waste across every site they run.\n\n\nWHY IT MATTERS\n\nLarge kitchens still plan on spreadsheets and phone calls. Orders arrive late, stock runs out and good food is thrown away. Our customers plan a week of menus in an hour.\n\n\nTHE TEAM YOU WILL JOIN\n\nYou will join a small sales team that sells to catering directors and procurement leads."
+  }
+ ]
+}

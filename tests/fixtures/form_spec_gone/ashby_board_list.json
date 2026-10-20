@@ -1,0 +1,13 @@
+{
+  "_recorded": "HAND-BUILT, not recorded: the shape of GET api.ashbyhq.com/posting-api/job-board/{token} (the public posting API; trimmed to the keys the gone check reads). It lists one posting, 2f1c0a9e-5b7d-4c3e-9a8f-1d2e3f405162.",
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "2f1c0a9e-5b7d-4c3e-9a8f-1d2e3f405162",
+      "title": "Account Executive",
+      "location": "Remote - US",
+      "isListed": true,
+      "jobUrl": "https://jobs.ashbyhq.com/acme/2f1c0a9e-5b7d-4c3e-9a8f-1d2e3f405162"
+    }
+  ]
+}

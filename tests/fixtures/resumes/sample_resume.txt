@@ -1,0 +1,28 @@
+Morgan Ellis
+Denver, CO | morgan.ellis@example.com | (555) 010-0142 | linkedin.com/in/morgan-ellis-example
+
+SUMMARY
+Customer success leader who builds onboarding programs for mid-market software customers.
+
+PROFESSIONAL EXPERIENCE
+
+Fernbrook Software — Denver, CO
+Customer Success Manager | Jun 2021 – Present
+• Managed a book of 48 mid-market accounts worth $3.2M in annual recurring revenue.
+• Cut median onboarding time from 60 days to 35 days by rebuilding the kickoff playbook
+  with the implementation team.
+• Responsible for quarterly business reviews with executive sponsors.
+• Led the renewal forecast for the Denver office.
+• Led a pilot of in-app guides that raised feature adoption 18%.
+
+Senior Support Specialist, Harbor Health Systems
+Aug 2017 – May 2021
+• Resolved 1,200+ tickets a year at a 96% satisfaction score.
+• Helped migrate the knowledge base to a new help center.
+• Trained 9 new support hires.
+
+EDUCATION
+University of Northern Colorado, B.A., Psychology, 2017
+
+SKILLS
+Salesforce, Gainsight, Zendesk, SQL, onboarding, renewals

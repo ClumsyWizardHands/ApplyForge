@@ -1,0 +1,21 @@
+# TEST PROFILE — not a template. tests/conftest.py copies tests/fixtures/config/
+# into every test sandbox as config/, so the suite runs on a fresh clone with no
+# personal config. The values are the settings the tests were written against,
+# as the fictional example user, Jordan Rivera, would set them.
+# For your own setup, run the setup interview or copy config/autoapprove.example.yaml.
+
+version: "1.0"
+
+auto_approve:
+  - when: { tier: 1, score_gte: 82, sanity_flags: none, friction_lte: 45 }
+    reason: "tier1-quick-apply"
+  - when: { score_gte: 95, remote: true, comp_min_gte: 200000 }
+    reason: "remote-high-base"
+
+auto_reject:
+  - when: { title_class: account_executive, tier: 3 }
+    reason: "ae-at-tier3-company"
+  - when: { title_class: account_executive, comp_max_lt: 160000 }
+    reason: "ae-low-ceiling"
+  - when: { tier: 3, score_lt: 72 }
+    reason: "tier3-below-bar"

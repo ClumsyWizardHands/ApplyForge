@@ -1,0 +1,116 @@
+{
+  "data": {
+    "jobPosting": {
+      "id": "00000000-0000-4000-8000-000000000000",
+      "title": "Revenue Operations Manager",
+      "applicationForm": {
+        "sections": [
+          {
+            "title": "Basic Information",
+            "fieldEntries": [
+              {
+                "field": {
+                  "id": "00000000-0000-4000-8000-000000000001",
+                  "path": "_systemfield_name",
+                  "humanReadablePath": "Legal First and Last Name",
+                  "title": "Legal First and Last Name",
+                  "isNullable": false,
+                  "isPrivate": false,
+                  "isDeactivated": false,
+                  "isMany": false,
+                  "metadata": {},
+                  "type": "String",
+                  "__autoSerializationID": "StringField"
+                },
+                "isRequired": true
+              },
+              {
+                "field": {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "path": "_systemfield_email",
+                  "humanReadablePath": "Email",
+                  "title": "Email",
+                  "isNullable": false,
+                  "isPrivate": false,
+                  "isDeactivated": false,
+                  "isMany": false,
+                  "metadata": {},
+                  "type": "Email",
+                  "__autoSerializationID": "EmailField"
+                },
+                "isRequired": true
+              },
+              {
+                "field": {
+                  "id": "00000000-0000-4000-8000-000000000003",
+                  "path": "_systemfield_resume",
+                  "humanReadablePath": "Resume",
+                  "title": "Resume",
+                  "isNullable": false,
+                  "isPrivate": false,
+                  "isDeactivated": false,
+                  "isMany": false,
+                  "metadata": {},
+                  "type": "File",
+                  "__autoSerializationID": "FileField"
+                },
+                "isRequired": true
+              }
+            ]
+          },
+          {
+            "title": "Work Eligibility",
+            "fieldEntries": [
+              {
+                "field": {
+                  "id": "00000000-0000-4000-8000-000000000004",
+                  "path": "a1b2c3d4-work-auth",
+                  "humanReadablePath": "Are you legally authorized to work in the United States?",
+                  "title": "Are you legally authorized to work in the United States?",
+                  "isNullable": false,
+                  "isPrivate": false,
+                  "isDeactivated": false,
+                  "isMany": false,
+                  "metadata": {},
+                  "type": "Boolean",
+                  "__autoSerializationID": "BooleanField"
+                },
+                "isRequired": true
+              },
+              {
+                "field": {
+                  "id": "00000000-0000-4000-8000-000000000005",
+                  "path": "a1b2c3d4-work-model",
+                  "humanReadablePath": "Which work model do you prefer?",
+                  "title": "Which work model do you prefer?",
+                  "isNullable": false,
+                  "isPrivate": false,
+                  "isDeactivated": false,
+                  "isMany": false,
+                  "metadata": {},
+                  "type": "ValueSelect",
+                  "__autoSerializationID": "ValueSelectField",
+                  "selectableValues": [
+                    {
+                      "label": "Remote",
+                      "value": "Remote"
+                    },
+                    {
+                      "label": "Hybrid",
+                      "value": "Hybrid"
+                    },
+                    {
+                      "label": "On-site",
+                      "value": "On-site"
+                    }
+                  ]
+                },
+                "isRequired": false
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+# config/autoapprove.yaml — standing rules: let the queue pre-decide the
+# obvious cases so only real judgment calls reach you (SPEC.md §6.2).
+#
+# This is the TEMPLATE. Your own copy, config/autoapprove.yaml, is personal and
+# gitignored. The setup interview proposes rules from your answers and writes
+# only the ones you accept, one at a time; or copy this file and edit it.
+#
+# Order of evaluation, fixed: deterministic filters → sanity checks → standing
+# rules. Rules only see jobs that survived both earlier layers (status queued).
+# Never duplicate a sanity-layer control here (remote conflict, commute,
+# underpriced belong to remote_policy / comp_sanity in filters.yaml).
+#
+# For each queued job, every auto_reject rule is tried first, then every
+# auto_approve rule; the first rule whose `when` matches decides.
+#   auto_reject:  the job is rejected (layer standing_rule), logged with the
+#                 rule's reason, reviewable — never silently dropped.
+#   auto_approve: the job is approved WITHOUT asking you: tailored and its form
+#                 staged overnight (never submitted — you always click submit).
+#                 The digest lists it as "done, FYI". Start with none.
+#
+# Conditions in `when` (all must hold):
+#   tier: 1|2|3               company tier from targets.yaml
+#   score_gte: N / score_lt: N    fit score 0-100
+#   sanity_flags: none        no sanity flag on the job
+#   friction_lte: N           application-form friction score
+#   remote: true|false
+#   comp_min_gte: N           published minimum (base; an OTE minimum never matches)
+#   comp_max_lt: N            published maximum below N
+#   comp_unpublished: true|false
+#   title_class: account_executive | sdr_bdr | sdr_bdr_manager
+#                             from the role tracks in filters.yaml (a founding/
+#                             first AE is not account_executive)
+#   flag_present: "<text>"    a sanity flag containing this text (e.g. "ote-unrealistic")
+#   any_of: [ {...}, {...} ]  at least one nested condition set holds
+
+version: "1.0"
+
+auto_approve: []
+  # Examples — uncomment and adjust only once you trust the scores:
+  # - when: { tier: 1, score_gte: 80, sanity_flags: none, friction_lte: 40 }
+  #   reason: "tier1-quick-apply"
+  # - when: { score_gte: 90, remote: true, comp_min_gte: 200000 }
+  #   reason: "remote-high-base"
+
+auto_reject:
+  # Opportunistic companies only for genuinely strong fits.
+  - when: { tier: 3, score_lt: 70 }
+    reason: "tier3-below-bar"
+  # More examples:
+  # - when: { tier: 2, score_lt: 70 }
+  #   reason: "tier2-weak-fit"
+  # - when: { title_class: sdr_bdr, comp_max_lt: 60000 }
+  #   reason: "sdr-low-comp"

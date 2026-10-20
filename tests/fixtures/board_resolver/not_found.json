@@ -1,0 +1,12 @@
+{
+ "_recorded": "404 bodies for a board token that does not exist (greenhouse: boards-api /v1/boards/<token>/jobs; lever: api.lever.co /v0/postings/<token>?mode=json; ashby: posting-api/job-board/<token>, text/plain), as the public APIs answer them",
+ "greenhouse": {
+  "status": 404,
+  "error": "Job not found"
+ },
+ "lever": {
+  "ok": false,
+  "error": "Document not found"
+ },
+ "ashby": "Not Found"
+}

@@ -1,0 +1,241 @@
+{
+ "comments": "13/03/2026: The API has been updated to include the companySlug field in the response.",
+ "updatedAt": 1787074767,
+ "offset": 0,
+ "limit": 5,
+ "totalCount": 101026,
+ "jobs": [
+  {
+   "title": "Senior Fire Scientist (Spain Only)",
+   "excerpt": "DESCRIPCI\u00d3N GENERALTechnosylva es una empresa SaaS l\u00edder en soluciones de soporte operativo y an\u00e1lisis de riesgos ante incendios forestales y fen\u00f3menos meteorol\u00f3gicos extremos.",
+   "companyName": "Technosylva",
+   "companySlug": "technosylva",
+   "companyLogo": "https://cdn-images.himalayas.app/yjbcm3b8g5x7g6oplchxc72muaaa",
+   "employmentType": "Full Time",
+   "minSalary": null,
+   "maxSalary": null,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Senior"
+   ],
+   "currency": null,
+   "locationRestrictions": [
+    "Spain"
+   ],
+   "timezoneRestrictions": [
+    0,
+    1
+   ],
+   "categories": [
+    "Fire-Science",
+    "Wildfire-Analysis",
+    "Spatial-Data-Science",
+    "Forestry-Engineering",
+    "GIS-Analysis",
+    "Senior-Fire-Protection-Engineer",
+    "Senior-Fire-Safety-Systems-Engineer",
+    "Senior-Scientist",
+    "Senior-Research-Scientist"
+   ],
+   "parentCategories": [],
+   "description": "<h3>DESCRIPCI\u00d3N GENERAL</h3><p><a href=\"https://himalayas.app/companies/technosylva\">Technosylva</a> es una empresa SaaS l\u00edder en soluciones de soporte operativo y an\u00e1lisis de riesgos ante incendios forestales y fen\u00f3menos meteorol\u00f3gicos extremos. Nuestra misi\u00f3n es reducir el impacto de estos eventos mediante inteligencia proactiva y procesable que permite una mejor toma de decisiones.</p><p>Ofrecemos un conjunto de soluciones de software dise\u00f1adas espec\u00edficamente para mitigar riesgos asociados tanto a incendios forestales como a condiciones meteorol\u00f3gicas extremas. Estas soluciones son utilizadas por algunas de las principales empresas de servicios p\u00fablicos privadas (IOU), agencias de gesti\u00f3n de incendios y otras organizaciones clave en Estados Unidos.</p><p>Nuestros productos permiten anticipar riesgos, generar predicciones de propagaci\u00f3n de incendios bajo demanda y analizar el fortalecimiento de infraestructuras, al tiempo que apoyan el cumplimiento normativo y los procesos de reporte. Si bien est\u00e1n dise\u00f1ados para satisfacer las necesidades de compa\u00f1\u00edas el\u00e9ctricas y agencias gubernamentales, est\u00e1n ganando r\u00e1pidamente presencia en otros sectores, como operadores de transmisi\u00f3n, aseguradoras y nuevas industrias expuestas al riesgo clim\u00e1tico.</p><p>Fundada en 1997, <a href=\"https://himalayas.app/companies/technosylva\">Technosylva</a> ha brindado soluciones cr\u00edticas durante m\u00e1s de dos d\u00e9cadas. En los \u00faltimos a\u00f1os, la empresa ha iniciado un proceso de transformaci\u00f3n y r\u00e1pido crecimiento, consolidando una plantilla de m\u00e1s de 180 empleados y una presencia internacional en m\u00e1s de 10 pa\u00edses.</p><h3>DESCRIPCION DEL PUESTO</h3><p>Estamos buscando un Senior Fire Scientist para unirse al equipo de Fire Science que tiene a d\u00eda de hoy 15 integrantes. Su objetivo principal ser\u00e1 el an\u00e1lisis de datos y apoyar al equipo a innovar y generar nuevos modelos para evaluar el riesgo de incendio forestal, apoyando a los clientes a una mejor toma de decisiones en entornos operacionales. Adem\u00e1s, colaborar\u00e1 en la programaci\u00f3n de scripts para automatizar los procedimientos de an\u00e1lisis existentes as\u00ed c\u00f3mo desarrollar nuevos modelos que permitan mejorar las predicciones de comportamiento de fuego. Buscamos una persona con experiencia, t\u00e9cnicamente capacitada y altamente motivada con la prestaci\u00f3n de servicios de an\u00e1lisis de incendios forestales. </p><h3>RESPONSABILIDADES</h3><ul>\n<li>Integrarse en el equipo de Fire Science y adaptarse a los diferentes flujos de trabajo.</li>\n<li>Procesado de datos espaciales y an\u00e1lisis num\u00e9rico.</li>\n<li>Realizar an\u00e1lisis estad\u00edsticos y uso de modelos de machine learning, adem\u00e1s de IA. </li>\n<li>Trabajar en colaboraci\u00f3n con otros equipos para mejorar los procesos a nivel de empresa. </li>\n<li>Contribuir a la automatizaci\u00f3n de los procedimientos de validaci\u00f3n programando procesos para monitorear los resultados de los diferentes productos generados en la empresa, as\u00ed como de los inputs empleados para ello.</li>\n<li>Documentar los resultados de los an\u00e1lisis realizados y contribuir a informes, presentaciones y publicaciones cient\u00edficas. </li>\n</ul><h3>EXPERIENCIA/HABILIDADES REQUERIDAS</h3><ul>\n<li>Ingeniero de montes o similar. El t\u00edtulo de doctor en ciencias del fuego es altamente valorado. </li>\n<li>Experiencia de al menos 5 a\u00f1os en un puesto similar.</li>\n<li>Experiencia en proyectos forestales y, en especial, de incendios forestales.</li>\n<li>Experiencia trabajando en ciencias y/o gesti\u00f3n de incendios forestales, como respuesta a incidentes, gesti\u00f3n de combustibles, investigaci\u00f3n de incendios, etc.</li>\n<li>Se valora el conocimiento pr\u00e1ctico de sistemas de modelado espacial del comportamiento del fuego y meteorolog\u00eda aplicada a incendios forestales. </li>\n<li>Conocimientos en sistemas de informaci\u00f3n geogr\u00e1fica (ArcGISPro, R, Python). Experiencia en la producci\u00f3n de datos espaciales y su an\u00e1lisis.</li>\n<li>Conocimientos estad\u00edsticos avanzados.</li>\n<li>Manejo de datos espaciales (rasters, netcdf, gribs\u2026)</li>\n<li>Experiencia en R y/o Python en la generaci\u00f3n de c\u00f3digos para desarrollar an\u00e1lisis espaciales y an\u00e1lisis estad\u00edsticos de datos. Automatizaci\u00f3n de procesos. </li>\n<li>Uso de bases de datos (realizaci\u00f3n de consultas y ejecuci\u00f3n de scripts para acceder y extraer datos). </li>\n<li>Capacidad para comunicarse eficazmente en ingl\u00e9s.</li>\n</ul><h3>BENEFICIOS</h3><ul>\n<li>Salario anual competitivo.</li>\n<li>Seguro m\u00e9dico y plan de retribuci\u00f3n flexible para que puedas adaptar parte de tu compensaci\u00f3n a tus necesidades.</li>\n<li>Bono anual basado en el desempe\u00f1o individual y el rendimiento de la empresa.</li>\n<li>Horario flexible.</li>\n<li>Opciones de trabajo remoto.</li>\n</ul><p>En <a href=\"https://himalayas.app/companies/technosylva\">Technosylva</a> valoramos la diversidad de experiencias y habilidades, y entendemos que cada trayectoria es \u00fanica. Por ello, invitamos a postularse a todas las personas que consideren cumplir con la mayor\u00eda de los requisitos y est\u00e9n interesadas en desarrollarse y contribuir en el puesto.</p><h3>DESCARGO DE RESPONSABILIDAD</h3><p>La finalizaci\u00f3n del salario y los beneficios depende de una multitud de factores que incluyen: ubicaci\u00f3n, experiencia, capacitaci\u00f3n, calificaciones y demandas del mercado.</p><h3>COMPROMISO DE INCLUSI\u00d3N</h3><p><a href=\"https://himalayas.app/companies/technosylva\">Technosylva</a> es un empleador que ofrece igualdad de oportunidades. Estamos comprometidos a crear un entorno inclusivo donde diferentes perspectivas contribuyan a mejores soluciones. </p><p>Originally posted on <a href=\"https://himalayas.app\">Himalayas</a></p>",
+   "pubDate": 1787074767,
+   "expiryDate": 1792258766,
+   "applicationLink": "https://himalayas.app/companies/technosylva/jobs/senior-fire-scientist-spain-only-9598688095",
+   "guid": "https://himalayas.app/companies/technosylva/jobs/senior-fire-scientist-spain-only-9598688095"
+  },
+  {
+   "title": "Incredible Account Manager",
+   "excerpt": "WHO WE AREWe\u2019re Incredible.  A full-service digital marketing agency with headquarters in Southern California and additional offices in Las Vegas and Minneapolis.",
+   "companyName": "Incredible Marketing",
+   "companySlug": "incredible-marketing",
+   "companyLogo": "https://cdn-images.himalayas.app/6896qs8ph8et8uyd3kcw5xor8ps9",
+   "employmentType": "Full Time",
+   "minSalary": 50000,
+   "maxSalary": 75000,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Senior"
+   ],
+   "currency": "USD",
+   "locationRestrictions": [
+    "United States"
+   ],
+   "timezoneRestrictions": [
+    -10,
+    -9,
+    -8,
+    -7,
+    -6,
+    -5,
+    14
+   ],
+   "categories": [
+    "Account-Management",
+    "Digital-Marketing",
+    "Client-Services",
+    "Digital-Strategy",
+    "Account-Manager",
+    "Customer-Account-Manager",
+    "Client-Account-Manager",
+    "Agency-Account-Manager",
+    "VIP-Account-Manager",
+    "Accounts-Manager"
+   ],
+   "parentCategories": [
+    "Sales"
+   ],
+   "description": "<div><div><div><div><div>\n<h3><strong>WHO WE ARE</strong></h3>\n<p>We\u2019re <em>Incredible.</em> A full-service digital marketing agency with headquarters in Southern California and additional offices in Las Vegas and Minneapolis. For nearly 15 years, we\u2019ve helped aesthetic, medical, and lifestyle brands grow through bold creativity, data-driven strategy, and a healthy dose of fun.</p>\n<p>Our culture? Think fast-paced, collaborative, and high-accountability. We work hard, laugh harder, and take pride in results that make our clients say, \u201cThat\u2019s incredible.\u201d</p>\n<h3><strong>WHO YOU ARE</strong></h3>\n<p>You\u2019re a strategic thinker and a proactive communicator, the kind of person who always knows what\u2019s happening with every client and every campaign. You thrive in a fast-moving environment, love building relationships, and aren\u2019t afraid to challenge both clients <em>and</em> colleagues if it means getting a better outcome.</p>\n<p>You\u2019re probably the kind of person people call \u201cType A\", organized, detail-obsessed, driven, and just competitive enough to hate losing. You take ownership, anticipate problems before they happen, and communicate with clarity and confidence.</p>\n<p>You understand digital marketing inside and out - SEO, content, email, social, PPC, analytics, and beyond. You\u2019re not just managing projects; you\u2019re orchestrating growth.</p>\n<h3>WHAT YOU\u2019LL DO</h3>\n<ul>\n<li><p><strong>Own client communication.</strong> Be the go-to point of contact for your clients, building trust, setting expectations, and keeping everyone aligned.</p></li>\n<li><p><strong>Lead strategy and execution.</strong> Develop, oversee, and refine multi-channel marketing strategies that deliver measurable results.</p></li>\n<li><p><strong>Analyze and report.</strong> Track campaign performance using key analytics tools and translate data into clear, actionable insights for clients.</p></li>\n<li><p><strong>Drive growth.</strong> Proactively identify opportunities for improvement and scale within client accounts.</p></li>\n<li><p><strong>Collaborate and coordinate.</strong> Work closely with our SEO, content, paid media, and creative teams to ensure flawless execution.</p></li>\n<li><p><strong>Lead initiatives.</strong> Spearhead new marketing projects and client initiatives from concept through completion.</p></li>\n<li><p><strong>Stay ahead.</strong> Keep your finger on the pulse of digital trends, tools, and emerging platforms and bring fresh ideas to the table.</p></li>\n</ul>\n<hr>\n<h3><strong>WHAT YOU BRING</strong></h3>\n<ul>\n<li><p>5+ years of experience in a digital, web, or creative agency environment.</p></li>\n<li><p>Proven experience managing 15+ active client relationships simultaneously.</p></li>\n<li><p>Deep understanding of SEO, content marketing, social, PPC, retargeting, and analytics.</p></li>\n<li><p>Exceptional communication and presentation skills, verbal, written, and interpersonal.</p></li>\n<li><p>Ability to confidently lead strategy discussions with C-level clients.</p></li>\n<li><p>Strong analytical mindset, comfortable using metrics to guide decisions.</p></li>\n<li><p>Hands-on experience with marketing tools (Google Analytics, Ads Manager, SEMrush, HubSpot, etc.).</p></li>\n<li><p>Willingness to meet clients in person when needed.</p></li>\n<li><p>Relentless attention to detail and follow-through.</p></li>\n</ul>\n<hr>\n<h3><strong>WHY YOU\u2019LL LOVE IT HERE</strong></h3>\n<ul>\n<li><p>A collaborative, creative, and supportive team that values results <em>and</em> personality.</p></li>\n<li><p>Opportunity to work with industry-leading clients and shape high-impact strategies.</p></li>\n<li><p>Growth potential within a fast-evolving digital agency.</p></li>\n<li><p>Competitive salary, benefits, and perks that reflect your expertise.</p></li>\n</ul>\n<p>Check us out at .<br>If you\u2019re ready to bring energy, strategy, and a little bit of swagger to your next role - we\u2019re ready for you.</p>\n</div></div></div></div></div><p>Originally posted on <a href=\"https://himalayas.app\">Himalayas</a></p>",
+   "pubDate": 1787074699,
+   "expiryDate": 1792258698,
+   "applicationLink": "https://himalayas.app/companies/incredible-marketing/jobs/incredible-account-manager",
+   "guid": "https://himalayas.app/companies/incredible-marketing/jobs/incredible-account-manager"
+  },
+  {
+   "title": "Real Estate Associate Agent (1099) - Salem",
+   "excerpt": "Are you a new real estate agent looking to grow your skills, or an experienced agent wanting more flexibility?",
+   "companyName": "Quicken Loans",
+   "companySlug": "quicken-loans",
+   "companyLogo": "https://cdn-images.himalayas.app/dectnap3xm75ou7pv1pdamfnaxkn",
+   "employmentType": "Full Time",
+   "minSalary": null,
+   "maxSalary": null,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Entry-level",
+    "Mid-level"
+   ],
+   "currency": null,
+   "locationRestrictions": [
+    "United States"
+   ],
+   "timezoneRestrictions": [
+    -10,
+    -9,
+    -8,
+    -7,
+    -6,
+    -5,
+    14
+   ],
+   "categories": [
+    "Real-Estate-Agent",
+    "Associate-Agent",
+    "Real-Estate-Sales",
+    "Property-Showing-Agent",
+    "Field-Sales-Agent",
+    "Field-Real-Estate-Agent",
+    "Home-Showing-Agent",
+    "1099-Real-Estate-Agent",
+    "Real-Estate-Associate-Agent",
+    "Associate-Real-Estate-Agent",
+    "Licensed-Real-Estate-Associate",
+    "Associate-Sales-Agent",
+    "Agent-Associate"
+   ],
+   "parentCategories": [
+    "Sales"
+   ],
+   "description": "<p>Are you a new real estate agent looking to grow your skills, or an experienced agent wanting more flexibility? Our Associate Agent role lets you work with customers on your schedule and make money in real estate without closing a transaction.</p><p>Apply today and you could be earning money in less than 14 days!</p><h3>The Role</h3><ul>\n<li><p>Show homes, host open houses, attend inspections</p></li>\n<li><p>Set your own hours and control your workload</p></li>\n<li><p>Get plenty of customers, especially on weekends</p></li>\n<li><p>No sales pressure, contracts, or closings</p></li>\n<li><p>Work remotely out in the field \u2013 no office visits required</p></li>\n<li><p>Free, optional educational services to grow your skills</p></li>\n</ul><h3>Pay</h3><p>As an independent contractor, you'll earn a flat-rate payment per field event.</p><h3>Qualifications</h3><ul>\n<li><p>Real estate license in the state where you'll work and willingness to affiliate your license exclusively with Redfin</p></li>\n<li><p>Smartphone, laptop, and GPS, or the willingness to get them</p></li>\n<li><p>Willingness to join the local MLS and Realtor Association</p></li>\n<li><p>Reliable mode of transportation and ability to travel within your market</p></li>\n</ul><p>Need a license? Learn how to get one.</p><h3>Application process</h3><p>Submit a quick application, and we'll invite you to a video screen if you meet our minimum qualifications. A recruiter will reach out with the next steps if we have an opening in your area. If we don't, we'll keep your info and reach out when new contract opportunities become available.</p><p>Find out more.</p><h3>About Redfin</h3><p>Our mission is to redefine real estate in the consumer's favor. As a full-service brokerage and #1 nationwide brokerage site in the US, we combine our own technology and real estate agents to make buying or selling a home faster, easier, and more efficient. We believe real estate can be better\u2014for customers, for agents, for everyone.</p><p>To ensure the health and safety of our workforce, customers and third parties, Redfin conducts background screening for this role. All screening is conducted consistent with applicable law, and Redfin encourages applications from, and fully considers, qualified applicants with criminal record histories.</p><p>Redfin accepts applications on an ongoing basis.</p><p>Originally posted on <a href=\"https://himalayas.app\">Himalayas</a></p>",
+   "pubDate": 1787074643,
+   "expiryDate": 1792258642,
+   "applicationLink": "https://himalayas.app/companies/quicken-loans/jobs/real-estate-associate-agent-1099-salem",
+   "guid": "https://himalayas.app/companies/quicken-loans/jobs/real-estate-associate-agent-1099-salem"
+  },
+  {
+   "title": "AVP, Assistant General Counsel",
+   "excerpt": "WHO WE ARE AND WHAT WE DO:Radiology Partners, through its owned and affiliated practices, is a leading radiology practice in the U.",
+   "companyName": "Radiology Partners",
+   "companySlug": "radiology-partners",
+   "companyLogo": "https://cdn-images.himalayas.app/go5rbbcakxfbcfy8vc745zm7gc0r",
+   "employmentType": "Full Time",
+   "minSalary": 190000,
+   "maxSalary": 210000,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Senior",
+    "Manager"
+   ],
+   "currency": "USD",
+   "locationRestrictions": [
+    "United States"
+   ],
+   "timezoneRestrictions": [
+    -10,
+    -9,
+    -8,
+    -7,
+    -6,
+    -5,
+    14
+   ],
+   "categories": [
+    "Assistant-General-Counsel",
+    "Legal-Counsel",
+    "Healthcare-Attorney",
+    "Corporate-Attorney",
+    "In-House-Counsel",
+    "Associate-General-Counsel",
+    "Vice-President-General-Counsel",
+    "Senior-Associate-General-Counsel",
+    "VP-Of-Legal",
+    "Vice-President-Legal",
+    "VP-Legal",
+    "Deputy-General-Counsel",
+    "General-Counsel",
+    "Legal"
+   ],
+   "parentCategories": [
+    "Legal"
+   ],
+   "description": "<strong>WHO WE ARE AND WHAT WE DO:</strong><div>\n<a href=\"https://himalayas.app/companies/radiology-partners\">Radiology Partners</a>, through its owned and affiliated practices, is a leading radiology practice in the U.S., serving hospitals and other healthcare facilities across the nation. As a physician-led and physician-owned practice, our mission is to transform radiology by innovating across clinical value, technology, service, and economics, while elevating the role of radiology and radiologists in healthcare. Using a proven healthcare services model, <a href=\"https://himalayas.app/companies/radiology-partners\">Radiology Partners</a> provides consistent, high-quality care to patients, while delivering enhanced value to the hospitals, clinics, imaging centers and referring physicians we serve.</div><div>\n<a href=\"https://himalayas.app/companies/radiology-partners\">Radiology Partners</a> is seeking a high-performing attorney who will partner with local radiology practices to provide legal counsel and develop solutions to complex issues as we grow the nation\u2019s leading radiology practice. This position involves developing and managing client relationships with local radiology practices and their leaders to identify unique clinical and business needs, drafting and negotiating employment and services agreements, and helping build the systems to deliver exceptional legal service at scale.</div><div><strong>AVP, ASSISTANT GENERAL COUNSEL - POSITION SUMMARY:</strong></div><div><ul>\n<li>Provide advice and support on a variety of legal issues relating to Practice operations and transactions.</li>\n<li>Develop and maintain client relationships with local-practice and business-team partners that help you identify legal risks and issues arising in day-to-day operations, contractual matters, and business transactions and collaboratively develop solutions.</li>\n<li>Counsel practice leadership regarding proposed arrangements and complex legal matters.</li>\n<li>Draft and negotiate a wide range of contracts and legal documents.</li>\n<li>Negotiate business deals and legal disputes.</li>\n<li>Help build and refine processes and systems to support the delivery of exceptional legal services across a nationwide organization.</li>\n<li>Support business counterparts in responding to audits or litigation matters.</li>\n<li>Manage and coordinate matters with outside counsel.</li>\n<li>Advise on the Practice\u2019s corporate governance documents and structures.</li>\n</ul></div><div><strong>DESIRED PROFESSIONAL SKILLS AND EXPERIENCE:</strong></div><div><ul>\n<li>Strategic thinking skills to provide practical advice with an awareness of legal risks in the business context</li>\n<li>Strong understanding of legal and business factors related to health care services</li>\n<li>Excellent oral and written communication skills in both legal and business contexts, to enable clients to clearly understand how legal issues affect their business goals and priorities</li>\n<li>Strong interpersonal skills that form the foundation of an open and active client rapport</li>\n<li>Strong organizational skills, attention to detail, and ability to independently prioritize competing work matters</li>\n<li>Ability to work with and maintain confidential information.</li>\n<li>J.D. degree from an ABA-accredited law school Licensed to practice law and a member in good standing of a state bar</li>\n<li>6+ years of corporate/transactional/operations combined experience at a law firm and in-house at a health care company preferred, strongly preferably health care services.</li>\n</ul></div><div><strong>FOR MORE INFORMATION:</strong></div><div>AVP Assistant General Counsel</div><div><strong>WHY RADIOLOGY PARTNERS:</strong></div><div><ul>\n<li>Competitive Benefits package \u2013 Eligibility starts the month after hire, with tiered options to choose from.</li>\n<li>Compensation Reviews, Career Growth Opportunities</li>\n<li>Flexible Remote Schedules - Nashville, TN Preferred</li>\n<li>Generous PTO Plans and Paid Holidays</li>\n<li>Proudly Certified as a Great Place to Work for Five Consecutive Years</li>\n</ul></div><div><strong>COMPENSATION:</strong></div><div>The salary range for this position is $190,000 - $210,000. Final determinations may vary based on several factors including but not limited to education, work experience, certifications, geographic location etc. This role is also eligible for an annual discretionary bonus. In addition to this range, <a href=\"https://himalayas.app/companies/radiology-partners\">Radiology Partners</a> offers competitive total rewards packages, which include health &amp; wellness coverage options, 401k benefits, and a broad range of other benefits such as family planning and telehealth (all benefits are subject to eligibility requirements).</div><div><em><a href=\"https://himalayas.app/companies/radiology-partners\">Radiology Partners</a> is an equal opportunity employer. RP is committed to being an inclusive, safe and welcoming environment where everyone has equal access and equitable resources to reach their full potential. We are united by our Mission to Transform Radiology and in turn have an important impact on the patients we serve and the healthcare system overall. We hold that diversity is a key source of strength from which we will build a practice culture that is inclusive for all. Our goal is to empower and engage the voice of every teammate to promote awareness, compassion and a healthy respect for differences.</em></div><div>\n<strong>CCPA Notice:</strong> When you submit a job application or resume, you are providing the Practice with the following categories of personal information that the Practice will use for the purpose of evaluating your candidacy for employment: (1) Personal Identifiers; and (2) Education and Employment History.</div><div>\n<a href=\"https://himalayas.app/companies/radiology-partners\">Radiology Partners</a> participates in E-verify.</div><div>\n<strong>Beware of Fraudulent Messages:</strong> <a href=\"https://himalayas.app/companies/radiology-partners\">Radiology Partners</a> will never request payment, banking or other financial information in exchange for interviews or as part of the hiring process. Additionally, we will not send checks for deposit into your bank account at any stage of recruitment. All communication during the interview and hiring process should come from an email address ending in \u201c@radpartners.com.\u201d If you suspect you are receiving a fraudulent job offer or solicitation from <a href=\"https://himalayas.app/companies/radiology-partners\">Radiology Partners</a> or one of our local practices, please email  to notify our team</div><p>Originally posted on <a href=\"https://himalayas.app\">Himalayas</a></p>",
+   "pubDate": 1787074636,
+   "expiryDate": 1792258636,
+   "applicationLink": "https://himalayas.app/companies/radiology-partners/jobs/avp-assistant-general-counsel",
+   "guid": "https://himalayas.app/companies/radiology-partners/jobs/avp-assistant-general-counsel"
+  },
+  {
+   "title": "Marketing Lead",
+   "excerpt": "About Piedmont Global Piedmont Global is a Strategic Globalization Organization (SGO) integrating cultural fluency, strategic insight, and custom technology to help clients scale with speed, navigate complexity, and operate seamlessly across cultures, markets, and systems.",
+   "companyName": "Piedmont Global Language Solutions",
+   "companySlug": "piedmont-global-language-solutions",
+   "companyLogo": "",
+   "employmentType": "Full Time",
+   "minSalary": null,
+   "maxSalary": null,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Senior"
+   ],
+   "currency": null,
+   "locationRestrictions": [
+    "United States"
+   ],
+   "timezoneRestrictions": [
+    -10,
+    -9,
+    -8,
+    -7,
+    -6,
+    -5,
+    14
+   ],
+   "categories": [
+    "Marketing-Lead",
+    "Demand-Generation",
+    "Content-Marketing",
+    "B2B-Marketing",
+    "Digital-Marketing",
+    "Lead-Marketing-Manager",
+    "Marketing-Team-Lead",
+    "Marketing-Leader"
+   ],
+   "parentCategories": [],
+   "description": "<p><b><strong>About Piedmont Global</strong></b></p><p>Piedmont Global is a Strategic Globalization Organization (SGO) integrating cultural fluency, strategic insight, and custom technology to help clients scale with speed, navigate complexity, and operate seamlessly across cultures, markets, and systems. Headquartered in Washington D.C with team members spanning five continents, Piedmont Global equips organisations with the people, capabilities, and strategies to lead - globally, fluently, and confidently.</p><p>Piedmont Global is a Strategic Globalization Organization (SGO). Enterprises and government agencies approach us because managing operations across different languages, cultures, markets, and systems places a coordination burden on staff who already have full-time jobs, causing the organization to act as an unofficial systems integrator for its own globalization efforts, whether that\u2019s across borders or within its own four walls.</p><p>Toaddressthatdisconnect, wemanageit asa singleoperation, drawing on eightintegratedsolutions: language operations, accessibility, staffing, data services,marketintelligence, BPO, content, and consulting.Any one of the eight is easy to buy from a point vendor. Getting all eight to run to one standard, under one accountable team, is the challenging part.That'swhatwe'rebuilt to do.</p><p>Behindussit 10,000+ globalization professionals working across 300+ languages and dialects, one set of certifications and security controls (ISO 27001, 9001, 17100, and 13485), and one delivery standard. Founded in 2013, Piedmont Global has earned Inc. 5000 recognition three years in a row and works withclients across government, healthcare, education, energy, and financial services.</p><p><b><strong>About the Role</strong></b></p><p>We'relooking for a marketer who thinks like a builder.</p><p>Someone who helps run a 45-minutewebinarand walks out with the article, four LinkedIn posts, the newsletter feature, and a sales one-pager already 80% drafted in their head. Someone who sees a thin social feed and an empty content calendar andthinks,<i><em>\u2018Good, let me build.\u2019</em></i>Someonewho'sbeen quietly using Claudeto excelin theircraftand is ready to push that further at a company already invested in the approach.</p><p><b><strong>As the Marketing Lead at Piedmont Global, you will oversee the entire demand generation process through</strong></b><b><strong>ICP-specific</strong></b><b><strong>content</strong></b><b><strong>creation,</strong></b><b><strong>measurement, and</strong></b><b><strong>iteration.</strong></b></p><p>Youwillown the Piedmont Global content programs: the newsletter, the webinar series, and our executives' public voice.One of your first assignments will beenhancingthe presence ofoursubsidiary brand serving the Deaf and Hard of Hearing community, as it has been quiet since weacquiredit. The website needs work, the social presence is thin, and the brand voice is undefined.You'llfix thatalongside our team, then run the same playbook on the brands weacquirenext.</p><p>Youwon'tbe carrying the accessibilityexpertisealone. This roleis pairedwith a dedicated accessibility intelligence resource, which means the subject-matter depth on Deaf and Hard of Hearing community norms, ASL, terminology, and accessibility compliance is on hand when you need it. Youonlyneedto bringthetaste andjudgment to usethe informationwell.</p><p>Ouraudiences are sharp and varied: school districts holding IEP meetings, hospitals working through Section 1557, courts needing certified interpreters, employers covered under the ADA, and the CEOs, CFOs, HR leaders, and compliance officers making complex decisions in heavily regulated industries.You'llwork alongside sales, solution leads, and subject matter experts across all eight of our solution pillars, so the topics range wide. </p><p>With proprietary SaaS products in market and more launching, marketingcan'tafford to be the bottleneck.You'rereadyto make sure itisn't.</p><p><b><strong>About the Work</strong></b></p><p><b><strong>1. Editorial Calendar &amp; Repurposing Engine</strong></b></p><p>You own the editorial calendar across every channel, which makes you the person who knows what's publishing when, why it matters to the reader, and how each piece connects to pipeline.You'realso the person who makes sure one strong ideadoesn'tlive and die as a single blog post.</p><ul><li>Own and manage the cross-channel editorial calendar in ClickUp.</li></ul><ul><li>Plan content themes quarterly, tied to solution pillars, industry verticals, product launches, policy moments, and the community's calendar of advocacy events.</li></ul><ul><li>Produce blog content, white papers, case studies, and social posts, including customer stories that show the work.</li></ul><ul><li>Build repeatable repurposing workflows so onewebinarbecomes a blog post, four LinkedIn posts, a newsletter feature, and a sales one-pager.</li></ul><ul><li>Make content accessible by default: captioned video, ASL interpretation whereappropriate, and plain-language summaries.</li></ul><ul><li>Trackwhat'sworking. Kill whatisn't. Use performance data to reshape the calendar.</li></ul><p><b><strong>2. Newsletter &amp; Webinar</strong></b><b><strong>Production</strong></b></p><p>Two recurring programs, both yours end-to-end. The newsletter is a direct line to prospects, clients, and partners. The futurewebinarseries iswhere our subject matter experts go on recordalongside our partnersand say something worth quoting. Every edition should earn the next open, and every session shouldleave behindtheblog post, the clips, and the sales asset that outlive the hour.</p><ul><li>Own newsletter strategy, production schedule, and distribution via HubSpot and LinkedIn.</li></ul><ul><li>Curate a mix of original content, repurposed assets, and industry commentary with help from in-house subject matter experts.</li></ul><ul><li>Plan and produce webinars and LinkedIn Lives from concept through post-event repurposing.</li></ul><ul><li>Coordinate with speakers, partners, and internal teams on prep, promotion, and production, and run day-of production so attendees and presenters have a clean experience.</li></ul><ul><li>Monitor open, click, and attendance data and use it to shape what comes next.</li></ul><p><b><strong>3. Executive Thought Leadership &amp; Earned Media</strong></b></p><p>Help enable our executives to carry theStrategic Globalizationargument in public. Piedmont Global's position is that running an operation across languages, cultures, markets, and systems creates a coordination load no vendor has ever agreed to own, leaving the enterprise to act as the systems integrator for its own globalization problem. We take that load off their desks and run it as one managed operation. Our executives have deep expertise and strong points of view in their respectivedomains, but they're running a business, not chasing podcast invites or drafting LinkedIn posts. You'll help develop and maintain their public voice across owned and earned channels. </p><ul><li>Partner with executives on their LinkedIn content strategies and posting cadence by conducting regular interviews and briefings, then drafting posts, articles, and commentary in their voice.</li></ul><ul><li>Carry that argument into interviews, contributed articles, and executive posts.</li></ul><ul><li>Source and pitch external opportunities: podcast interviews, contributed articles, and pull quotes in research studies that build backlinks, expand reach, and give us more to repurpose.</li></ul><ul><li>Own the press release pipeline: announcements, launches, certifications, awards, and partnerships.</li></ul><ul><li>Build a lightweight, sustainable process so thisdoesn'tbecome a bottleneck for anyone involved.</li></ul><p><b><strong>4. Demand</strong></b><b><strong>Gen</strong></b><b><strong>&amp;</strong></b><b><strong>Lifecycle</strong></b><b><strong>Marketing</strong></b></p><p>The engine should run on its own onceyou'vebuilt it. You design the workflows that turn a content download into a nurture sequence, a social engagement into an enrichment moment, and a quiet contact into a re-engaged one. </p><ul><li>Build and maintain HubSpot nurture sequences tied to content downloads,webinarregistrations, and high-intent page visits.</li></ul><ul><li>Work withRevOps to configure engagement scoring so salesknowswhich contacts are warming up.</li></ul><ul><li>Run customer marketing programs: upsell sequences, cross-sell campaigns, retention touches, and win-back flows.</li></ul><ul><li>Develop case studies that show how we solve the problems schools, hospitals, courts, and employersface.</li></ul><ul><li>Partner with sales to keep messaging tight, current, and aligned withwhat'sworking in the field.</li></ul><p><b><strong>5. Brand Building for Acquired Companies</strong></b></p><p>Our acquired brand needs a voice, a look, and a reason for buyers to call it first. You're going to build all threealongside our team, and you're going to do it in a way that respects the Deaf and Hard of Hearing community. That means no pity-driven framing, no condescending storytelling, and no marketing that treats Deafness as something to overcome.</p><ul><li>Define and document brand voice, visual direction, and messaging architecture in partnership with our VP of Marketing &amp; RevOps.</li></ul><ul><li>Audit the website, social profiles, and existing collateral. Build a prioritized fix list. Ship the fixes.</li></ul><ul><li>Develop positioning that reflects how Deaf and Hard of Hearing people actually want to be talked to and talked about.</li></ul><ul><li>Apply the same playbook to future acquired brands as they join the Piedmont Global portfolio.</li></ul><p><b><strong>6. Community Presence</strong></b></p><p>Piedmont Global sells into markets where credibility tends toget earnedin person: healthcare and community health conferences, K-12 and district leadership events, government contracting forums, and the policy moments around the ADA and Section 1557. Our acquired brands bring their own rooms, and the Deaf and Hard of Hearing communityin particular istight-knit and rightly skeptical of vendors who show up only when they're selling.Your job is to find the rooms worth being in and the people worth knowing, and to represent us in a way that earns trust rather than spends it.</p><ul><li>Identifyspeaking, sponsorship, and advocacy opportunities that match the brand and the audience.</li></ul><ul><li>Build relationships with Deaf-led organizations and community partners who can amplify the brand's voice.</li></ul><p><b><strong>About You</strong></b></p><ul><li>\n<b><strong>Experience:</strong></b>5+ years of hands-on marketing experience, ideally B2B in SaaS, professional services, or another complex or regulated industry, witha track recordof owning channels or programs end-to-end.</li></ul><ul><li>\n<b><strong>Education:</strong></b>Bachelor's degree in marketing, communications, or a related field preferred, or equivalent practical experiencedemonstratedthrough a strong portfolio of content and campaign work.</li></ul><ul><li>\n<b><strong>You've</strong></b><b><strong>built at least one brand or channel from scratch:</strong></b>a social presence, a blog program, a newsletter, or an event series. You know how to make something out of nothing.</li></ul><ul><li>\n<b><strong>You're comfortable marketing something buyers don't have a name for yet.</strong></b>Some of our category language will be new to the people you're writing for, and the job is to explain it in their terms rather than ours.</li></ul><ul><li>\n<b><strong>Respect for the communities we serve, and the discipline to check your assumptions against the people and resources who know better.</strong></b>You'llbe writing about accessibilityand language access for audiences who can tellimmediatelywhether the writer did the work.</li></ul><ul><li>\n<b><strong>Clear, direct communication and comfort working independently in a remote environment.</strong></b>You\u2019re able toask for what you needandpush backrespectfullywhen you disagree. </li></ul><ul><li>\n<b><strong>You're also a</strong></b><b><strong>great</strong></b><b><strong>interviewer:</strong></b>you can sit down with an executive who has 20 minutes and no prepared thoughts and walk out with the point of view, the example, and the line they'd actually say out loud. </li></ul><ul><li>\n<b><strong>A systems mindset.</strong></b>When you see a recorded conversation, you see a blog post, a newsletter feature, a set of social clips, and a sales asset waiting tobe built.</li></ul><ul><li>\n<b><strong>Strong writer with a firm understanding of SEO and AEO.</strong></b>In the same morning, you can create a case study, a LinkedIn post, and a customer email that all reflect the same brand and adhere to best practices. You know how to craft content for senior stakeholders and understand the distinction between content that simply sounds intelligent and content that actively influences a purchasing decision by speaking the buyer\u2019s language. </li></ul><ul><li>\n<b><strong>You\u2019re already using AI in your work today.</strong></b>We use Claude, HubSpot AI, Clay,ClickUp,and othermarketing automationtools daily, and we expect you to bring your own opinions on where they help and where theydon't.</li></ul><ul><li>\n<b><strong>A taste for design</strong></b><b><strong>and familiarity with design tools</strong></b>(e.g.,Canva, Adobe Suite)<b><strong>.</strong></b>You'renot designing from scratch, since the brand design team builds your templates, butyou'rethe one populating them, and you need to know the difference between good and good enough.</li></ul><ul><li>\n<b><strong>Understanding</strong></b><b><strong>of</strong></b><b><strong>analytics platforms</strong></b>(e.g., Google Analytics, HubSpot reporting).</li></ul><ul><li>\n<b><strong>Organized and</strong></b><b><strong>detail-oriented.</strong></b>Multiple projects in flight at oncedoesn'trattle you.It'sjust Tuesday.</li></ul><ul><li>\n<b><strong>Time zone availability:</strong></b>Core working hours are expected to overlap with Eastern, Central, or Mountain time zones. This position is open to candidates outside the U.S. Non-U.S. candidates without US work authorization may be engaged on a contractor basis rather than as direct employees. We will clearly communicate the employment arrangement during the interview process, allowing you to make an informed decision before moving forward.</li></ul><p><b><strong>A Note on Hiring for This Role</strong></b></p><p>This job description covers a lot, and we know no one has done all of it.That'snot what we're after. We're looking for someone genuinely curious about how content and brand influence business outcomes, who has proven they can own a channel, find what works, and grow from there. Tools and industries can be learned. What's harder to teach is asking,<i><em>\"Who is this for,</em></i><i><em>and why should they care?\"</em></i>before creating anything.</p><p>We also recognize how AI is changing marketing roles, and we're actively building around it. We encourage AI use across our workflows and clear the barriers that slow it down. The best candidates will see AI as a tool to improve quality and speed while still applying their own critical thinking. If you're experimenting with AI and have views on its strengths and limits,we'dlove to hearfromyou.</p><p>Originally posted on <a href=\"https://himalayas.app\">Himalayas</a></p>",
+   "pubDate": 1787074584,
+   "expiryDate": 1792258584,
+   "applicationLink": "https://himalayas.app/companies/piedmont-global-language-solutions/jobs/marketing-lead",
+   "guid": "https://himalayas.app/companies/piedmont-global-language-solutions/jobs/marketing-lead"
+  }
+ ]
+}

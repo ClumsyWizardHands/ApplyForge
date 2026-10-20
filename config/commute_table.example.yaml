@@ -1,0 +1,28 @@
+# commute_table.yaml — door-to-door minutes from home to each place a hybrid
+# job could be (SPEC.md §5 stage 4, the remote reality check).
+#
+# This is the TEMPLATE. Your own copy, config/commute_table.yaml, is personal
+# and gitignored (the setup interview writes it; or copy this file).
+#
+# How it is used: when the remote check finds a job is really HYBRID, jobkit
+# looks up the job's location bucket here. Over remote_policy.
+# max_commute_minutes (filters.yaml) it is rejected; with no entry it is
+# rejected as an unknown commute, unless the place is one of your
+# remote_policy.relocation_cities. Remote jobs count as 0 minutes.
+#
+# Keys are location buckets, as jobkit names a posting's location
+# (src/jobkit/normalize.py):
+#   metros:  nyc-metro, sf-bay, seattle-metro, boston-metro, la-metro,
+#            chicago-metro, austin-metro, denver-metro, dc-metro, miami-metro,
+#            atlanta-metro, dallas-metro, london-metro, toronto-metro
+#   other places: other-<first word(s) of the location, letters only>,
+#            e.g. "Columbus, OH" → other-columbus, "St. Louis" → other-stlouis
+# Use typical transit (or driving) time at commute hours, and refine it from
+# experience. Only `buckets` is read.
+
+version: "1.0"
+
+buckets:
+  remote: 0
+  # chicago-metro: 35
+  # other-evanston: 25

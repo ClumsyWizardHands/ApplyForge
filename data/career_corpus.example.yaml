@@ -1,0 +1,156 @@
+# career_corpus.yaml — the single source of truth for every factual claim
+# jobkit may make about you.
+#
+# This is the TEMPLATE, filled in for a FICTIONAL person (Jordan Rivera, the
+# example user of the docs and tests, with a shortened and simplified career)
+# so the shape is clear. Your own data/career_corpus.yaml is personal and
+# gitignored. The setup interview builds a draft from YOUR resume (text taken
+# from the resume only: nothing rewritten, improved or inferred), then you
+# confirm each entry. Or copy this file and replace everything in it.
+#
+# RULE: if it isn't in this file, it cannot appear on a generated resume,
+# cover letter or form answer. The provenance validator enforces this.
+
+corpus_version: "1.0"
+
+identity:
+  name: "Jordan Rivera"
+  email: "jordan.rivera@example.com"
+  phone: "+1 555 0100"
+  # What the resume header shows. A POSITIONING choice, not a fact; the tailor
+  # can vary it per job (location_strategy in config/filters.yaml).
+  display_location: "Bristol, PA"
+  # Where you actually are. Commute math only, never rendered.
+  home_city: "Bristol, PA"
+  home_coordinates: [40.1007, -74.8518]
+  links:
+    linkedin: "https://linkedin.com/in/jordan-rivera-example"
+    github: ""
+    site: ""
+
+# Positioning statements — the tailor picks ONE per job by role archetype.
+# Your words, from your resume or written by you. Never model-generated.
+positioning:
+  - id: pos_leader
+    archetype: "first-line sales leadership"
+    text: >
+      Regional sales manager who leads nine account executives and built a
+      channel-partner program.
+  - id: pos_operator
+    archetype: "revenue operations"
+    text: >
+      Sales leader who ran revenue operations before going back to the field.
+
+roles:
+  - id: role_haulmark
+    company: "Haulmark"
+    title: "Regional Sales Manager"
+    start: "2024-03"
+    end: null                     # null = current role
+    location: "Remote (Northeast)"
+    scope: "Leads a team of 9 AEs selling route-planning software to freight carriers"
+    context: >
+      One sentence a person would say out loud about this role. Used for the
+      role blurb line, never as a bullet.
+
+  - id: role_ledgerline
+    company: "ledgerline"
+    title: "Head of Revenue Operations"
+    start: "2021-11"
+    end: "2024-03"
+    location: "Philadelphia, PA"
+    scope: "Revenue operations for a sales team of 30+ sellers"
+    context: >
+      ...
+
+  - id: role_marlow
+    company: "Marlow Payroll"
+    title: "Mid-Market Account Executive"
+    start: "2018-05"
+    end: "2021-11"
+    location: "Philadelphia, PA"
+    scope: "Mid-market new business for a payroll SaaS"
+    context: >
+      ...
+
+bullets:
+  # metric_confidence and evidence are YOURS to set, entry by entry: jobkit
+  # never fills them in. verified = you can show a record; estimate = your
+  # honest approximation (rendered per drift.estimate_style in
+  # config/banned_phrases.yaml); none = no figure to stand behind.
+  - id: b_001
+    role_id: role_haulmark
+    text_long: >
+      Led a team of 9 account executives and built the channel-partner program
+      from 3 to 17 reseller partners in about 18 months.
+    text_short: "Led 9 AEs; grew channel partners 3 → 17 in ~18 months."
+    tags: [team-leadership, partnerships, channel, sales]
+    metric: "9 AEs; 3 → 17 reseller partners"
+    metric_confidence: verified
+    evidence: "Signed partner agreements in the CRM"
+
+  - id: b_002
+    role_id: role_ledgerline
+    text_long: >
+      Moved commission tracking off spreadsheets into Salesforce and rebuilt
+      the sales reports in Looker, cutting the month-end commission run from
+      about 6 days to 2.
+    text_short: "Commissions into Salesforce, reports into Looker; month-end run ~6 days → 2."
+    tags: [revenue-operations, salesforce, reporting, process]
+    metric: "~6 days → 2"
+    metric_confidence: estimate   # verified | estimate | none
+    evidence: "Finance close calendar, before and after"
+
+  - id: b_003
+    role_id: role_marlow
+    text_long: >
+      Made President's Club in 2019 and 2020, closing 124% and then 131% of
+      annual quota on mid-market payroll deals.
+    text_short: "President's Club 2019 and 2020 (124%, then 131% of annual quota)."
+    tags: [closing, new-business, quota, mid-market, sales]
+    metric: "124% and 131% of annual quota"
+    metric_confidence: verified
+    evidence: "President's Club award letters"
+
+# STAR-format stories for interview prep. Same tag vocabulary as bullets.
+stories:
+  - id: s_001
+    title: "The first reseller partners"
+    tags: [partnerships, channel]
+    situation: "..."
+    task: "..."
+    action: "..."
+    result: "..."
+    related_bullets: [b_001]
+
+education:
+  - school: "Lakeside State University"
+    degree: "B.S., Business Administration"
+    years: "2008 – 2012"
+
+# Hard limits the generator must never cross.
+constraints:
+  never_claim_titles: ["VP of Sales", "Chief Revenue Officer"]
+  never_claim_tools: ["Salesforce administrator certification"]
+  spelling:
+    "ledgerline": "ledgerline"    # exact company spellings (a lower-case brand)
+  never_state:
+    - "prior compensation"
+    - "reason for leaving"
+  max_resume_pages: 1
+  max_bullets_per_role: 4
+
+# Optional: self-assessed depth per skill tag. Sharpens scoring; never rendered.
+skill_index:
+  salesforce: expert
+  revenue-operations: working
+  team-leadership: working
+  forecasting: working
+
+# 2–3 samples of prose you actually wrote (an email, a memo). Few-shot voice
+# grounding for cover letters. Never model-generated.
+voice_samples:
+  - id: v_001
+    source: "email to a reseller partner, 2023"
+    text: >
+      ...

@@ -1,0 +1,83 @@
+{
+ "_recorded": "hand-built in the shape of GET https://boards-api.greenhouse.io/v1/boards/tyrell/jobs (no content, HTTP 200): a fictional company; company, titles, locations, ids, requisition ids and timestamps are invented, data_compliance/metadata left out",
+ "jobs": [
+  {
+   "absolute_url": "https://job-boards.greenhouse.io/tyrell/jobs/5102000109",
+   "internal_job_id": 5101000109,
+   "location": {
+    "name": "Austin (Hybrid); Round Rock, TX (Hybrid)"
+   },
+   "id": 5102000109,
+   "updated_at": "2026-09-22T14:05:17-05:00",
+   "requisition_id": "TY-0412",
+   "title": "Director of Brand Content",
+   "company_name": "Tyrell",
+   "first_published": "2026-09-14T10:21:08-05:00",
+   "language": "en",
+   "application_deadline": null
+  },
+  {
+   "absolute_url": "https://job-boards.greenhouse.io/tyrell/jobs/5102000209",
+   "internal_job_id": 5101000209,
+   "location": {
+    "name": "Remote - US"
+   },
+   "id": 5102000209,
+   "updated_at": "2026-10-02T10:12:48-05:00",
+   "requisition_id": "TY-0431",
+   "title": "Sales Enablement Manager, Customer Success & Support",
+   "company_name": "Tyrell",
+   "first_published": "2026-10-01T15:27:09-05:00",
+   "language": "en",
+   "application_deadline": null
+  },
+  {
+   "absolute_url": "https://job-boards.greenhouse.io/tyrell/jobs/5102000309",
+   "internal_job_id": 5101000309,
+   "location": {
+    "name": "Remote - US"
+   },
+   "id": 5102000309,
+   "updated_at": "2026-10-02T10:14:02-05:00",
+   "requisition_id": "TY-0432",
+   "title": "Sales Enablement Manager, Mid-Market & Enterprise Sales",
+   "company_name": "Tyrell",
+   "first_published": "2026-10-01T15:29:44-05:00",
+   "language": "en",
+   "application_deadline": null
+  },
+  {
+   "absolute_url": "https://job-boards.greenhouse.io/tyrell/jobs/5102000409",
+   "internal_job_id": 5101000409,
+   "location": {
+    "name": "Remote - US"
+   },
+   "id": 5102000409,
+   "updated_at": "2026-08-11T09:52:30-05:00",
+   "requisition_id": "TY-0377",
+   "title": "Sales Engineer",
+   "company_name": "Tyrell",
+   "first_published": "2026-05-14T13:18:06-05:00",
+   "language": "en",
+   "application_deadline": null
+  },
+  {
+   "absolute_url": "https://job-boards.greenhouse.io/tyrell/jobs/5102000509",
+   "internal_job_id": 5101000509,
+   "location": {
+    "name": "Remote - US"
+   },
+   "id": 5102000509,
+   "updated_at": "2026-09-03T17:21:55-05:00",
+   "requisition_id": "TY-0381",
+   "title": "Account Director",
+   "company_name": "Tyrell",
+   "first_published": "2026-05-14T13:20:41-05:00",
+   "language": "en",
+   "application_deadline": null
+  }
+ ],
+ "meta": {
+  "total": 5
+ }
+}

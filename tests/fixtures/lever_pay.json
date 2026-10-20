@@ -1,0 +1,73 @@
+[
+ {
+  "id": "08d9a7e4-4fcc-40f3-85ae-549cb1e8c0fc",
+  "text": "Lead Value Consultant",
+  "categories": {
+   "commitment": "Full-Time",
+   "department": "Sales",
+   "location": "United States",
+   "team": "Value Consulting",
+   "allLocations": [
+    "United States"
+   ]
+  },
+  "workplaceType": "remote",
+  "createdAt": 1783714196147,
+  "hostedUrl": "https://jobs.lever.co/outreach/08d9a7e4-4fcc-40f3-85ae-549cb1e8c0fc",
+  "applyUrl": "https://jobs.lever.co/outreach/08d9a7e4-4fcc-40f3-85ae-549cb1e8c0fc/apply",
+  "description": "<div>Role description trimmed for the fixture.</div>",
+  "descriptionPlain": "Role description trimmed for the fixture.",
+  "salaryRange": {
+   "min": 180000,
+   "max": 210000,
+   "currency": "USD",
+   "interval": "per-year-salary"
+  },
+  "salaryDescriptionPlain": "The annual on target earnings (OTE) range for this role is $180,000 - $210,000 USD. You may also be offered incentive compensation, bonus, restricted stock unit"
+ },
+ {
+  "id": "1ec537cb-d3fc-42ed-bb0e-15264ecf7446",
+  "text": "Manager, Customer Operations (Revenue Operations)",
+  "categories": {
+   "commitment": "Full-Time",
+   "department": "Revenue Operations",
+   "location": "United States",
+   "team": "Revenue Operations",
+   "allLocations": [
+    "United States"
+   ]
+  },
+  "workplaceType": "remote",
+  "createdAt": 1785447689961,
+  "hostedUrl": "https://jobs.lever.co/outreach/1ec537cb-d3fc-42ed-bb0e-15264ecf7446",
+  "applyUrl": "https://jobs.lever.co/outreach/1ec537cb-d3fc-42ed-bb0e-15264ecf7446/apply",
+  "description": "<div>Role description trimmed for the fixture.</div>",
+  "descriptionPlain": "Role description trimmed for the fixture.",
+  "salaryRange": {
+   "min": 120000,
+   "max": 155000,
+   "currency": "USD",
+   "interval": "per-year-salary"
+  },
+  "salaryDescriptionPlain": "The base salary range for this role is $120,000 - $155,000 USD. You may also be offered incentive compensation, bonus, restricted stock units, and benefits. Act"
+ },
+ {
+  "id": "dc29c7f1-d7ef-431f-a35a-173dac2a4138",
+  "text": "Director of Applied Science and Engineering - Knowledge Graphs & AI",
+  "categories": {
+   "commitment": "Full-Time",
+   "department": "Engineering",
+   "location": "Hyderabad",
+   "team": "Engineering",
+   "allLocations": [
+    "Hyderabad"
+   ]
+  },
+  "workplaceType": "remote",
+  "createdAt": 1776247967763,
+  "hostedUrl": "https://jobs.lever.co/outreach/dc29c7f1-d7ef-431f-a35a-173dac2a4138",
+  "applyUrl": "https://jobs.lever.co/outreach/dc29c7f1-d7ef-431f-a35a-173dac2a4138/apply",
+  "description": "<div>Role description trimmed for the fixture.</div>",
+  "descriptionPlain": "Role description trimmed for the fixture."
+ }
+]

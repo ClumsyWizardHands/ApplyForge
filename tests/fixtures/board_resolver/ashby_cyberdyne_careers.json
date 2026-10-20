@@ -1,0 +1,111 @@
+{
+ "_recorded": "hand-built in the shape of GET https://api.ashbyhq.com/posting-api/job-board/cyberdyne-careers (HTTP 200): a fictional company whose Ashby token is not its name; company, ids, titles, offices, timestamps and text are invented, and no posting links the company's own domain",
+ "apiVersion": "1",
+ "jobs": [
+  {
+   "id": "7d2e4b6a-8c1f-4a3e-b5d7-2c4e6f8a0b01",
+   "title": "Senior Account Executive - Nordics",
+   "department": "Sales",
+   "team": "Sales",
+   "employmentType": "FullTime",
+   "location": "Stockholm Office",
+   "secondaryLocations": [],
+   "publishedAt": "2026-07-14T08:31:52.204+00:00",
+   "isListed": true,
+   "isRemote": false,
+   "workplaceType": "OnSite",
+   "address": {
+    "postalAddress": {
+     "addressRegion": "",
+     "addressCountry": "Sweden",
+     "addressLocality": "Stockholm"
+    }
+   },
+   "jobUrl": "https://jobs.ashbyhq.com/cyberdyne-careers/7d2e4b6a-8c1f-4a3e-b5d7-2c4e6f8a0b01",
+   "applyUrl": "https://jobs.ashbyhq.com/cyberdyne-careers/7d2e4b6a-8c1f-4a3e-b5d7-2c4e6f8a0b01/application",
+   "descriptionHtml": "<p>Senior Account Executive - Nordics</p><p>Our Senior Account Executives for public-sector customers help port authorities and national agencies plan and run their warehouse robotics programs.</p><p>You will build strong relationships with agency stakeholders, tailor your approach to their needs and present Cyberdyne's products in a clear, approachable way. You will measure your success by attainment of assigned quota.</p>",
+   "descriptionPlain": "Senior Account Executive - Nordics\n\nOur Senior Account Executives for public-sector customers help port authorities and national agencies plan and run their warehouse robotics programs.\n\nYou will build strong relationships with agency stakeholders, tailor your approach to their needs and present Cyberdyne's products in a clear, approachable way. You will measure your success by attainment of assigned quota."
+  },
+  {
+   "id": "7d2e4b6a-8c1f-4a3e-b5d7-2c4e6f8a0b02",
+   "title": "Senior Account Executive - Nordics",
+   "department": "Sales",
+   "team": "Sales",
+   "employmentType": "FullTime",
+   "location": "Stockholm Office",
+   "secondaryLocations": [],
+   "publishedAt": "2026-07-14T08:31:55.871+00:00",
+   "isListed": true,
+   "isRemote": false,
+   "workplaceType": "OnSite",
+   "address": {
+    "postalAddress": {
+     "addressRegion": "",
+     "addressCountry": "Sweden",
+     "addressLocality": "Stockholm"
+    }
+   },
+   "jobUrl": "https://jobs.ashbyhq.com/cyberdyne-careers/7d2e4b6a-8c1f-4a3e-b5d7-2c4e6f8a0b02",
+   "applyUrl": "https://jobs.ashbyhq.com/cyberdyne-careers/7d2e4b6a-8c1f-4a3e-b5d7-2c4e6f8a0b02/application",
+   "descriptionHtml": "<p>Senior Account Executive - Nordics</p><p>Our Senior Account Executives for public-sector customers help port authorities and national agencies plan and run their warehouse robotics programs.</p><p>You will build strong relationships with agency stakeholders, tailor your approach to their needs and present Cyberdyne's products in a clear, approachable way. You will measure your success by attainment of assigned quota.</p>",
+   "descriptionPlain": "Senior Account Executive - Nordics\n\nOur Senior Account Executives for public-sector customers help port authorities and national agencies plan and run their warehouse robotics programs.\n\nYou will build strong relationships with agency stakeholders, tailor your approach to their needs and present Cyberdyne's products in a clear, approachable way. You will measure your success by attainment of assigned quota."
+  },
+  {
+   "id": "7d2e4b6a-8c1f-4a3e-b5d7-2c4e6f8a0b03",
+   "title": "Enterprise Account Executive | Logistics",
+   "department": "Sales",
+   "team": "Sales",
+   "employmentType": "FullTime",
+   "location": "Chicago Office",
+   "secondaryLocations": [
+    {
+     "location": "Texas",
+     "address": {
+      "postalAddress": {
+       "addressRegion": "Texas",
+       "addressCountry": "United States"
+      }
+     }
+    }
+   ],
+   "publishedAt": "2026-09-29T15:42:17.336+00:00",
+   "isListed": true,
+   "isRemote": null,
+   "workplaceType": null,
+   "address": {
+    "postalAddress": {
+     "addressRegion": "Illinois",
+     "addressCountry": "United States",
+     "addressLocality": "Chicago"
+    }
+   },
+   "jobUrl": "https://jobs.ashbyhq.com/cyberdyne-careers/7d2e4b6a-8c1f-4a3e-b5d7-2c4e6f8a0b03",
+   "applyUrl": "https://jobs.ashbyhq.com/cyberdyne-careers/7d2e4b6a-8c1f-4a3e-b5d7-2c4e6f8a0b03/application",
+   "descriptionHtml": "<p>Enterprise Account Executive, Logistics</p><p>Our Account Executives help freight carriers, 3PLs and distributors automate their back-office and dock operations with Cyberdyne's warehouse and document robotics.</p><p>Account Executives work on both new business and account management. We measure success by attainment of assigned quota, new logos and renewals.</p>",
+   "descriptionPlain": "Enterprise Account Executive, Logistics\n\nOur Account Executives help freight carriers, 3PLs and distributors automate their back-office and dock operations with Cyberdyne's warehouse and document robotics.\n\nAccount Executives work on both new business and account management. We measure success by attainment of assigned quota, new logos and renewals."
+  },
+  {
+   "id": "7d2e4b6a-8c1f-4a3e-b5d7-2c4e6f8a0b04",
+   "title": "Director of Sales Enablement",
+   "department": "Sales",
+   "team": "Enablement",
+   "employmentType": "FullTime",
+   "location": "Boston",
+   "secondaryLocations": [],
+   "publishedAt": "2026-10-05T16:07:23.512+00:00",
+   "isListed": true,
+   "isRemote": true,
+   "workplaceType": "Remote",
+   "address": {
+    "postalAddress": {
+     "addressRegion": "Massachusetts",
+     "addressCountry": "United States"
+    }
+   },
+   "jobUrl": "https://jobs.ashbyhq.com/cyberdyne-careers/7d2e4b6a-8c1f-4a3e-b5d7-2c4e6f8a0b04",
+   "applyUrl": "https://jobs.ashbyhq.com/cyberdyne-careers/7d2e4b6a-8c1f-4a3e-b5d7-2c4e6f8a0b04/application",
+   "descriptionHtml": "<p>Cyberdyne builds robotics software for warehouses and distribution centers. Over the last two years we have grown quickly and launched two new product lines.</p><p></p><p>At Cyberdyne, the enablement team exists to help our customer-facing teams ramp faster and sell better. As the Director of Sales Enablement you will build onboarding, coaching and certification for every seller.</p>",
+   "descriptionPlain": "Cyberdyne builds robotics software for warehouses and distribution centers. Over the last two years we have grown quickly and launched two new product lines.\n\n\n\nAt Cyberdyne, the enablement team exists to help our customer-facing teams ramp faster and sell better. As the Director of Sales Enablement you will build onboarding, coaching and certification for every seller."
+  }
+ ]
+}

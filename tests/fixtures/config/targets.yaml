@@ -1,0 +1,25 @@
+# TEST PROFILE — not a template. tests/conftest.py copies tests/fixtures/config/
+# into every test sandbox as config/, so the suite runs on a fresh clone with no
+# personal config. The values are the settings the tests were written against,
+# as the fictional example user, Jordan Rivera, would set them.
+# For your own setup, run the setup interview or copy config/targets.example.yaml.
+
+companies:
+- name: Contoso
+  domain: contoso.example
+  tier: 1
+  board:
+    ats: greenhouse
+    token: contoso
+- name: Tailspin
+  domain: tailspin.example
+  tier: 1
+  board:
+    ats: ashby
+    token: tailspin
+- name: Hooli
+  domain: hooli.example
+  tier: 2
+  board:
+    ats: lever
+    token: hooli

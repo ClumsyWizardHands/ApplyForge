@@ -1,0 +1,21 @@
+# comp_benchmarks.yaml — your own table of title × level × geo → expected range.
+# Copy to config/comp_benchmarks.yaml. Seed manually; refine as you see real
+# ranges. Do NOT scrape Levels.fyi (SPEC.md §5 stage 5).
+# Not read by the code yet (SPEC.md §5 stage 5 plans it for comp sanity's
+# comp_percentile and value_verdict); safe to skip.
+
+version: "1.0"
+currency: USD
+
+benchmarks:
+  # - title_pattern: '(?i)\bstaff\b.*\bengineer\b'
+  #   level: staff
+  #   geo: nyc-metro
+  #   expected_min: 190000
+  #   expected_max: 250000
+  # - title_pattern: '(?i)\bsolutions architect\b'
+  #   level: senior
+  #   geo: remote-us
+  #   expected_min: 170000
+  #   expected_max: 220000
+  []

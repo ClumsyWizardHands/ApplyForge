@@ -1,0 +1,38 @@
+# config/targets.yaml — the companies whose job boards jobkit polls directly.
+#
+# This is the TEMPLATE. Your own copy, config/targets.yaml, is personal and
+# gitignored. The setup interview writes it for you (say "set up jobkit" in
+# Claude); or copy this file to config/targets.yaml and edit it.
+# What counts as a hit (titles, locations, comp) is in config/filters.yaml.
+#
+# Aggregator feeds (filters.yaml `feeds:`) find postings at companies that are
+# not listed here. This list is for the companies you want watched every day.
+#
+# tier — how much you want the company (standing rules can use it,
+#        autoapprove.yaml `tier:`):
+#   1 = would take the call tomorrow
+#   2 = strong fit
+#   3 = opportunistic
+#
+# board — the company's public ATS job board: `ats` is greenhouse | lever |
+#   ashby, `token` is the board slug in its URL:
+#     boards.greenhouse.io/<token>   jobs.lever.co/<token>   jobs.ashbyhq.com/<token>
+#   Ashby tokens are case-sensitive. The company's careers page links to its
+#   board; registries/*.yml list thousands of known boards. A company with no
+#   `board` is recorded but not polled.
+
+companies:
+  - name: "Datadog"
+    domain: "datadoghq.com"
+    tier: 1
+    board: { ats: greenhouse, token: "datadog" }
+
+  - name: "Linear"
+    domain: "linear.app"
+    tier: 2
+    board: { ats: ashby, token: "linear" }
+
+  - name: "Spotify"
+    domain: "spotify.com"
+    tier: 2
+    board: { ats: lever, token: "spotify" }

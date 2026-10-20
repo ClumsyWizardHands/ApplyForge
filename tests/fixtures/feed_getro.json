@@ -1,0 +1,223 @@
+{
+ "results": {
+  "jobs": [
+   {
+    "compensation_public": true,
+    "featured": false,
+    "compensation_amount_max_cents": null,
+    "searchable_locations": [
+     "United States",
+     "North America",
+     "Remote"
+    ],
+    "created_at": 1787662878,
+    "weight": 0,
+    "compensation_amount_min_cents": null,
+    "source": "career_page",
+    "title": "Revenue Operations Manager",
+    "work_mode": "remote",
+    "url": "https://boards.greenhouse.io/lumon/jobs/1000003",
+    "skills": [
+     "Strategic Thinking",
+     "Operational Excellence",
+     "Software Project Management",
+     "Data Analysis",
+     "Business Intelligence Development",
+     "Organizational Effectiveness",
+     "Time Management",
+     "Emotional Intelligence",
+     "Written Communication",
+     "Leadership"
+    ],
+    "location_details": [
+     {
+      "name": "United States",
+      "area_type": "country",
+      "point": "POINT (-95.712891 37.09024)"
+     },
+     {
+      "name": "Remote",
+      "area_type": "global",
+      "point": null
+     }
+    ],
+    "compensation_offers_equity": null,
+    "compensation_currency": null,
+    "compensation_period": "period_not_defined",
+    "organization": {
+     "stage": "ipo",
+     "logo_url": "https://cdn.getro.com/companies/00000000-0000-4000-8000-000000000003-1768234672",
+     "topics": [
+      "Enterprise"
+     ],
+     "name": "Lumon",
+     "head_count": 5,
+     "id": 10001,
+     "industry_tags": [
+      "Artificial Intelligence",
+      "Automation",
+      "Business/Productivity Software",
+      "Cloud",
+      "Cloud Security",
+      "Compliance",
+      "Data Management",
+      "Developer Tools",
+      "DevOps",
+      "Enterprise Software",
+      "Information Technology",
+      "Information Technology and Services",
+      "IT Services and IT Consulting",
+      "Open Source",
+      "Platform",
+      "Privacy and Security",
+      "SaaS",
+      "Services-Prepackaged Software",
+      "Software",
+      "Software - Infrastructure",
+      "Software Development Applications",
+      "Technology",
+      "Technology And Computing"
+     ],
+     "slug": "lumon-com"
+    },
+    "locations": [
+     "United States",
+     "Remote"
+    ],
+    "has_description": true,
+    "slug": "91000001-revenue-operations-manager",
+    "seniority": "director",
+    "id": 91000001
+   },
+   {
+    "compensation_public": true,
+    "featured": false,
+    "compensation_amount_max_cents": 10000,
+    "searchable_locations": [
+     "Brazil"
+    ],
+    "created_at": 1787419849,
+    "weight": 0,
+    "compensation_amount_min_cents": 10000,
+    "source": "career_page",
+    "title": "Expert Opportunity - Sales Operations, Fundraising ($100/hr, up to $2,000/week)",
+    "work_mode": "on_site",
+    "url": "https://br.linkedin.com/jobs/view/expert-opportunity-sales-operations-fundraising-%24100-hr-up-to-%242-000-week-at-ethos-4455153447",
+    "skills": [
+     "Fundraising",
+     "Venture Capital",
+     "Investor Relations",
+     "Written Communication"
+    ],
+    "location_details": [
+     {
+      "name": "Brazil",
+      "area_type": "country",
+      "point": "POINT (-51.92528 -14.235004)"
+     }
+    ],
+    "compensation_offers_equity": false,
+    "compensation_currency": "BRL",
+    "compensation_period": "hour",
+    "organization": {
+     "stage": "series_a",
+     "logo_url": "https://cdn.getro.com/companies/80b3b2b5-1251-4731-b378-0d8d1bcb4f59-1762911521",
+     "topics": [],
+     "name": "Ethos",
+     "head_count": 1,
+     "id": 1910559,
+     "industry_tags": [
+      "Artificial Intelligence (AI)",
+      "Business/Productivity Software",
+      "Data & Analytics",
+      "Design",
+      "Generative AI",
+      "Information Services",
+      "Information Technology",
+      "Market Research",
+      "Media and Information Services (B2B)",
+      "Professional Services",
+      "Recruiting",
+      "Science and Engineering",
+      "Software"
+     ],
+     "slug": "ethos-2-e1b0048b-7d7c-4a76-97d7-b71911ec294a"
+    },
+    "locations": [
+     "Brazil"
+    ],
+    "has_description": true,
+    "slug": "90912726-expert-opportunity-sales-operations-fundraising-100-hr-up-to-2-000-week",
+    "seniority": "director",
+    "id": 90912726
+   },
+   {
+    "compensation_public": true,
+    "featured": false,
+    "compensation_amount_max_cents": 15000000,
+    "searchable_locations": [
+     "London, UK",
+     "Greater London, UK",
+     "England, UK",
+     "United Kingdom",
+     "Europe"
+    ],
+    "created_at": 1787233599,
+    "weight": 0,
+    "compensation_amount_min_cents": 10000000,
+    "source": "career_page",
+    "title": "Deal Desk Manager, Product",
+    "work_mode": "on_site",
+    "url": "https://boards.greenhouse.io/monzo/jobs/8121572",
+    "skills": [
+     "Software Project Management",
+     "Strategic Planning",
+     "Data Analysis",
+     "Stakeholder Management",
+     "Collaboration",
+     "Problem Solving",
+     "Product Management",
+     "Performance Management",
+     "Organizational Skills"
+    ],
+    "location_details": [
+     {
+      "name": "London, UK",
+      "area_type": "locality",
+      "point": "POINT (-0.1277583 51.5073509)"
+     }
+    ],
+    "compensation_offers_equity": true,
+    "compensation_currency": "GBP",
+    "compensation_period": "year",
+    "organization": {
+     "stage": "other",
+     "logo_url": "https://cdn.getro.com/companies/d5d38140-ac53-45cb-99f6-abaa21cd8822-1760923832",
+     "topics": [
+      "FinTech"
+     ],
+     "name": "Monzo",
+     "head_count": 5,
+     "id": 13568,
+     "industry_tags": [
+      "Banking",
+      "Finance",
+      "Financial Services",
+      "Fintech",
+      "Lending and Investments",
+      "Wealth Management"
+     ],
+     "slug": "monzo"
+    },
+    "locations": [
+     "London, UK"
+    ],
+    "has_description": true,
+    "slug": "90624985-deal-desk-manager-product",
+    "seniority": "director",
+    "id": 90624985
+   }
+  ],
+  "count": 21
+ }
+}

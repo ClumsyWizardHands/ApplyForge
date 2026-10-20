@@ -1,0 +1,86 @@
+[project]
+name = "jobkit"
+version = "0.1.0"
+description = "Local-first job application pipeline: discover, sanity-check, tailor, stage — human clicks submit."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "typer>=0.12",
+    "mcp>=1.2",
+    "httpx>=0.27",
+    "beautifulsoup4>=4.12",
+    "markdownify>=0.13",
+    "anthropic>=0.40",
+    "fastembed>=0.4",
+    "playwright>=1.48",
+    "pydantic>=2.9",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "typst>=0.15.0",
+]
+
+[project.optional-dependencies]
+sheets = ["gspread>=6.0"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "types-pyyaml",
+]
+
+[project.scripts]
+jobkit = "jobkit.cli:main"
+jobkit-mcp = "jobkit.mcp_server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+# Never package personal data, local state or machine config (CLAUDE.md hard
+# rule 13). Hatch also honours .gitignore; these hold even without it. The
+# project skills in .claude/skills/ ship; the rest of .claude/ never does.
+exclude = [
+    "/data/*",
+    "!/data/*.example.yaml",
+    "/config/*.yaml",
+    "!/config/*.example.yaml",
+    "/out",
+    "/logs",
+    "/.env",
+    "/.mcp.json",
+    "*.db",
+    "*.db-*",
+    "/.claude/*",
+    "!/.claude/skills",
+    "/src/jobkit/.claude",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jobkit"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Claude Code worktrees nest full repo copies (src/jobkit/.claude/worktrees/...)
+extend-exclude = [".claude"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+files = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.uv]
+# Rebuild the (non-editable) project whenever source changes. Non-editable
+# avoids the .pth mechanism entirely — something on this machine stamps macOS
+# UF_HIDDEN onto venv .pth files and Python 3.12+ silently skips hidden ones.
+cache-keys = [{ file = "pyproject.toml" }, { file = "src/**/*.py" }, { file = "prompts/**" }]

@@ -1,0 +1,52 @@
+# Personal data, secrets and machine-local state — never commit
+# (CLAUDE.md hard rule 13). Templates ship as *.example.* next to each file.
+.env
+data/*
+!data/*.example.yaml
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+logs/
+out/
+
+# Personal config: one person's tracks, floors, locations, rules, style and
+# commute. Written by the setup interview (say "set up jobkit" in Claude) or
+# copied from config/<name>.example.yaml. Only the templates are tracked.
+config/*.yaml
+!config/*.example.yaml
+
+# Local working notes made from one person's data (audits, review dumps,
+# proposed corpus diffs) go in docs/local/. The dated names below cover notes
+# written at the top of docs/ before that folder existed. Every other file
+# under docs/ ships, and tests/test_setup_config.py scans every committable file
+# for the original owner's identifiers.
+docs/local/
+docs/audit-*
+docs/residual-issues-*
+docs/*-proposed-*.diff
+docs/persona-mapping.md
+
+# MCP registration holds an absolute path for one machine; copy
+# .mcp.example.json to .mcp.json and point --directory at your checkout
+.mcp.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# OS
+.DS_Store
+
+# Claude Code: session state and worktrees stay local; the project skills in
+# .claude/skills/ ship with the repo
+.claude/*
+!.claude/skills/
+src/jobkit/.claude/

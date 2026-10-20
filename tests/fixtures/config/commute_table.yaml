@@ -1,0 +1,21 @@
+# TEST PROFILE — not a template. tests/conftest.py copies tests/fixtures/config/
+# into every test sandbox as config/, so the suite runs on a fresh clone with no
+# personal config. The values are the settings the tests were written against,
+# as the fictional example user, Jordan Rivera, would set them.
+# For your own setup, run the setup interview or copy config/commute_table.example.yaml.
+
+version: "1.0"
+origin: from_corpus
+
+buckets:
+  other-bristol: 5
+  other-langhorne: 15
+  other-cherryhill: 25
+  other-camden: 30
+  other-philadelphia: 40
+  other-kingofprussia: 70
+  nyc-metro: 105
+  remote: 0
+
+fallback:
+  metro_speed_kmh: 30

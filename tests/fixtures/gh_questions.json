@@ -1,0 +1,654 @@
+{
+ "id": 4400012001,
+ "title": "Account Executive, Mid-Market ",
+ "questions": [
+  {
+   "description": null,
+   "label": "First Name",
+   "required": true,
+   "fields": [
+    {
+     "name": "first_name",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Last Name",
+   "required": true,
+   "fields": [
+    {
+     "name": "last_name",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Email",
+   "required": true,
+   "fields": [
+    {
+     "name": "email",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Phone",
+   "required": true,
+   "fields": [
+    {
+     "name": "phone",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Resume/CV",
+   "required": false,
+   "fields": [
+    {
+     "name": "resume",
+     "type": "input_file",
+     "values": []
+    },
+    {
+     "name": "resume_text",
+     "type": "textarea",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Cover Letter",
+   "required": false,
+   "fields": [
+    {
+     "name": "cover_letter",
+     "type": "input_file",
+     "values": []
+    },
+    {
+     "name": "cover_letter_text",
+     "type": "textarea",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Are you based in San Francisco, Austin or New York City, and will you come into the office three days a week as part of the hybrid schedule?",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_55120418004",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "Yes",
+       "value": 1
+      },
+      {
+       "label": "No",
+       "value": 0
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Are you currently based in any of these countries? Please note these are the only countries where we are accepting applications",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_55120095004",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "United States",
+       "value": 161517771004
+      },
+      {
+       "label": "Germany",
+       "value": 161517772004
+      },
+      {
+       "label": "United Kingdom",
+       "value": 161517773004
+      },
+      {
+       "label": "Argentina",
+       "value": 161517774004
+      },
+      {
+       "label": "Australia",
+       "value": 161517775004
+      },
+      {
+       "label": "Canada",
+       "value": 161517776004
+      },
+      {
+       "label": "India",
+       "value": 161517777004
+      },
+      {
+       "label": "Japan",
+       "value": 161517778004
+      },
+      {
+       "label": "Other",
+       "value": 161517779004
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": "<p>Please mark '<strong>YES</strong>' if you will require Visa Sponsorship now, or in the future.<br>Mark '<strong>NO</strong>' if you will <strong>NOT</strong> require Visa Sponsorship now, or in the future.</p>",
+   "label": "Will you require Visa Sponsorship now, or in the future?",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_55120096004",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "Yes",
+       "value": 1
+      },
+      {
+       "label": "No",
+       "value": 0
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Your authorization to work in the country where you live. Please choose the option that describes your work authorization.\n",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_55120097004",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "I am authorized to work in the country due to my nationality",
+       "value": 161517780004
+      },
+      {
+       "label": "I am authorized to work in the country based on a valid work permit and do not need a company to sponsor my visa",
+       "value": 161517781004
+      },
+      {
+       "label": "I am authorized to work in the country based on a valid work permit which needs to be sponsored by the company I work for",
+       "value": 161517782004
+      },
+      {
+       "label": "I am not authorized to work in the country and need visa support",
+       "value": 161517783004
+      },
+      {
+       "label": "Other",
+       "value": 161517784004
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": "<p>Please mark &lsquo;<strong>YES</strong>&rsquo; if you <span style=\"text-decoration: underline;\">currently live</span> in one of these states.<br>If you do <strong>NOT</strong> currently live in one of these states, mark &lsquo;<strong>NO</strong>.&rsquo;</p>",
+   "label": "Do you live in one of the following states?\nAlabama, Alaska, Delaware, Kansas, Maine, Mississippi, Montana, Nebraska, New Mexico, North Dakota, South Dakota, West Virginia, or Wyoming.",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_55120098004",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "Yes",
+       "value": 1
+      },
+      {
+       "label": "No",
+       "value": 0
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "LinkedIn Profile",
+   "required": false,
+   "fields": [
+    {
+     "name": "question_55120099004",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Twitter",
+   "required": false,
+   "fields": [
+    {
+     "name": "question_55120100004",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Github",
+   "required": false,
+   "fields": [
+    {
+     "name": "question_55120101004",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Website",
+   "required": false,
+   "fields": [
+    {
+     "name": "question_55120102004",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": "<p>If multiple things played a part, tell us about the very first one.</p>",
+   "label": "Where did you first hear about this role?",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_55120103004",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "Events",
+       "value": 161517785004
+      },
+      {
+       "label": "Built In",
+       "value": 161517786004
+      },
+      {
+       "label": "LinkedIn",
+       "value": 161517787004
+      },
+      {
+       "label": "Google Search",
+       "value": 161517788004
+      },
+      {
+       "label": "Advertisements",
+       "value": 161517789004
+      },
+      {
+       "label": "Other job boards",
+       "value": 161517790004
+      },
+      {
+       "label": "LLMs (ChatGPT, etc.)",
+       "value": 161517791004
+      },
+      {
+       "label": "I'm a Globex customer",
+       "value": 161517792004
+      },
+      {
+       "label": "Referral from a Globex customer",
+       "value": 161517793004
+      },
+      {
+       "label": "Referral from a Globex team member",
+       "value": 161517794004
+      },
+      {
+       "label": "Social media (X, Instagram, YouTube, etc.)",
+       "value": 161517795004
+      },
+      {
+       "label": "Other Content (news articles, podcasts, blogs)",
+       "value": 161517796004
+      },
+      {
+       "label": "Developer communities (GitHub, Hacker News, Reddit, etc.)",
+       "value": 161517797004
+      },
+      {
+       "label": "Other",
+       "value": 161517798004
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": "<p><span style=\"font-weight: 400;\">By submitting my application, I acknowledge that I have read and understand Globex&rsquo;s </span><a href=\"https://globex.example/legal/job-applicant-privacy-notice\"><span style=\"font-weight: 400;\">Job Applicant Privacy Notice</span></a><span style=\"font-weight: 400;\">.</span><span style=\"font-weight: 400;\">&nbsp;</span></p>",
+   "label": "By submitting my application, I acknowledge that I have read and understand Globex\u2019s Job Applicant Privacy Notice - https://globex.example/legal/job-applicant-privacy-notice ",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_55120104004",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "Acknowledge/Confirm",
+       "value": 161517799004
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Please double-check all the information provided above. Ensuring accuracy is crucial, as any errors or omissions may impact the review of your application.",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_55120105004",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "I have reviewed and confirmed that all the information provided is accurate and complete.",
+       "value": 161517800004
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "demographic_questions": {
+  "header": "U.S. Standard Demographic Questions",
+  "description": "<p>At Globex, we value belonging and believe in fostering an environment where a diversity of perspectives can thrive. As part of this commitment, we invite you to voluntarily provide demographic information. Your responses will be used (in aggregate only) to help us better understand the diversity of our applicants and identify areas of improvement in our recruitment and hiring process. Your responses, or decision not to respond, will be kept confidential and will only be used in aggregate form for diversity and inclusion efforts. This information&nbsp;<u>will not</u>&nbsp;be associated with your specific application and&nbsp;<u>will not</u>&nbsp;be disclosed to the hiring team or used in the hiring decision in any way.<br><br>Individuals seeking employment are considered without regard to race, color, religion, national origin, age, sex, marital status, ancestry, physical or mental disability, veteran status, or sexual orientation. Asking the below questions help us comply with federal and state Equal Employment Opportunity/Affirmative Action record keeping, reporting, and other legal requirements.</p>",
+  "questions": [
+   {
+    "id": 4015790004,
+    "label": "How would you describe your gender identity? (mark all that apply)",
+    "required": false,
+    "type": "multi_value_multi_select",
+    "answer_options": [
+     {
+      "id": 4094149004,
+      "label": "Man",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094147004,
+      "label": "Non-binary",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094144004,
+      "label": "Woman",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094143004,
+      "label": "I prefer to self-describe",
+      "free_form": true,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094141004,
+      "label": "I don't wish to answer",
+      "free_form": false,
+      "decline_to_answer": false
+     }
+    ]
+   },
+   {
+    "id": 4015786004,
+    "label": "How would you describe your racial/ethnic background? (mark all that apply)",
+    "required": false,
+    "type": "multi_value_multi_select",
+    "answer_options": [
+     {
+      "id": 4094137004,
+      "label": "Black or of African descent",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094135004,
+      "label": "East Asian",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094133004,
+      "label": "Hispanic, Latinx or of Spanish Origin",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094131004,
+      "label": "Indigenous, American Indian or Alaska Native",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094129004,
+      "label": "Middle Eastern or North African",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094128004,
+      "label": "Native Hawaiian or Pacific Islander",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094125004,
+      "label": "South Asian",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094123004,
+      "label": "Southeast Asian",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094121004,
+      "label": "White or European",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094120004,
+      "label": "I prefer to self-describe",
+      "free_form": true,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094119004,
+      "label": "I don't wish to answer",
+      "free_form": false,
+      "decline_to_answer": false
+     }
+    ]
+   },
+   {
+    "id": 4015785004,
+    "label": "How would you describe your sexual orientation? (mark all that apply)",
+    "required": false,
+    "type": "multi_value_multi_select",
+    "answer_options": [
+     {
+      "id": 4094117004,
+      "label": "Asexual",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094115004,
+      "label": "Bisexual and/or pansexual",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094113004,
+      "label": "Gay",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094111004,
+      "label": "Heterosexual",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094110004,
+      "label": "Lesbian",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094109004,
+      "label": "Queer",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094108004,
+      "label": "I prefer to self-describe",
+      "free_form": true,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094107004,
+      "label": "I don't wish to answer",
+      "free_form": false,
+      "decline_to_answer": false
+     }
+    ]
+   },
+   {
+    "id": 4015783004,
+    "label": "Do you identify as transgender?",
+    "required": false,
+    "type": "multi_value_single_select",
+    "answer_options": [
+     {
+      "id": 4094104004,
+      "label": "Yes",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094102004,
+      "label": "No",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094099004,
+      "label": "I prefer to self-describe",
+      "free_form": true,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094097004,
+      "label": "I don't wish to answer",
+      "free_form": false,
+      "decline_to_answer": false
+     }
+    ]
+   },
+   {
+    "id": 4015781004,
+    "label": "Do you have a disability or chronic condition (physical, visual, auditory, cognitive, mental, emotional, or other) that substantially limits one or more of your major life activities, including mobility, communication (seeing, hearing, speaking), and learning?",
+    "required": false,
+    "type": "multi_value_single_select",
+    "answer_options": [
+     {
+      "id": 4094093004,
+      "label": "Yes",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094090004,
+      "label": "No",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094088004,
+      "label": "I prefer to self-describe",
+      "free_form": true,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094087004,
+      "label": "I don't wish to answer",
+      "free_form": false,
+      "decline_to_answer": false
+     }
+    ]
+   },
+   {
+    "id": 4015780004,
+    "label": "Are you a veteran or active member of the United States Armed Forces?",
+    "required": false,
+    "type": "multi_value_single_select",
+    "answer_options": [
+     {
+      "id": 4094083004,
+      "label": "Yes, I am a veteran or active member",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094081004,
+      "label": "No, I am not a veteran or active member",
+      "free_form": false,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094079004,
+      "label": "I prefer to self-describe",
+      "free_form": true,
+      "decline_to_answer": false
+     },
+     {
+      "id": 4094077004,
+      "label": "I don't wish to answer",
+      "free_form": false,
+      "decline_to_answer": false
+     }
+    ]
+   }
+  ]
+ }
+}

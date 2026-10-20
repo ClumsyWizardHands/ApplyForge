@@ -1,0 +1,22 @@
+Casey Reyes
+Columbus, OH | casey.reyes@example.com | (555) 010-0177 | github.com/creyes-example
+
+EXPERIENCE
+
+Copperline Analytics — Senior Data Engineer
+Jun 2021 – Present
+• Built dbt + Snowpark pipelines on Snowflake; Airflow DAGs on MWAA with Terraform.
+• Ported PySpark jobs from EMR to Databricks Photon; Delta Lake, Unity Catalog.
+• Kafka, Debezium CDC, Avro schemas, Flink SQL for clickstream sessionization.
+
+Lakeshore Freight — Data Engineer
+Jun 2017 – May 2021
+• Python, Scala, SQL on BigQuery, Redshift, Postgres; Fivetran and Airbyte syncs.
+• Great Expectations, Monte Carlo, OpenLineage for observability and lineage.
+• Grafana, Prometheus, PagerDuty runbooks; Kubernetes, Helm, ArgoCD deploys.
+
+EDUCATION
+Ohio State University, B.S. Computer Science, 2017
+
+SKILLS
+Python, Scala, SQL, dbt, Airflow, PySpark, Kafka, Flink, Snowflake, BigQuery, Databricks, Terraform

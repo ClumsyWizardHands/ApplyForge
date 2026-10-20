@@ -1,0 +1,148 @@
+{
+ "_note": "Recorded from boards-api.greenhouse.io list payloads (content=true), 2026-09-03 raw snapshots in data/raw/greenhouse. Content trimmed to the pay-transparency block. Two rows' company name, board slug, job ids, title, publish dates and pay range replaced with fictional values (Contoso; ids 1000001 and 1000002).",
+ "jobs": [
+  {
+   "id": 1000001,
+   "internal_job_id": 2000001,
+   "title": "Account Director, Enterprise",
+   "company_name": "Contoso",
+   "location": {
+    "name": "USA Remote"
+   },
+   "absolute_url": "https://job-boards.greenhouse.io/contoso/jobs/1000001",
+   "first_published": "2026-07-14T10:12:44-04:00",
+   "updated_at": "2026-08-27T09:46:20-04:00",
+   "departments": [],
+   "content": "&lt;p&gt;Role description trimmed for the fixture.&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;Pay disclosure text trimmed for the fixture.&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;Remote Base Salary Range&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$198,400&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$251,000 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;"
+  },
+  {
+   "id": 6008747004,
+   "internal_job_id": 5159992004,
+   "title": "Deal Desk Analyst",
+   "company_name": "Apollo.io",
+   "location": {
+    "name": "Remote, United States"
+   },
+   "absolute_url": "https://job-boards.greenhouse.io/apolloio/jobs/6008747004",
+   "first_published": "2026-05-29T16:30:17-04:00",
+   "updated_at": "2026-08-14T18:57:22-04:00",
+   "departments": [],
+   "content": "&lt;p&gt;Role description trimmed for the fixture.&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;Pay disclosure text trimmed for the fixture.&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;Tier 1 Pay Range (San Francisco, New York City, Seattle)&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$129,600&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$161,900 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;Tier 2 Pay Range (All other US Locations)&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$112,600&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$140,800 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;"
+  },
+  {
+   "id": 7592588,
+   "internal_job_id": 3355991,
+   "title": "Account Manager, CPG",
+   "company_name": "DoorDash USA",
+   "location": {
+    "name": "New York, NY; Los Angeles, CA; Atlanta, GA; Chicago, IL; San Francisco, CA"
+   },
+   "absolute_url": "https://job-boards.greenhouse.io/doordashusa/jobs/7592588",
+   "first_published": "2026-02-06T14:58:37-05:00",
+   "updated_at": "2026-08-31T14:00:55-04:00",
+   "departments": [],
+   "content": "&lt;p&gt;Role description trimmed for the fixture.&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;Pay disclosure text trimmed for the fixture.&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;The national base pay range for this position within the United States, including Illinois and Colorado.&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$85,680&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$126,000 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;The total on-target earnings (base + commissions) for this position within the United States, including Illinois and Colorado.&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$114,600&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$168,500 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;"
+  },
+  {
+   "id": 5168141,
+   "internal_job_id": 2583501,
+   "title": "Business Development Representative, Bellevue",
+   "company_name": "Okta",
+   "location": {
+    "name": "Bellevue, Washington"
+   },
+   "absolute_url": "https://www.okta.com/company/careers/opportunity/5168141?gh_jid=5168141",
+   "first_published": "2023-07-20T15:19:57-04:00",
+   "updated_at": "2026-08-24T12:51:52-04:00",
+   "departments": [],
+   "content": "&lt;p&gt;Role description trimmed for the fixture.&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;Pay disclosure text trimmed for the fixture.&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;The annual OTE range for this position for candidates located in California (excluding San Francisco Bay Area), Colorado, Illinois, New York, and Washington is between:&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$71,997.71&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$71,997.71 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;"
+  },
+  {
+   "id": 4135236007,
+   "internal_job_id": 4095477007,
+   "title": "Account Executive, Territory (Mid-Market)",
+   "company_name": "Verkada",
+   "location": {
+    "name": "Tempe, AZ United States"
+   },
+   "absolute_url": "https://job-boards.greenhouse.io/verkada/jobs/4135236007",
+   "first_published": "2023-11-10T11:17:03-05:00",
+   "updated_at": "2026-08-19T01:00:22-04:00",
+   "departments": [],
+   "content": "&lt;p&gt;Role description trimmed for the fixture.&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;Pay disclosure text trimmed for the fixture.&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;Estimated Hourly Pay Range&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$85,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$145,000 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;"
+  },
+  {
+   "id": 7858932,
+   "internal_job_id": 3317134,
+   "title": "Account Executive",
+   "company_name": "DoorDash USA",
+   "location": {
+    "name": "Charlotte, NC; Raleigh, NC; Tampa, FL; Orlando, FL; Pittsburgh, PA; Richmond, VA; Jacksonville, FL; Columbus, OH; Dallas, TX; Houston, TX; Minneapolis, MN; Nashville, TN; Kansas City, MO; St. Louis, MO; Tempe, AZ; Indianapolis, IN; Oklahoma City, OK; New Orleans, LA; Charleston, SC; Atlanta, GA"
+   },
+   "absolute_url": "https://job-boards.greenhouse.io/doordashusa/jobs/7858932",
+   "first_published": "2026-04-27T14:36:09-04:00",
+   "updated_at": "2026-08-31T14:00:55-04:00",
+   "departments": [],
+   "content": "&lt;p&gt;Role description trimmed for the fixture.&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;Pay disclosure text trimmed for the fixture.&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;The national base pay range for this position within the United States, including Illinois and Colorado.&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$19.37&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$32.50 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;The total on-target earnings (base + commissions) for this position within the United States, including Illinois and Colorado.&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$34&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$50 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;"
+  },
+  {
+   "id": 7848317,
+   "internal_job_id": 3420554,
+   "title": "AI Research Fellowship, (Summer and Fall 2026)",
+   "company_name": "DoorDash USA",
+   "location": {
+    "name": "San Francisco, CA"
+   },
+   "absolute_url": "https://job-boards.greenhouse.io/doordashusa/jobs/7848317",
+   "first_published": "2026-04-29T15:40:09-04:00",
+   "updated_at": "2026-08-31T14:00:55-04:00",
+   "departments": [],
+   "content": "&lt;p&gt;Role description trimmed for the fixture.&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;Pay disclosure text trimmed for the fixture.&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;Base Pay (Monthly)&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$8,500&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$16,000 USD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;"
+  },
+  {
+   "id": 5391499008,
+   "internal_job_id": 4533138008,
+   "title": "Canada Public Sector Account Executive",
+   "company_name": "Anthropic",
+   "location": {
+    "name": "Ontario, CAN"
+   },
+   "absolute_url": "https://job-boards.greenhouse.io/anthropic/jobs/5391499008",
+   "first_published": "2026-08-25T13:44:47-04:00",
+   "updated_at": "2026-08-28T16:46:24-04:00",
+   "departments": [],
+   "content": "&lt;p&gt;Role description trimmed for the fixture.&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;Pay disclosure text trimmed for the fixture.&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;Annual Salary:&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;$420,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;$495,000 CAD&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;"
+  },
+  {
+   "id": 7981883,
+   "internal_job_id": 3464053,
+   "title": "Senior Specialist, Affiliate & Influencers - Italy",
+   "company_name": "N26",
+   "location": {
+    "name": "Milan"
+   },
+   "absolute_url": "https://n26.com/en-eu/careers/positions/7981883?gh_jid=7981883",
+   "first_published": "2026-06-08T09:47:09-04:00",
+   "updated_at": "2026-08-05T05:59:35-04:00",
+   "departments": [],
+   "content": "&lt;p&gt;Role description trimmed for the fixture.&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;description&quot;&gt;&lt;p&gt;Pay disclosure text trimmed for the fixture.&lt;/p&gt;&lt;/div&gt;&lt;div class=&quot;title&quot;&gt;Italy Pay Range&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;€49,80&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;€57,30 EUR&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;"
+  },
+  {
+   "id": 1000002,
+   "internal_job_id": null,
+   "title": "General Apply - Product",
+   "company_name": "Contoso",
+   "location": {
+    "name": "New York, NY"
+   },
+   "absolute_url": "https://job-boards.greenhouse.io/contoso/jobs/1000002",
+   "first_published": "2024-04-30T11:20:05-04:00",
+   "updated_at": "2026-08-27T09:46:20-04:00",
+   "departments": [],
+   "content": "&lt;p&gt;Role description trimmed for the fixture. No pay range is published.&lt;/p&gt;"
+  }
+ ],
+ "meta": {
+  "total": 10
+ }
+}
