@@ -2,7 +2,7 @@
 
 ## Read first
 
-`SPEC.md` (v1.4) is the contract, with `ONBOARDING.md` covering milestone M0b. Read it fully before writing code. If something is wrong or unbuildable, say so and propose a change — do not silently deviate.
+`SPEC.md` (v1.5) is the contract, with `ONBOARDING.md` covering milestone M0b. Read it fully before writing code. If something is wrong or unbuildable, say so and propose a change — do not silently deviate.
 
 ## Using jobkit (not building it)
 
@@ -14,7 +14,7 @@ Each person's data stays on their machine. `data/` (except `data/*.example.yaml`
 
 ## Build order
 
-**M0 → M0b → M1 → M1b → M2 → M2b → M3 → M4 → M4b → M5 → M6.** Do not start a milestone until the previous one's acceptance criteria pass. Report acceptance explicitly at each boundary and stop for review. M0 through M6 are built (README, Status); new work follows the same acceptance discipline.
+**M0 → M0b → M1 → M1b → M2 → M2b → M3 → M4 → M4b → M5 → M6.** Do not start a milestone until the previous one's acceptance criteria pass. Report acceptance explicitly at each boundary and stop for review. M0 through M6 are built (`docs/contributing.md`); new work follows the same acceptance discipline.
 
 M0 is not ceremony. The ATS endpoint shapes in SPEC.md §2.1 come from prior knowledge and may have drifted. Verify against live boards and correct the spec before building on them.
 
@@ -22,7 +22,7 @@ M0b (onboarding) is built. The modules in `src/jobkit/onboarding/` do the work; 
 
 ## Hard rules
 
-1. **The browser clicks submit only through `src/jobkit/autofill/submit.py`** *(amended 2026-10-09: unattended submission is an opt-in the owner of a checkout can enable. `submit.py` is not built yet, so today nothing submits — the human clicks submit)*. That module runs only when `auto_submit` is enabled in config, its mode is `live`, the kill file is absent, and every precondition passes (provenance + authenticity clean, every required field filled from the Answer Bank or validated drafts, no flagged/EEO/comp-history/novel field, no visible CAPTCHA or bot check, not a duplicate, caps not exceeded). Every submission must be verified against the ATS confirmation page; unconfirmed ones go to the human and are never retried. All other fill code never targets a submit, apply, or send control — the static scan and the runtime click guard enforce it, and the static scan confines submit selectors to `submit.py`. Hard Rule 2 (never solve or evade a CAPTCHA or bot check) is unchanged and applies to `submit.py` too.  
+1. **The browser never clicks submit.** The person presses submit on every application. A bot check on an employer's form is the employer asking for a person to submit, invisible checks can't be detected reliably, and every ATS submit API takes the employer's key, not the applicant's (SPEC.md §8). Fill code never targets a submit, apply or send control: the static scan of `src/jobkit/autofill/` (no file is exempt) and the runtime click guard enforce it. Do not build, enable or configure automatic submission.  
 2. **Never solve a CAPTCHA or bot challenge.** Detect, abort, hand to the human.  
 3. **Never bypass the provenance validator.** A failing tailored resume must fail loudly, not get a relaxed check.  
 4. **Never auto-select an EEO/demographic field** without an explicit entry in the Answer Bank. Absent an entry: leave blank and flag.  
@@ -41,6 +41,7 @@ M0b (onboarding) is built. The modules in `src/jobkit/onboarding/` do the work; 
 - **Background and foreground are separate.** Polling, extraction, sanity checks, and scoring run headless on a schedule with no human present. The MCP server reads the resulting DB and triggers post-approval actions. Do not put LLM calls in the MCP request path except tailoring and novel-question drafting.  
 - **The MCP server is the primary interface.** The CLI exists for cron and debugging. Every user-facing capability must be reachable through an MCP tool. A CLI-only feature isn't done.  
 - **SQLite is the only source of truth.** Sheets is a write-only mirror.  
+- **Email is read-only.** Employer replies are read only through the person's own email connector in Claude; jobkit never connects to a mailbox, and nothing there is sent, deleted or changed. Only the outcome, the date, a link to the message and a one-line summary are stored, never the body (`src/jobkit/track/responses.py`).  
 - **One knob, one owner.** Every threshold lives in exactly one config file. Evaluation order: deterministic filters → sanity checks → standing rules. The rejection log records which layer decided. If two configs appear to control the same behavior, the spec has a bug — raise it, do not reconcile silently.
 
 ## Conventions
@@ -68,5 +69,5 @@ Ask before: changing the data model, adding a dependency not in SPEC.md §10, ch
 
 ## Definition of done for a milestone
 
-Acceptance criteria pass · tests green · `ruff` and `mypy` clean · README updated with new commands and MCP tools · a one-paragraph summary of what changed and what the next milestone unblocks.
+Acceptance criteria pass · tests green · `ruff` and `mypy` clean · README and `docs/commands.md` updated with new commands and MCP tools · a one-paragraph summary of what changed and what the next milestone unblocks.
 

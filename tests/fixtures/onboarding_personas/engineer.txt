@@ -1,0 +1,24 @@
+Priya Natarajan
+Remote (Portland, OR) | priya.natarajan@example.com | (555) 010-0129 | github.com/pnatarajan-example
+
+SUMMARY
+Backend engineer who builds reliable APIs and data pipelines.
+
+EXPERIENCE
+
+Cobalt Ledger — Remote
+Senior Software Engineer | Apr 2021 – Present
+• Designed the payments API that handles 4 million requests a day.
+• Cut p99 latency of the ledger service from 900 ms to 250 ms.
+• Mentored 3 engineers through their first on-call rotations.
+
+Pinecone Freight — Portland, OR
+Software Engineer | Jul 2017 – Mar 2021
+• Built the shipment tracking service in Go and PostgreSQL.
+• Moved the nightly batch jobs to Kubernetes.
+
+EDUCATION
+Cascade State University, B.S., Computer Science, 2017
+
+SKILLS
+Go, Python, PostgreSQL, Kubernetes, AWS, Terraform

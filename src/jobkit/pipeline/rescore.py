@@ -20,9 +20,21 @@ Which jobs (the selection rules):
   picks it up. A dry run lists them and writes nothing;
 * approved jobs too, but their status is never touched: their new score is
   reported;
-* by default, only jobs whose score predates the current corpus: the newest
-  `score_profile` event (triage.score_rows writes one per score) names another
-  corpus hash, or there is none (a score from before the record).
+* by default, only stale scores: the newest `score_profile` event
+  (triage.score_rows writes one per score) names another corpus hash, or
+  another scoring prompt than the active prompt set's (score_fit or
+  score_fit_general, triage.score_prompt_name), or, for score_fit_general,
+  the same prompt at another version; or there is no event (a score from
+  before the record). An event with no prompt name is a score_fit score
+  (score_fit events never carry one), and a score_fit version is never
+  compared, as before prompt sets: a sales score is stale only by corpus or
+  by a switch to another prompt set.
+
+Re-gating without re-scoring: a job rejected only by the score gate, whose
+track sets its own `min_score` (filters.yaml tracks[].min_score), and whose
+current score now meets that track's gate (it was rejected under another
+gate) goes back to the queue with its score unchanged, after the same
+deterministic-filter check as any revival. One `regated` event per job.
 
 With explicit job ids (`--job-ids`; a confirmed corpus proposal starts that
 for the jobs its question listed) those jobs are re-scored whatever their
@@ -30,8 +42,9 @@ hash, applied jobs included (score reported, status untouched). Any other
 status (snoozed, new, rejected by another layer, closed) is skipped with the
 reason.
 
-After scoring: the queue gate (filters.yaml `gates.min_score_to_surface`, the
-one owner, read through Filters.min_score_to_surface) is applied to the
+After scoring: the queue gate (filters.yaml `gates.min_score_to_surface`, or
+the job's track `min_score` when it sets one, read through
+Filters.min_score_for) is applied to the
 gate-eligible jobs — at or above it they are queued, below it a queued or
 filtered job is rejected with the same score_below_surface reason run_queue
 writes — and then the standing rules run over the queue, as on every
@@ -45,10 +58,12 @@ path."""
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from dataclasses import dataclass, field
 
 from jobkit import db as q
+from jobkit import llm
 from jobkit.config import Filters, load_filters
 from jobkit.log import log
 from jobkit.normalize import jd_is_missing
@@ -60,6 +75,63 @@ GATED = ("queued", "filtered")  # the queue gate applies; status may change
 REPORT_ONLY_DEFAULT = ("approved",)  # re-scored when stale; status never changes
 REPORT_ONLY_EXPLICIT = ("approved", "applied")  # with explicit job ids
 EVENT = "rescored"
+REGATE_EVENT = "regated"
+
+# the newest score_profile event of a job (detail: profile_hash,
+# prompt_version and, for a prompt other than score_fit, prompt)
+SCORE_PROFILE_DETAIL = """
+SELECT detail FROM events WHERE job_id = :job_id AND kind = 'score_profile'
+ORDER BY id DESC LIMIT 1
+"""
+LEGACY_SCORE_PROMPT = triage.SALES_SCORE_PROMPT
+_GATE_REASON = re.compile(r"<(\d+)$")
+
+
+@dataclass(frozen=True)
+class ScoringPrompt:
+    """What a current score is made with: the corpus hash, the active prompt
+    set's scoring prompt and its version."""
+
+    profile_hash: str
+    name: str
+    version: str
+
+
+def current_scoring(filters: Filters, profile_hash: str | None = None) -> ScoringPrompt:
+    name = triage.score_prompt_name(filters)
+    return ScoringPrompt(
+        profile_hash or triage.current_profile_hash(), name, llm.PromptFile(name).version
+    )
+
+
+def score_is_stale(detail: str | None, now: ScoringPrompt) -> bool:
+    """Whether a score_profile event (its JSON detail, None when there is
+    none) describes a score made with something other than `now`."""
+    if not detail:
+        return True
+    try:
+        d = json.loads(detail)
+    except ValueError:
+        return True
+    if not isinstance(d, dict) or d.get("profile_hash") != now.profile_hash:
+        return True
+    # an event with no prompt name is a score_fit (sales) score
+    if d.get("prompt", LEGACY_SCORE_PROMPT) != now.name:
+        return True
+    if now.name == LEGACY_SCORE_PROMPT:
+        # as before prompt sets: a score_fit.md version bump alone never made
+        # a sales score stale (only the corpus does)
+        return False
+    return str(d.get("prompt_version")) != now.version
+
+
+def recorded_gate(reason: str | None) -> int | None:
+    """The gate a score_below_surface rejection was made under
+    ("score_below_surface:58<65" -> 65)."""
+    if not reason or not reason.startswith(triage.SCORE_GATE_PREFIX):
+        return None
+    m = _GATE_REASON.search(reason)
+    return int(m.group(1)) if m else None
 
 
 @dataclass(frozen=True)
@@ -107,6 +179,9 @@ class RescoreReport:
     explicit: bool
     min_score: int
     candidates: list[Candidate] = field(default_factory=list)
+    # score-gate rejections that meet their track's current gate: (job, gate)
+    regated: list[tuple[Candidate, int]] = field(default_factory=list)
+    track_gates: dict[str, int] = field(default_factory=dict)
     rescored: list[Rescored] = field(default_factory=list)
     skipped: list[tuple[int, str]] = field(default_factory=list)
     # score-gate rejections the current filters reject: (job_id, filter reason)
@@ -115,7 +190,11 @@ class RescoreReport:
     rules: dict[str, int] | None = None
 
     def render(self) -> str:
-        which = "the jobs given" if self.explicit else "open jobs scored against an older corpus"
+        which = (
+            "the jobs given"
+            if self.explicit
+            else "open jobs scored against an older corpus or another scoring prompt"
+        )
         lines: list[str] = []
         if self.dry_run:
             lines.append("DRY RUN — no LLM call, nothing changed.")
@@ -140,6 +219,16 @@ class RescoreReport:
                     f"auto_approved={self.rules.get('auto_approved', 0)} "
                     f"auto_rejected={self.rules.get('auto_rejected', 0)}"
                 )
+        if self.track_gates:
+            lines.append(
+                "track gates: " + ", ".join(f"{t} {g}" for t, g in sorted(self.track_gates.items()))
+            )
+        if self.regated:
+            lines.append(
+                ("would return" if self.dry_run else "returned")
+                + " to the queue without re-scoring (their track's gate changed):"
+            )
+            lines += [f"  {c.brief()} meets gate {g}" for c, g in self.regated]
         if self.filter_rejected:
             lines.append(
                 "stay rejected: rejected by the score gate, but the current filters reject them "
@@ -190,6 +279,8 @@ class Selection:
     candidates: list[Candidate]  # one per row
     skipped: list[tuple[int, str]]  # (job_id, why)
     filter_rejected: list[tuple[int, str]]  # score-gate rejections the filters reject now
+    # score-gate rejections, not stale, that meet their track's current gate
+    regate: list[tuple[Candidate, int]] = field(default_factory=list)
 
 
 def select(
@@ -199,10 +290,10 @@ def select(
     filters: Filters | None = None,
 ) -> Selection:
     """The jobs to re-score under the selection rules above, the ones skipped
-    with the reason, and the score-gate rejections the current filters reject
-    (never re-scored). Read-only."""
-    phash = profile_hash or triage.current_profile_hash()
+    with the reason, the score-gate rejections the current filters reject
+    (never re-scored) and the ones to re-gate. Read-only."""
     filters = filters or load_filters()
+    now = current_scoring(filters, profile_hash)
     wanted = set(job_ids or [])
     sel = Selection(rows=[], candidates=[], skipped=[], filter_rejected=[])
     seen: set[int] = set()
@@ -217,8 +308,10 @@ def select(
             if wanted:
                 sel.skipped.append((jid, _skip_reason(conn, jid)))
             continue
-        stale = r["scored_profile"] != phash
-        if not wanted and not stale:
+        detail = conn.execute(SCORE_PROFILE_DETAIL, {"job_id": jid}).fetchone()
+        stale = score_is_stale(detail["detail"] if detail else None, now)
+        regate_to = None if (wanted or stale) else _regate_gate(r, gated, filters)
+        if not wanted and not stale and regate_to is None:
             continue
         if r["status"] == "rejected":
             # a revival is a new way into the queue: the deterministic filters
@@ -227,24 +320,41 @@ def select(
             if verdict:
                 sel.filter_rejected.append((jid, verdict))
                 continue
+        cand = Candidate(
+            job_id=jid,
+            company=str(r["company_name"] or ""),
+            title=str(r["title"] or ""),
+            status=str(r["status"]),
+            old_score=r["old_score"],
+            gated=gated,
+            stale=stale,
+        )
+        if regate_to is not None:
+            sel.regate.append((cand, regate_to))
+            continue
         if jd_is_missing(r["jd_html"]):
             sel.skipped.append((jid, "description too short to score (jd_missing)"))
             continue
         sel.rows.append(r)
-        sel.candidates.append(
-            Candidate(
-                job_id=jid,
-                company=str(r["company_name"] or ""),
-                title=str(r["title"] or ""),
-                status=str(r["status"]),
-                old_score=r["old_score"],
-                gated=gated,
-                stale=stale,
-            )
-        )
+        sel.candidates.append(cand)
     for jid in sorted(wanted - seen):
         sel.skipped.append((jid, _skip_reason(conn, jid)))
     return sel
+
+
+def _regate_gate(r: sqlite3.Row, gated: bool, filters: Filters) -> int | None:
+    """The track gate a score-gate rejection now meets, or None. Only for a
+    job whose track sets its own min_score, rejected under another gate, with
+    a score at or above the track's gate."""
+    if not gated or r["status"] != "rejected" or r["old_score"] is None:
+        return None
+    track = filters.track_of(str(r["title"] or ""))
+    if track is None or track.min_score is None:
+        return None
+    was = recorded_gate(r["last_rejection"])
+    if was is None or was == track.min_score or int(r["old_score"]) < track.min_score:
+        return None
+    return track.min_score
 
 
 def rescore(
@@ -271,6 +381,8 @@ def rescore(
         explicit=bool(job_ids),
         min_score=min_score,
         candidates=cands,
+        regated=sel.regate,
+        track_gates={t.id: t.min_score for t in filters.tracks if t.min_score is not None},
         skipped=sel.skipped,
         filter_rejected=sel.filter_rejected,
     )
@@ -278,6 +390,7 @@ def rescore(
         log(
             "rescore.dry_run",
             candidates=len(cands),
+            regate=len(sel.regate),
             skipped=len(sel.skipped),
             filter_rejected=len(sel.filter_rejected),
         )
@@ -287,26 +400,48 @@ def rescore(
         # that decides today, so no later rescore treats it as score-gated
         conn.execute(q.RECORD_FILTER_REJECTION, {"job_id": jid, "reason": reason})
         log("rescore.filter_rejected", job_id=jid, reason=reason)
+    for c, gate in sel.regate:
+        conn.execute(q.SET_JOB_STATUS, {"job_id": c.job_id, "status": "queued"})
+        conn.execute(
+            q.RECORD_EVENT,
+            {
+                "job_id": c.job_id,
+                "kind": REGATE_EVENT,
+                "detail": json.dumps({"score": c.old_score, "gate": gate}),
+            },
+        )
+        log("rescore.regated", job_id=c.job_id, score=c.old_score, gate=gate)
     conn.commit()
     if not rows:
-        log("rescore.done", rescored=0, candidates=0, filter_rejected=len(sel.filter_rejected))
+        if sel.regate:
+            report.rules = run_standing_rules(conn)
+        log(
+            "rescore.done",
+            rescored=0,
+            candidates=0,
+            regated=len(sel.regate),
+            filter_rejected=len(sel.filter_rejected),
+        )
         return report
-    scores = triage.score_rows(conn, rows, stage_label="rescore", profile_hash=phash)
+    scores = triage.score_rows(
+        conn, rows, stage_label="rescore", profile_hash=phash, filters=filters
+    )
     report.failed = [c.job_id for c in cands if c.job_id not in scores]
     for c in cands:
         if c.job_id not in scores or not c.gated:
             continue
         new = scores[c.job_id]
-        if new >= min_score:
+        gate = filters.min_score_for_title(c.title)
+        if new >= gate:
             conn.execute(q.SET_JOB_STATUS, {"job_id": c.job_id, "status": "queued"})
         elif c.status in GATED:
             conn.execute(q.SET_JOB_STATUS, {"job_id": c.job_id, "status": "rejected"})
             conn.execute(
                 q.RECORD_SCORE_GATE_REJECTION,
-                {"job_id": c.job_id, "reason": triage.score_gate_reason(new, min_score)},
+                {"job_id": c.job_id, "reason": triage.score_gate_reason(new, gate)},
             )
     conn.commit()
-    if any(c.gated for c in cands if c.job_id in scores):
+    if sel.regate or any(c.gated for c in cands if c.job_id in scores):
         report.rules = run_standing_rules(conn)
     for c in cands:
         if c.job_id not in scores:
@@ -346,6 +481,7 @@ def rescore(
         "rescore.done",
         rescored=len(report.rescored),
         candidates=len(cands),
+        regated=len(sel.regate),
         failed=len(report.failed),
         filter_rejected=len(sel.filter_rejected),
         requeued=sum(1 for r in report.rescored if r.before != "queued" and r.after == "queued"),

@@ -126,6 +126,7 @@ from jobkit.config import BoardResolution, Filters, load_filters, load_targets
 from jobkit.contact import user_agent
 from jobkit.discovery import ingest, registry
 from jobkit.discovery.url_resolver import resolve as resolve_url
+from jobkit.discovery.url_resolver import resolve_for_board_matching
 from jobkit.log import log
 from jobkit.normalize import (
     location_bucket,
@@ -2265,7 +2266,10 @@ def resolve(
                     rep.skipped += 1
                     rep.lines.append(f"{it.head()}: no company name, or blocklisted: skipped")
                     continue
-                hit = resolve_url(it.apply_url) if it.kind == "job" else None
+                # pinned to the systems this skip has always used: a row whose
+                # link is on a newly recognised system (Taleo, Jobvite, ...) is
+                # still name-matched, because companies change ATS
+                hit = resolve_for_board_matching(it.apply_url) if it.kind == "job" else None
                 if hit is not None and not hit.supported:
                     rep.skipped += 1
                     rep.lines.append(

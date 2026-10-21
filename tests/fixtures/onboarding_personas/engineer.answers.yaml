@@ -1,0 +1,22 @@
+# TEST PERSONA (fictional): interview answers for a senior backend engineer
+# who wants remote work only. Read by tests/test_onboarding_intake.py with
+# engineer.txt as the resume.
+tracks:
+  - name: Backend Engineer
+    titles: [Backend Engineer]
+    title_words:
+      all: [[engineer, developer]]
+      any: [back end, platform, api, software]
+    should_match:
+      - "Backend Engineer (Senior)"
+      - "Sr. Software Engineer"
+      - "Senior Back-End Engineer"
+      - "Software Engineer III - Backend"
+      - "Senior Backend Developer"
+    should_not_match: [Frontend Engineer, Sales Engineer]
+    comp_floor: 170000
+    emphasis: "APIs and services I designed and ran in production"
+    said: "senior backend or platform engineering, remote, 170k base or more"
+seniority_floor: { level: senior, said: "senior and up" }
+locations: { work_mode: remote_only, said: "remote only" }
+comp: { default_floor: 160000, said: "160k for anything else" }

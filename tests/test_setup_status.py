@@ -165,3 +165,34 @@ def test_mcp_setup_status_and_ingest(fresh: Path) -> None:
     out = mcp_tools.ingest_resume(path=str(TXT))
     assert "Draft: data/career_corpus.draft.yaml" in out
     assert "Next 5 bullets" in mcp_tools.corpus_draft_status()
+
+
+def test_feed_only_targets_count_as_done_with_a_warning(fresh: Path) -> None:
+    from jobkit.onboarding.targets import seed_targets
+
+    seed_targets([], feed_only_said="my employers use Workday and iCIMS")
+    status = setup_status()
+    step = next(s for s in status.steps if s.name.startswith("target companies"))
+    assert step.state == "done"
+    assert "feeds only" in step.detail
+    assert step.warning == "0 polled boards; postings come from the feeds"
+    assert "! 0 polled boards; postings come from the feeds" in status.render()
+
+
+def test_targets_without_boards_or_feed_only_stay_partial(fresh: Path) -> None:
+    (fresh / "config" / "targets.yaml").write_text(
+        'companies:\n  - { name: "City Hospital", tier: 1 }\n'
+    )
+    step = next(s for s in setup_status().steps if s.name.startswith("target companies"))
+    assert step.state == "partial" and "feed_only_said" in step.next_action
+
+
+def test_cli_and_mcp_feed_only(fresh: Path) -> None:
+    res = CliRunner().invoke(
+        cli.app, ["setup", "targets", "--feed-only", "the district uses Frontline"]
+    )
+    assert res.exit_code == 0, res.output
+    assert "discovery comes from the feeds" in res.output
+    assert _states()["target companies"] == "done"
+    out = mcp_tools.seed_targets(feed_only_said="feeds only, still")
+    assert "feeds only, still" in out

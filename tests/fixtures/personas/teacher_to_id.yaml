@@ -1,0 +1,29 @@
+# TEST PERSONA — not a template. A fictional middle-school teacher moving into
+# instructional design, open to remote work. tests/test_prompt_set.py loads it.
+
+prompt_set: general
+
+filters:
+  tracks:
+    - id: instructional_designer
+      title_regex: '(?i)\b(instructional designer|learning (experience )?designer|curriculum (designer|developer))\b'
+      pivot: true
+      min_score: 50
+      emphasis: "Units I designed from learning objectives, the assessments I wrote, and LMS work"
+    - id: classroom_teacher
+      title_regex: '(?i)\b(teacher|educator)\b'
+
+  locations:
+    allowed: []
+    accept_remote: true
+
+  comp:
+    floor: 65000
+    currency: USD
+
+gates:
+  min_score_to_surface: 65
+
+comp_sanity:
+  underpriced_below: 81250
+  ote_check: ote_tracks

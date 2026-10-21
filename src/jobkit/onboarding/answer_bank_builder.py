@@ -15,7 +15,10 @@ free-text scaffolds and the novel-question and abort rules.
 - Salary history is never answered (hard rule 5): fixed to leave-blank.
 - Salary expectation: the human picks the policy — a number, their own
   wording, or leave it blank every time — and the lowest figure they would
-  say.
+  say. Hourly pay (unit: hourly) is given in their own wording ("$42 an
+  hour"), never as a bare number, and has no annual floor: the floor is
+  compared with posted annual ranges, so an hourly figure there would be
+  meaningless.
 - Legal acknowledgements (arbitration, AI-use policy, reference consent):
   off unless the human opts in, and even then only labels the human approves
   word for word (`approved_labels`, empty by default) are ticked.
@@ -70,6 +73,7 @@ IDENTITY_KEYS = (
     "portfolio",
 )
 COMP_POLICIES = ("number", "text", "leave_blank")
+COMP_UNITS = ("annual", "hourly")
 # screening entries the matcher reads that the template does not carry
 _EXTRA_SCREENING: dict[str, dict[str, Any]] = {
     "country_of_residence": {
@@ -169,7 +173,9 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "comp_expectation",
         "Salary expectation questions: give a number, your own wording, or leave them blank "
-        "every time (policy: number | text | leave_blank) — and the lowest figure you would say",
+        "every time (policy: number | text | leave_blank) — and the lowest yearly figure you "
+        "would say. Paid by the hour? unit: hourly, with your wording as the text "
+        "(policy text) and no floor",
         "comp",
     ),
     *(
@@ -239,15 +245,35 @@ def _normalize(key: str, raw: Any) -> dict[str, Any]:
     elif q.kind == "comp":
         if not isinstance(value, dict):
             raise SetupError(
-                "comp_expectation: give {policy: number|text|leave_blank, amount?, text?, floor?}"
+                "comp_expectation: give {policy: number|text|leave_blank, amount?, text?, "
+                "floor?, unit?: annual|hourly}"
             )
         policy = str(value.get("policy") or "")
         if policy not in COMP_POLICIES:
             raise SetupError(f"comp_expectation.policy must be one of {', '.join(COMP_POLICIES)}")
+        unit = str(value.get("unit") or "annual")
+        if unit not in COMP_UNITS:
+            raise SetupError(f"comp_expectation.unit must be one of {', '.join(COMP_UNITS)}")
         floor = value.get("floor")
         if floor is not None and (isinstance(floor, bool) or not isinstance(floor, int)):
             raise SetupError("comp_expectation.floor must be a whole number")
+        if unit == "hourly":
+            # the form field gets the person's wording; a bare number would read
+            # as a yearly figure, and the floor is compared with posted yearly
+            # ranges, so an hourly one would never block anything sensibly
+            if policy == "number":
+                raise SetupError(
+                    "comp_expectation: hourly pay goes in the person's own words (policy text, "
+                    "e.g. text: '$42 an hour'), or policy leave_blank"
+                )
+            if floor is not None:
+                raise SetupError(
+                    "comp_expectation.floor is a yearly figure compared with posted yearly "
+                    "ranges; leave it out for hourly pay"
+                )
         out = {"policy": policy, "floor": floor}
+        if unit == "hourly":
+            out["unit"] = "hourly"
         if policy == "number":
             amount = value.get("amount")
             if isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0:

@@ -633,14 +633,34 @@ _HEADINGS: dict[str, tuple[str, ...]] = {
         "qualifications summary",
         "qualifications",
     ),
-    "other": (
+    # licenses and certifications: kept in other_sections under their heading
+    "credentials": (
         "certifications",
         "certificates",
+        "certification",
         "licenses",
+        "license",
+        "licensure",
+        "credentials",
         "licenses & certifications",
         "licenses and certifications",
+        "licensure & certifications",
+        "licensure and certifications",
+        "certifications & licenses",
+        "certifications and licenses",
+        "licenses & credentials",
+        "licenses and credentials",
+        "professional licenses",
+    ),
+    # projects and portfolio pieces: kept in other_sections under their heading
+    "projects": (
         "projects",
         "selected projects",
+        "portfolio",
+        "selected work",
+        "work samples",
+    ),
+    "other": (
         "awards",
         "honors",
         "awards & honors",
@@ -794,9 +814,54 @@ class ParsedResume:
     notes: list[str] = field(default_factory=list)
 
 
+# A heading of at most this many words that ends in one of these words opens
+# that kind of section: "Clinical Experience", "Teaching Experience", "Clinical
+# Rotations", "Freelance Projects". The exact names above win, so "Volunteer
+# Experience" stays a section of its own.
+_HEADING_TAIL_WORDS = 4
+_HEADING_TAILS = {
+    "experience": "experience",
+    "history": "experience",
+    "rotations": "experience",
+    "projects": "projects",
+}
+# words that make a short line a job title or a sentence rather than a
+# heading: "Head of Customer Experience", "I have experience"
+_TITLE_LIKE = frozenset(
+    {
+        "of",
+        "for",
+        "to",
+        "at",
+        "head",
+        "director",
+        "manager",
+        "vp",
+        "vice",
+        "president",
+        "lead",
+        "chief",
+        "officer",
+        "specialist",
+        "coordinator",
+        "analyst",
+        "associate",
+        "senior",
+        "i",
+        "my",
+        "have",
+        "has",
+        "with",
+        "years",
+    }
+)
+
+
 def heading_kind(line: str) -> str | None:
     """The section a heading line opens, or None. "WORK EXPERIENCE",
-    "Experience:", "E X P E R I E N C E" all open experience."""
+    "Experience:", "E X P E R I E N C E" and "Clinical Experience" all open
+    experience; "Licenses & Certifications" opens credentials and
+    "Portfolio" opens projects (both kept in other_sections)."""
     s = line.strip().strip(":").strip()
     if not s or len(s) > 45:
         return None
@@ -807,6 +872,13 @@ def heading_kind(line: str) -> str | None:
     if kind is None and " " not in key:
         # a letter-spaced heading lost its word gaps: "WORKEXPERIENCE"
         kind = {k.replace(" ", ""): v for k, v in _HEADING_KIND.items()}.get(key)
+    if kind is None and key:
+        words = key.split()
+        # the whole line must be heading words: letters only before the
+        # filter above, so a sentence that ends in "experience" never counts
+        plain = re.fullmatch(r"[A-Za-z&/\- ]+", s) is not None
+        if plain and len(words) <= _HEADING_TAIL_WORDS and not _TITLE_LIKE.intersection(words[:-1]):
+            kind = _HEADING_TAILS.get(words[-1])
     return kind
 
 
@@ -1194,4 +1266,10 @@ def parse_resume(text: str) -> ParsedResume:
         # no summary section: the paragraphs above the roles, never a role header
         resume.summary = [text for last, text in runs if last < roles_start]
     resume.roles = _parse_experience(exp_lines, resume.notes)
+    if not any(r.bullets for r in resume.roles):
+        resume.notes.append(
+            "headings found: "
+            + ("; ".join(resume.headings) if resume.headings else "none")
+            + ". Ask which one holds the jobs"
+        )
     return resume

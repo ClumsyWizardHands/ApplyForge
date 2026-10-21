@@ -13,6 +13,8 @@ import sqlite3
 from collections import Counter
 from dataclasses import dataclass, field
 
+from jobkit.config import Filters, load_filters
+
 
 @dataclass
 class Calibration:
@@ -42,7 +44,12 @@ def _word_patterns(reasons: list[str], min_count: int = 5) -> list[tuple[str, in
     return [(w, c) for w, c in words.most_common(8) if c >= min_count]
 
 
-def calibrate(conn: sqlite3.Connection) -> Calibration:
+def calibrate(conn: sqlite3.Connection, filters: Filters | None = None) -> Calibration:
+    """Numbered proposals from the decisions log. `filters` (default: loaded
+    from config/filters.yaml) names the scoring prompt a re-anchor proposal
+    points at: the active prompt set's file."""
+    from jobkit.pipeline.triage import score_prompt_name
+
     cal = Calibration()
     cal.decisions = conn.execute("SELECT COUNT(*) c FROM decisions").fetchone()["c"]
 
@@ -67,9 +74,10 @@ def calibrate(conn: sqlite3.Connection) -> Calibration:
     stats = {r["decision"]: r for r in bands}
     app, rjc = stats.get("approve"), stats.get("reject")
     if app and app["n"] >= 5 and (app["hi"] - app["lo"]) <= 12:
+        prompt_file = f"prompts/{score_prompt_name(filters or load_filters())}.md"
         cal.proposals.append(
             f"Your {app['n']} approvals cluster at {app['lo']}-{app['hi']} — the rubric "
-            f"is compressed. Re-anchor prompts/score_fit.md with three of your own "
+            f"is compressed. Re-anchor {prompt_file} with three of your own "
             f"recent decisions as worked examples?"
         )
     if app and rjc and app["avg_s"] is not None and rjc["avg_s"] is not None:

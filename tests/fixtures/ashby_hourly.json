@@ -1,0 +1,48 @@
+{
+ "__note": "Hand-built in the shape of the Ashby posting-api job-board response (includeCompensation=true). Fictional employer and ids. Not a live recording.",
+ "jobs": [
+  {
+   "id": "00000000-0000-4000-8000-000000000101",
+   "title": "Registered Nurse, Virtual Care",
+   "department": "Clinical",
+   "team": "Nursing",
+   "employmentType": "FullTime",
+   "location": "Columbus, OH",
+   "isListed": true,
+   "isRemote": false,
+   "workplaceType": "OnSite",
+   "publishedAt": "2026-10-14T12:00:00.000+00:00",
+   "jobUrl": "https://jobs.ashbyhq.com/examplehealth/00000000-0000-4000-8000-000000000101",
+   "applyUrl": "https://jobs.ashbyhq.com/examplehealth/00000000-0000-4000-8000-000000000101/application",
+   "descriptionHtml": "<p>Provide nursing care to patients through video and phone visits.</p>",
+   "compensation": {
+    "compensationTierSummary": "$38 – $52 per hour",
+    "summaryComponents": [
+     {"compensationType": "Salary", "interval": "1 HOUR", "currencyCode": "USD", "minValue": 38, "maxValue": 52}
+    ]
+   }
+  },
+  {
+   "id": "00000000-0000-4000-8000-000000000102",
+   "title": "Nurse Manager",
+   "department": "Clinical",
+   "team": "Nursing",
+   "employmentType": "FullTime",
+   "location": "Columbus, OH",
+   "isListed": true,
+   "isRemote": false,
+   "workplaceType": "OnSite",
+   "publishedAt": "2026-10-14T12:00:00.000+00:00",
+   "jobUrl": "https://jobs.ashbyhq.com/examplehealth/00000000-0000-4000-8000-000000000102",
+   "applyUrl": "https://jobs.ashbyhq.com/examplehealth/00000000-0000-4000-8000-000000000102/application",
+   "descriptionHtml": "<p>Lead the nursing team for the virtual care clinic.</p>",
+   "compensation": {
+    "compensationTierSummary": "$45/hr or $105K – $125K",
+    "summaryComponents": [
+     {"compensationType": "Salary", "interval": "1 HOUR", "currencyCode": "USD", "minValue": 45, "maxValue": 55},
+     {"compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 105000, "maxValue": 125000}
+    ]
+   }
+  }
+ ]
+}

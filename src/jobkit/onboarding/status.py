@@ -21,8 +21,16 @@ from typing import Any
 from jobkit import config, doctor
 from jobkit import schedule as launchd
 from jobkit.onboarding.answer_bank_builder import answer_status, load_record
-from jobkit.onboarding.corpus_confirm import CONFIDENCES, promotion_blockers
+from jobkit.onboarding.corpus_confirm import (
+    CONFIDENCES,
+    THIN_BULLETS,
+    THIN_VERIFIED,
+    figure_counts,
+    is_thin,
+    promotion_blockers,
+)
 from jobkit.onboarding.files import SetupFiles, load_yaml, setup_files
+from jobkit.onboarding.targets import feed_only_said
 
 
 @dataclass(frozen=True)
@@ -31,6 +39,7 @@ class Step:
     state: str  # done | partial | todo | check
     detail: str
     next_action: str = ""
+    warning: str = ""  # shown under a step that is done but worth knowing about
 
 
 @dataclass
@@ -50,6 +59,8 @@ class SetupStatus:
         lines = [f"jobkit setup — {self.root}"]
         for i, s in enumerate(self.steps, 1):
             lines.append(f"{i}. [{s.state:^7}] {s.name}: {s.detail}")
+            if s.warning:
+                lines.append(f"             ! {s.warning}")
             if s.state != "done" and s.next_action:
                 lines.append(f"             → {s.next_action}")
         nxt = self.next_step
@@ -98,16 +109,16 @@ def _corpus_step(files: SetupFiles) -> Step:
                 f"{len(unset)} of {len(bullets)} bullets have no metric_confidence",
                 "set metric_confidence and evidence for each (yours to set, never defaulted)",
             )
-        verified = sum(1 for b in bullets if b.get("metric_confidence") == "verified")
+        figures, verified = figure_counts(bullets)
         thin = (
-            " — thin (under 30 bullets or 40% verified)"
-            if (len(bullets) < 30 or verified / len(bullets) < 0.4)
+            f" — thin (under {THIN_BULLETS} bullets or {THIN_VERIFIED:.0%} of figures verified)"
+            if is_thin(bullets)
             else ""
         )
         return Step(
             "career corpus",
             "done",
-            f"{len(bullets)} bullets, {verified} verified{thin}",
+            f"{len(bullets)} bullets, {verified} of {figures} figures verified{thin}",
         )
     if files.corpus_draft.is_file():
         data, err = _safe_yaml(files.corpus_draft)
@@ -167,13 +178,26 @@ def _preferences_step(files: SetupFiles) -> Step:
 
 
 def _targets_step(files: SetupFiles) -> Step:
-    action = "seed_targets(companies) — CLI: jobkit setup targets <name> [<name> ...]"
+    action = (
+        "seed_targets(companies) — CLI: jobkit setup targets <name> [<name> ...]; when the "
+        "person's employers have no board jobkit can poll: seed_targets(feed_only_said=<their "
+        'words>) — CLI: jobkit setup targets --feed-only "<their words>"'
+    )
     ok, why = _config_ok(files, "targets.yaml")
     if not ok:
         return Step("target companies (config/targets.yaml)", "todo", f"targets.yaml {why}", action)
-    t = config.load_targets(files.config_file("targets.yaml"))
+    path = files.config_file("targets.yaml")
+    t = config.load_targets(path)
     boards = sum(1 for c in t.companies if c.board)
     if not boards:
+        said = feed_only_said(path)
+        if said:
+            return Step(
+                "target companies (config/targets.yaml)",
+                "done",
+                f'{len(t.companies)} companies; feeds only (you said: "{said[:120]}")',
+                warning="0 polled boards; postings come from the feeds",
+            )
         return Step(
             "target companies (config/targets.yaml)",
             "partial",

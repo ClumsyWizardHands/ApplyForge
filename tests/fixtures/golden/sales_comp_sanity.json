@@ -1,0 +1,33 @@
+{
+ "Account Executive, Mid-Market": {
+  "flags": [
+   "no-range-where-required"
+  ],
+  "verdict": "unknown"
+ },
+ "Director of Sales": {
+  "flags": [
+   "ote-basis-unclear: big number, base-vs-OTE not stated"
+  ],
+  "verdict": "fair"
+ },
+ "Enterprise Account Executive": {
+  "flags": [
+   "range-dodge: width 67%",
+   "underpriced: demand 80 (roles=1) at ceiling $150,000"
+  ],
+  "verdict": "underpriced"
+ },
+ "Head of Revenue": {
+  "flags": [],
+  "verdict": "fair"
+ },
+ "Manager, Sales Development": {
+  "flags": [
+   "range-dodge: width 100%",
+   "role-sprawl: 3 jobs in one posting",
+   "ote-unrealistic: uncapped commission doing all the work"
+  ],
+  "verdict": "fair"
+ }
+}

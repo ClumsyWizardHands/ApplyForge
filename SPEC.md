@@ -1,6 +1,6 @@
 # JOBKIT — Build Specification
 
-**Version:** 1.4 **Target builder:** Claude Opus in Claude Code **Changes from 1.3:** weekly tailoring cap DELETED — `volume_mode` is the only throughput throttle, default `high` · dedup key canonicalized, `location_bucket` defined · one-knob-one-owner config precedence (§1.7) · `on_remote_conflict` defaults to `flag` · embeddings pinned to local `fastembed` · commute data source specified · queue numbering pinned per session · `get_digest` tool · onboarding now populates `answer_bank.yaml` (2.7) and seeds standing rules (2.8) · M0b runs pre-MCP as a plain Claude Code conversation · Workday routed to manual path · `banned_phrases.yaml` declared authoritative **Companion doc:** `ONBOARDING.md` (milestone M0b)
+**Version:** 1.5 **Target builder:** Claude Opus in Claude Code **Changes from 1.4** (2026-10-21, §15): the person presses every submit, and the opt-in auto-submit amendment is withdrawn (§8) · follow-up note drafting removed; a plain no-reply rule marks applications ghosted (§7 stage 12) · employer replies read from the person's own mailbox, read-only (§7 stage 12) · `prompt_set` and per-track `pivot`, `min_score` and `emphasis` for searches outside sales (§5 stage 6) · `comp_sanity` thresholds moved into config (§5 stage 5) · location-aware Adzuna and USAJOBS searches (§2.2) **Changes in 1.4, from 1.3:** weekly tailoring cap DELETED — `volume_mode` is the only throughput throttle, default `high` · dedup key canonicalized, `location_bucket` defined · one-knob-one-owner config precedence (§1.7) · `on_remote_conflict` defaults to `flag` · embeddings pinned to local `fastembed` · commute data source specified · queue numbering pinned per session · `get_digest` tool · onboarding now populates `answer_bank.yaml` (2.7) and seeds standing rules (2.8) · M0b runs pre-MCP as a plain Claude Code conversation · Workday routed to manual path · `banned_phrases.yaml` declared authoritative **Companion doc:** `ONBOARDING.md` (milestone M0b)
 
 ---
 
@@ -24,11 +24,11 @@ A local-first pipeline that finds relevant job postings from open ATS APIs, sani
         │  "yes to 1, 3, 7"       →  tailor + render + stage form   │
         │  "open them"            →  browser tabs, pre-filled       │
         │  YOU CLICK SUBMIT                                         │
-        │  "logged 1,3,7"         →  tracked, follow-ups scheduled  │
+        │  "logged 1,3,7"         →  tracked, replies recorded      │
         └───────────────────────────────────────────────────────────┘
 ```
 
-**The one hard rule:** the system never presses submit. Everything up to that click is automated. See §8 for why this is a technical fact, not a preference.
+**The person presses submit.** Everything before that is automated. §8 gives the two reasons: a bot check on an employer's form is the employer asking for a person to submit, and no ATS offers applicants a submit API.
 
 ---
 
@@ -38,7 +38,7 @@ A local-first pipeline that finds relevant job postings from open ATS APIs, sani
 2. **The LLM selects; it does not invent.** Resume bullets come from a pre-approved corpus. Every claim traces to a `bullet_id`. Fail closed.  
 3. **SQLite is the source of truth.** Sheets is a mirror. Everything reproducible from the DB.  
 4. **Background work is background.** Polling, extraction, and scoring happen on a schedule with no human present. The human only ever sees a decision queue.  
-5. **Approval is one keystroke.** If reviewing costs mental energy, the system has failed. See §6.  
+5. **Approval is one keystroke.** Reviewing should take little effort. See §6.  
 6. **Idempotent everything.** Re-runs create no duplicates and cost near-zero on cache hits.  
 7. **One knob, one owner.** Every threshold lives in exactly one config location. Evaluation order is fixed: deterministic filters → sanity checks → standing rules, and the rejection log records which layer killed a job. If two configs appear to control the same behavior, that is a spec bug — raise it, do not reconcile silently.
 
@@ -58,6 +58,8 @@ A local-first pipeline that finds relevant job postings from open ATS APIs, sani
 | Recruitee | `GET https://{company}.recruitee.com/api/offers/` |
 | Rippling | `GET https://api.rippling.com/platform/api/ats/v1/board/{token}/jobs` |
 
+**Status (v1.5):** Greenhouse, Lever and Ashby are built. Workable and SmartRecruiters were verified live on 2026-08-18 and are not built (next on the roadmap); Rippling was partly verified and Recruitee could not be verified (`docs/endpoints_verified.md`). Employers on Workday, iCIMS, Taleo, SuccessFactors and similar systems are recognised from a pasted link but not read: their job APIs are undocumented or need an employer account (hard rules 9 and 11).
+
 **M0 TASK:** verify every one of these live before building on it. Record actual shapes and date in `docs/endpoints_verified.md`. Rippling especially is newer and less stable.
 
 Caveats worth knowing: SmartRecruiters' public postings feed is **tier-dependent** — customers on lower plans have it disabled. Lever customers can disable their public endpoint or use vanity URLs. Neither ATS publishes a list of which customers are public, so discovery failures are normal, not bugs.
@@ -74,6 +76,8 @@ Per-company ATS endpoints return one employer per call. These return many, and c
 | Remotive | `https://remotive.com/api/remote-jobs` | Remote tech | Free, no key |
 | RemoteOK | `https://remoteok.com/api` | Remote tech | Free, no key |
 | Himalayas | `https://himalayas.app/jobs/api` | Remote | Free |
+
+**Amended in v1.5:** Adzuna and USAJOBS take optional locations from `feeds.adzuna.locations` (`where`, `distance_km`; at most 3 places a run, each searched with every phrase, up to 10 phrases) and `feeds.usajobs.locations` (`name`, `radius_miles`; at most 5), and Adzuna's country from `feeds.adzuna.country` (default `us`). Both use only their documented search parameters. A feed whose key is missing is skipped before any request and logged with the missing variable names.
 
 **Dead ends — do not build on these.** The Indeed Publisher API was retired in 2023. LinkedIn job data is gated behind partner-only Talent Solutions. Any guide recommending either is out of date.
 
@@ -120,13 +124,13 @@ LinkedIn, Indeed, Glassdoor direct. Gated APIs, adversarial anti-bot, retired pu
 
 **Note, 2026-10-12: one LinkedIn exception.** CLAUDE.md hard rule 11 now allows LinkedIn's logged-out ("guest") job search for discovery only (`src/jobkit/discovery/linkedin_guest.py`, `jobkit linkedin-discover`, MCP `linkedin_discover`; off unless `feeds.linkedin_guest.enabled`). It is never logged in, sends no cookies, uses an honest User-Agent, makes at most 6 searches per local day, and stops for the day on HTTP 429/999/403/401, any redirect, a CAPTCHA or challenge page at any status (Cloudflare's included) or a search page with no job card that is not the empty no-results page. It runs one at a time (a lock held for the whole run) and reads the day's block again before every request. It stores no LinkedIn job rows: a card enters jobkit directly only when its "apply on company site" link resolves to the employer's own Greenhouse/Lever/Ashby board (the add-url path), and otherwise only the company name goes to the discovery queue. Verified live the same day: the guest search returns job cards to a plain HTTP client, but the logged-out posting page no longer carries the employer's apply link, so in practice each card's company is queued and the discovery stage finds its board by name through the registry (§2.4); the run itself never adds or polls a board on a name match. The mode is still against LinkedIn's User Agreement. Indeed and Glassdoor stay out of scope. Details: `docs/why-no-linkedin.md`.
 
-**Third-party auto-apply services** are also out of scope. Several vendors accept a job URL plus a candidate profile and file the application on your behalf. They work by driving the same browser automation this system deliberately stops short of — which is precisely what employer bot-detection is tuned to catch — and they require handing a third party your identity documents and full work history. Noted here so nobody re-discovers them in month three and assumes they were overlooked.
+**Third-party auto-apply services** are also out of scope. Several vendors accept a job URL plus a candidate profile and file the application on your behalf. They drive the same submit click this system leaves to the person, which employer bot checks are there to stop (§8), and they require handing a third party your identity documents and full work history.
 
 ---
 
 ## 3. Data model (SQLite)
 
-Tables from v1.0 — `companies`, `boards`, `jobs`, `job_requirements`, `scores`, `applications`, `contacts`, `events`, `followups` — plus:
+Tables from v1.0: `companies`, `boards`, `jobs`, `job_requirements`, `scores`, `applications`, `contacts` and `events`, plus the ones below. *(v1.5: the v1.0 `followups` table is gone. `db.init_db` archives each of its rows into `events` as `followups_archived`, after writing a SQLite backup to `data/jobkit.pre-followups.db`, then drops it.)*
 
 ```sql
 CREATE TABLE sanity (
@@ -264,9 +268,13 @@ For hybrid roles, compute commute minutes from `home_coordinates` (the real loca
 
 *Missing range where legally required:* As of 2026, California, Colorado, Hawaii, Illinois, Maryland, Massachusetts, Minnesota, New Jersey, New York, Vermont, and Washington (plus DC) require a good-faith pay range in the posting, and remote postings performable from those states generally fall under their law. A remote posting with no range is therefore either non-compliant or deliberately opaque. Flag as `comp_required_by_law = 1, comp_published = 0` — it's a real signal about the employer.
 
+*Amended in v1.5:* the thresholds are config, not constants. `comp_sanity` in `filters.yaml` holds `max_range_width_pct` (0.6), `flag_missing_range_when_required` (true), `underpriced_below` (160000), `ote_unclear_from` (200000) and `ote_check` (`always`, or `ote_tracks` to apply both OTE flags only to titles whose floor basis is `ote`). The defaults equal the old constants.
+
 Maintain `config/comp_benchmarks.yaml` — your own table of title × level × geo → expected range. Seed it manually; refine as you see real ranges. Do not scrape Levels.fyi.
 
 **6 · score** (Haiku) — 0–100 fit, two-sentence rationale, explicit `gaps` array. Rubric in `prompts/score_fit.md` must contain three anchored worked examples (a 90, a 60, a 30) or scores bunch at 70–85 and become useless. Re-calibrate against your own labels after 50 jobs.
+
+*Amended in v1.5 (prompt sets):* `prompt_set` at the top of `filters.yaml` picks the scoring and bullet-selection prompts. `sales` (and an absent key) uses `score_fit.md` and `select_bullets.md` unchanged, so an existing config's results do not move. `general` uses `score_fit_general.md` (worked bands from several fields, plus a career-change band) and `select_bullets_general.md` (each track's `emphasis`, in the person's words, in place of the sales presets). Any other value fails at load. Tracks gain optional `pivot` (score the track's jobs as a career change: the switch is a gap after the unmet must-haves and before any overqualified gap), `min_score` (the track's queue gate in place of `gates.min_score_to_surface`) and `emphasis` (one line, at most 200 characters; used in selection, never in scoring). Every score records the corpus hash and prompt version, and a `score_fit_general` score also records the prompt name. Rescore treats a new corpus hash or a switch of prompt set as stale, and for `score_fit_general` a new version too; a `score_fit.md` version bump alone leaves sales scores as they are, as before prompt sets. The setup interview writes `general` unless every track is a sales title and no track sets `pivot` or `emphasis`. Golden tests pin the sales path byte for byte.
 
 **7 · form spec** (adapter + Haiku) — *NEW in v1.2.* For every job that survived scoring, fetch the application form structure via the ATS adapter (§2.3). Match each field against the Answer Bank. Draft answers for unmatched fields using the corpus + JD, subject to the `never_draft_if` rules. Compute `friction_score` from field count, required count, novel-question count, and assessment presence.
 
@@ -276,11 +284,11 @@ This is the last background stage, and it runs while you sleep. By morning most 
 
 Stages 9–11 (tailor, cover letter, form staging) run **only after approval**. See §6 and §7.
 
-*Amended 2026-10-08 (nightly run):* the background pipeline runs once a night, unattended, as `jobkit nightly` (MCP `run_nightly`): every stage above, standing rules, tailoring of approved jobs and follow-up drafts, then stage 11 for approved jobs whose application is tailored and not staged since, then the digest (stage 13) last. Staging runs in one process, one headed browser at a time, closed when its forms are filled so the profile lock is free in the morning, and with no carry-forward between jobs (§7.1: nobody is in the session). It never submits (§8); the staged forms wait for `open_queue`. Each stage runs isolated, the run is recorded (`run_all.*` events with mode `nightly`), the digest shows the last successful nightly run, and the command exits non-zero when a stage failed. The schedule is one macOS LaunchAgent, `com.jobkit.nightly`, managed by `jobkit schedule install|uninstall|status` (MCP `schedule_*`) at `schedule.nightly_at` in `filters.yaml` (default `"02:00"`); other platforms are not supported yet. It replaces `scripts/install_schedule.sh` and the unread per-stage times in `schedule:`.
+*Amended 2026-10-08 (nightly run):* the background pipeline runs once a night, unattended, as `jobkit nightly` (MCP `run_nightly`): every stage above, standing rules, tailoring of approved jobs and the no-reply rule (stage 12; v1.5), then stage 11 for approved jobs whose application is tailored and not staged since, then the digest (stage 13) last. Staging runs in one process, one headed browser at a time, closed when its forms are filled so the profile lock is free in the morning, and with no carry-forward between jobs (§7.1: nobody is in the session). It never submits (§8); the staged forms wait for `open_queue`. Each stage runs isolated, the run is recorded (`run_all.*` events with mode `nightly`), the digest shows the last successful nightly run, and the command exits non-zero when a stage failed. The schedule is a scheduled task in the Claude app, whose prompt points at `.claude/skills/jobkit-scheduled-run/SKILL.md` (v1.5). The fallback is one macOS LaunchAgent, `com.jobkit.nightly`, managed by `jobkit schedule install|uninstall|status` (MCP `schedule_*`) at `schedule.nightly_at` in `filters.yaml` (default `"02:00"`). On Linux, cron runs `jobkit nightly`. The LaunchAgent replaces `scripts/install_schedule.sh` and the unread per-stage times in `schedule:`.
 
 ---
 
-## 6. The review loop (this is the product)
+## 6. The review loop
 
 ### 6.1 MCP server
 
@@ -301,10 +309,11 @@ Stages 9–11 (tailor, cover letter, form staging) run **only after approval**. 
 | `restage(id)` | Re-run staging from cached form spec after a dropped session |
 | `get_novel_questions(n)` | Only the questions the Answer Bank couldn't cover |
 | `answer_novel(n, answers)` | Records answers; offers promotion into the bank |
-| `mark_submitted(ids)` | Logs application, schedules follow-ups |
-| `get_followups()` | Due follow-ups with drafts attached |
+| `mark_submitted(ids)` | Logs application |
+| `record_outcome(job_id, outcome)` | Records a reply, rejection, interview or offer |
+| `email_targets()` · `match_email(...)` · `record_email_response(...)` · `finish_email_check()` | Replies from the person's own mailbox, read through their email connector (v1.5, §7 stage 12) |
 | `get_stats(period)` | Funnel + conversion rates |
-| `get_digest(date?)` | The daily digest — overnight auto-approvals, sanity flags, reposts, follow-ups due. Newest digest header is also prepended to `get_queue` output |
+| `get_digest(date?)` | The daily digest — overnight auto-approvals, sanity flags, reposts, replies recorded. Newest digest header is also prepended to `get_queue` output |
 | `tune_filters()` | Rejection-reason analysis with suggested config edits |
 | `ingest_resume(path)` | Parse resume, propose corpus draft, return critique (ONBOARDING.md §1) |
 | `confirm_bullets(batch, decisions)` | Human confirmation loop; sets `metric_confidence` + `evidence` |
@@ -313,7 +322,7 @@ Stages 9–11 (tailor, cover letter, form staging) run **only after approval**. 
 | `calibrate()` | Decision-log analysis, numbered config proposals (ONBOARDING.md §3) |
 | `corpus_health()` | Bullet count, metric coverage, tag distribution, gaps vs recent postings |
 | `build_answer_bank()` | Screening-question walk; writes `answer_bank.yaml` (ONBOARDING.md 2.7) |
-| `seed_rules()` | Proposes initial standing rules for per-rule acceptance (ONBOARDING.md 2.8) |
+| `seed_rules()` | Planned: proposes initial standing rules for per-rule acceptance (ONBOARDING.md 2.8). Not built; `autoapprove.yaml` starts with no rules |
 | `review_artifacts(id)` | Authenticity verdict + flagged spans for resume and cover letter |
 
 **Queue numbering is pinned.** `get_queue` captures a number → `job_id` map at render time; `approve` / `reject` / `snooze` resolve against that pinned map, never against the queue's current order. A re-sort between render and reply cannot misroute an approval. New render, new map.
@@ -336,7 +345,7 @@ Claude: [tailors 6 · provenance clean · forms staged · 2 novel questions on #
 
 That's the whole interaction. One message in, one message back.
 
-### 6.2 Standing rules (the real mental-space saver)
+### 6.2 Standing rules
 
 `config/autoapprove.yaml` lets the queue pre-decide the obvious cases so only genuine judgment calls surface:
 
@@ -352,7 +361,7 @@ auto_reject:
 
 Auto-approved jobs still get tailored and staged — they just don't ask you first. They appear in the digest as "done, FYI." Auto-rejects are logged and reviewable weekly, never silently dropped.
 
-Onboarding seeds the first rules (ONBOARDING.md 2.8) — proposed from your interview answers, accepted by you one rule at a time — so the queue is pre-deciding the obvious from day one rather than week three. Calibration then grows the set from observed behavior. Within two weeks the queue should be short and every item on it should be genuinely interesting.
+Planned: onboarding seeds the first rules (ONBOARDING.md 2.8), proposed from your interview answers and accepted one rule at a time. Today `autoapprove.yaml` starts with none. Calibration then grows the set from observed behavior. Within two weeks the queue should be short and every item on it should be genuinely interesting.
 
 ---
 
@@ -410,7 +419,7 @@ Record every run in an `authenticity_runs` table — verdict, flags, regeneratio
 4. Fill every field with an Answer Bank match above threshold. Attach the tailored resume and cover letter PDFs.  
 5. Leave novel questions blank and **visually highlight them** (inject a CSS outline).  
 6. Screenshot, write `autofill_runs` row with status `staged`.  
-7. **Stop. Do not click submit. Do not solve a CAPTCHA.**
+7. **Stop before submit.** The person presses it (§8). Do not solve a CAPTCHA.
 
 **Note, 2026-10-12.** Step 4 now runs in this order: the resume and cover letter are attached first, as copies named `First_Last_Resume.pdf` / `First_Last_Cover_Letter.pdf` from the Answer Bank identity (kept in `out/uploads/job-<id>/`; the tailored originals are never changed), into the file input the ATS field id names or else the one input labelled as that file; staging then waits, at most 8 s, for an ATS resume parser to stop rewriting the form; then the other fields are filled. After the fill every filled value is read back; a value the page changed is filled once more, and one still changed is recorded as `overwritten-after-fill`, makes the run `needs_human`, and is counted in a `readback` event keyed by the `autofill_runs` id (no schema change). The CAPTCHA check of step 7 also runs after every click the filler makes and once after the fill; a challenge found then stops the run as `captcha-provoked-by-fill:<field>` with a screenshot, and is never touched. Form-spec capture (§2.3) closes a job whose per-job ATS fetch is a definite not-found (404/410, Lever's or Ashby's not-found body): status `closed`, event `posting_gone`, never tailored or staged; any other fetch failure keeps the DOM-scrape placeholder.
 
@@ -428,25 +437,27 @@ A first-class object, not a side effect of staging. `submit_queue` holds everyth
 
 **Abort conditions** (from `answer_bank.yaml`) halt staging for that job and mark it `needs_human`: CAPTCHA or Turnstile present, SSN / DOB / government ID requested, payment details requested, an embedded assessment or timed test, or a required field with no bank match and no safe draft. The job stays in the queue with the reason attached; it is never dropped and never guessed at.
 
-**Session hygiene.** One persistent profile, human-paced interaction (`slow_mo`, randomized inter-field delays), a hard cap on concurrent tabs (default 8), and no headless mode ever. Staging is not a race — it runs while you make coffee.
+**Session hygiene.** One persistent profile, human-paced interaction (`slow_mo`, randomized inter-field delays), a hard cap on concurrent tabs (default 8), and no headless mode ever. Staging runs at a human pace.
 
 **Recovery.** Forms expire, sessions drop, selectors drift. Every staged run screenshots on completion and on failure. `restage(job_id)` re-runs from the cached form spec and refills from `autofill_runs`, so a dropped session costs seconds rather than a redo.
 
 ### 7.2 Playwright vs Claude in Chrome
 
-Playwright is the engine: programmatic, headed, persistent profile, screenshots, deterministic replay, and it can hold eight tabs open without supervision. Claude in Chrome is the right tool for the one-off — a Workday form the adapter can't parse, a company portal with its own login flow, anything where you want a conversational assist on a single application rather than a batch. Build Playwright; keep Chrome as the documented manual fallback in the README. Workday-hosted applications route to the manual path by default and take an automatic friction penalty — they typically sit behind per-company account creation, which staging must never perform, and their multi-page DOM defeats the scrape fallback often enough that pretending otherwise wastes the batch.
+Playwright is the engine: programmatic, headed, persistent profile, screenshots, deterministic replay, and it can hold eight tabs open without supervision. Claude in Chrome is the right tool for the one-off — a Workday form the adapter can't parse, a company portal with its own login flow, anything where you want a conversational assist on a single application rather than a batch. Build Playwright; keep Chrome as the documented manual fallback (`docs/form-filling.md`). Workday-hosted applications route to the manual path by default and take an automatic friction penalty — they typically sit behind per-company account creation, which staging must never perform, and their multi-page DOM defeats the scrape fallback often enough that pretending otherwise wastes the batch.
 
-**12 · track** — on `mark_submitted`, stage → `submitted`, schedule follow-ups: +7d status check, +14d hiring-manager note (if a contact exists), +30d close as ghosted. Drafts are generated. **Sending is manual.**
+**12 · track** — on `mark_submitted`, stage → `submitted`. *(Amended in v1.5.)* No follow-up notes are drafted. A plain status rule, run each night as the `ghost-close` stage with no LLM call, marks an application `ghosted` when it has been at `submitted` for `tracking.ghost_after_days` (default 30; a legacy `followups:` entry of kind `close_as_ghosted` supplies the days when the key is absent) with no recorded outcome and no email reply other than an automatic receipt. Replies are recorded by `record_outcome`, or from the person's own mailbox: Claude reads it through the email connector the person set up, and the `email_targets`, `match_email`, `record_email_response` and `finish_email_check` tools record what it finds. jobkit never connects to a mailbox, and nothing there is sent or changed. Each reply is one `email_response` event holding the outcome (acknowledged, rejected, assessment, interview, offer or recruiter_question), the date, the message id, a link and a one-line summary; the body is never stored. Matching is a fixed rule (company name, company domain, the ATS applied through, title words), and an unclear match goes to the person.
 
-**13 · digest** — daily markdown written to `out/digest/{date}.md` and exposed via the `get_digest` MCP tool (the newest digest header is also prepended to `get_queue` output, so overnight activity is visible without asking): new jobs above threshold, auto-approved FYIs, sanity flags, reposts, stale boards, follow-ups due, and the funnel (seen → filtered → queued → approved → submitted → replied) with conversion rates at each step. The funnel is how you learn whether targeting or the resume is the bottleneck.
+**13 · digest** — daily markdown written to `out/digest/{date}.md` and exposed via the `get_digest` MCP tool (the newest digest header is also prepended to `get_queue` output, so overnight activity is visible without asking): new jobs above threshold, auto-approved FYIs, sanity flags, reposts, stale boards, replies recorded since the last digest, and the funnel (seen → filtered → queued → approved → submitted → replied) with conversion rates at each step. The funnel is how you learn whether targeting or the resume is the bottleneck.
 
 ---
 
-## 8. Why the system stops one click short
+## 8. Why the person presses submit
 
-This is a technical constraint, not caution. Record it so nobody re-litigates it in month three.
+There are two reasons. One is a choice about consent; the other is how the ATS platforms work. *(Amended in v1.5, owner decision 2026-10-21: the opt-in auto-submit amendment of 2026-10-09 is withdrawn, and nothing in jobkit submits an application.)*
 
-**There is no candidate-side submission API on any major ATS.** Verified individually, not assumed:
+**Consent.** Many employers put a CAPTCHA or another bot check on their application forms. A bot check is the employer asking for a person to send the application, and jobkit respects it. Some checks are invisible, so software can't reliably tell which forms have one. The person therefore presses submit on every application, and when a form shows a challenge, staging stops and hands it to the person (hard rule 2).
+
+**No applicant-side submit API.** Every ATS that accepts applications through an API does so only with a credential issued to the hiring company. Verified individually:
 
 | ATS | Submit endpoint | Auth required | Whose credential |
 | :---- | :---- | :---- | :---- |
@@ -456,17 +467,19 @@ This is a technical constraint, not caution. Record it so nobody re-litigates it
 | SmartRecruiters | `POST /postings/{uuid}/candidates` | `X-SmartToken` header | Employer's, minted in their admin or partner OAuth |
 | Workable / Recruitee / Rippling | Same pattern | Account-scoped | Employer's |
 
-Every write path is tenant-scoped to the hiring company. This is deliberate platform design — it is what stands between the ecosystem and unlimited automated application spam. **Adding more ATS adapters multiplies the jobs you can find and the forms you can pre-fill. It does not and cannot produce a submission path.** Do not spend time looking for one.
+Each of these submit endpoints takes a key issued to the hiring company, so an applicant has no API to submit through. More ATS adapters add jobs to find and forms to fill; they add no way to submit (hard rule 9). Submitting for the person would mean pressing the employer's button in a browser, which is what the bot checks are there to stop.
 
-So submission means driving the web form, and there the remaining blockers are:
+If employers ever offer an approved way for software to apply on a person's behalf, that is consent, and jobkit could use it.
 
-1. **Free-text custom questions** vary per job; a wrong answer is unrecoverable.  
+What is left for the person on a filled form:
+
+1. **Free-text custom questions** vary per job; a wrong answer can't be taken back.  
 2. **EEO / veteran / disability** sections are legally the applicant's own responses.  
-3. **Work authorization and sponsorship** — a wrong answer is misrepresentation, not a bug.  
-4. **Turnstile / hCaptcha** now guards many submit endpoints. Solving these is out of scope, permanently.  
-5. **You cannot un-apply.** A wrong resume at a tier-1 company burns that company.
+3. **Work authorization and sponsorship**: a wrong answer is misrepresentation.  
+4. **Turnstile / hCaptcha** guards many forms. jobkit does not solve them.  
+5. **An application can't be withdrawn.** A wrong resume at a tier-1 company uses up that company.
 
-The Answer Bank collapses 1–3 to near-zero effort. What's left is a glance and a click.
+The Answer Bank answers 1–3, so most forms need only a review and the click.
 
 ---
 
@@ -518,6 +531,7 @@ jobkit/
 │   ├── extract_requirements.md · remote_check.md · comp_sanity.md
 │   ├── authenticity_critic.md · resume_critique.md · intake_interview.md
 │   ├── score_fit.md · select_bullets.md · cover_letter.md
+│   ├── score_fit_general.md · select_bullets_general.md   # prompt_set: general (v1.5)
 │   └── novel_question.md
 ├── templates/resume.typ · cover_letter.typ
 ├── out/{company}-{role}-{date}/  # resume.pdf, cover.pdf, gap_report.md, provenance.json
@@ -586,7 +600,7 @@ class FeedAdapter(Protocol):
 
 **M5 — Submit queue (2.5 days).** Answer Bank, Playwright staging, per-field provenance rendering, novel-question flow, carry-forward, abort conditions, batch `open_queue`, `restage` recovery. *Accept:* on live Greenhouse, Lever, and Ashby forms, ≥85% of fields fill correctly, every filled field carries a correct `source`, EEO fields respect stored choices or stay blank, abort conditions halt cleanly with a reason, novel questions are highlighted, and **the browser never clicks submit** — assert with a test that fails if any submit selector is ever targeted.
 
-**M6 — Tracking + calibration (1.5 days).** Applications, events, follow-up drafts, Sheets mirror, funnel stats, launchd/cron install script, and the `calibrate()` loop over the decisions log. *Accept:* after 50 seeded decisions, calibration surfaces at least one real filter pattern, one standing-rule candidate, and the top corpus gap — as numbered proposals that require explicit acceptance.
+**M6 — Tracking + calibration (1.5 days).** Applications, events, drafted follow-up notes (removed in v1.5; see §7 stage 12), Sheets mirror, funnel stats, launchd/cron install script, and the `calibrate()` loop over the decisions log. *Accept:* after 50 seeded decisions, calibration surfaces at least one real filter pattern, one standing-rule candidate, and the top corpus gap — as numbered proposals that require explicit acceptance.
 
 **M7 — Interview prep (stretch).** `prep(job_id)` — matching STAR stories, likely questions per requirement, questions to ask, known contacts.
 
@@ -600,16 +614,29 @@ class FeedAdapter(Protocol):
 - **Duplicate postings** — same role in 5 locations. Cluster on the canonical key from §2.2: `(normalized_company, normalized_title, location_bucket)`, `jd_hash` tiebreak.  
 - **Form selectors drift.** Greenhouse and Lever redesign periodically. Keep adapters thin and screenshot every staged run so failures are diagnosable after the fact.  
 - **Corpus drift** invalidates old outputs. Store `corpus_hash` in `provenance.json`.  
-- **The temptation to auto-submit.** It will feel like the obvious last feature. See §8. Do not build it.
+- **Auto-submit.** Out of scope; see §8.
 
 ---
 
 ## 14. Success criteria
 
-Not applications sent. These:
+Measure these:
 
 - **Response rate** (replies ÷ submitted). Target 15%+. Below 8%, the funnel tells you whether it's targeting or the resume.  
 - **Time from posting appearing to submitted.** Target under 48 hours. Early applications get read; week-three applications get skimmed.  
 - **Human minutes per application.** Target under 2, including both glances.  
-- **Zero fabrications.** Non-negotiable. One invented metric surfacing in an interview costs more than the system saves in a year.
+- **No fabricated claims.** One invented figure that comes up in an interview costs more than the system saves in a year.
 
+
+---
+
+## 15. Amendments in v1.5 (2026-10-21)
+
+Owner decisions of 2026-10-21. Each changes the sections named; the text there carries the detail.
+
+1. **Submit (§0, §7 stage 11, §8, §13).** The person presses submit on every application. The 2026-10-09 amendment to CLAUDE.md hard rule 1, which planned an opt-in unattended submit step, is withdrawn: there is no submit module and no setting that enables one, and the static scan of `src/jobkit/autofill/` exempts no file. The reason given to users is consent: a bot check on an employer's form is the employer asking for a person to submit, invisible checks can't be detected reliably, and every ATS submit API takes the employer's key, not the applicant's.
+2. **Follow-ups (§3, §6.1, §7 stages 12 and 13).** Follow-up note drafting is removed: the drafting stage, its prompt, its MCP tools (`get_followups`, `run_followups`, `mark_followup_sent`), the `jobkit followups` command and the digest section. The `followups` table is archived into `events` (`followups_archived`, one per row, drafts included) after a SQLite backup to `data/jobkit.pre-followups.db` (never overwriting an existing backup: a later run that finds rows writes `-2`, `-3` ..., up to five copies), then dropped; the migration is idempotent and logged. An empty table (an old open session re-creates one on every call) is dropped with no backup. The 30-day no-reply bookkeeping stays as the `ghost-close` status rule, `tracking.ghost_after_days`.
+3. **Email replies (§6.1, §7 stage 12; CLAUDE.md architecture invariants).** Employer replies can be recorded from the person's own mailbox, read only through the email connector the person set up in Claude. jobkit never connects to a mailbox, sends or changes nothing there, and stores only the outcome, the date, a link and a one-line summary. The unattended scheduled run checks email only with `tracking.email_check: true` (the setup interview writes it); asking Claude to check works either way.
+4. **Any field (§2.1, §2.2, §5 stages 5 and 6).** `prompt_set: sales | general` (absent means `sales`), per-track `pivot`, `min_score` and `emphasis`, the `comp_sanity` thresholds as config, `tracking.ghost_after_days`, Adzuna and USAJOBS locations (with `feeds.adzuna.search_nationwide` for someone near a place who also takes remote work), `filters.locations.match_state` (a place written "City, ST" also checks the posting's state), `feeds.usajobs.full_description` (duties, qualifications and education stored with the summary), and a general requirement-extraction prompt under `prompt_set: general`. With places configured, Adzuna's location adds the state it reports and a USAJOBS "Multiple Locations" posting takes its site in a searched place. Deliberate changes on the sales path, listed under Updating in docs/setup.md: an Ashby range paid by the hour, week or month is stored as unpublished pay, and `add-url` exits 0 with a note on a link it can't use. Every new behaviour hangs off a key an existing config lacks, so with the key absent the code runs as before; golden tests on the sales test profile prove it.
+5. **Coverage (§2.1).** Discovery is strongest for employers on Greenhouse, Lever and Ashby. Links on other systems are recognised and named, not read. Next on the roadmap: a paste-the-description path for jobs on any site, and Workable and SmartRecruiters board adapters.
+6. **Schedule (§5, nightly amendment).** The setup interview schedules the nightly run as a scheduled task in the Claude app; the macOS LaunchAgent is the fallback.

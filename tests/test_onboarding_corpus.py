@@ -522,3 +522,124 @@ def test_a_promoted_corpus_tailors_on_a_fresh_config(drafted: Path) -> None:
     assert not (template.get("location_strategy") or {}).get("default")
     job = {"location_raw": "Austin, TX", "remote": 0, "location_bucket": "other-tx"}
     assert tailor._display_location(job, Filters(raw=template), corpus) == "Denver, CO"
+
+
+# ---------------------------------------------------------------------------
+# figures verified, and skills from the resume
+# ---------------------------------------------------------------------------
+
+
+def test_thin_corpus_counts_only_bullets_that_state_a_figure(drafted: Path) -> None:
+    confirm_bullets(DECISIONS)
+    update_draft(CONFIRM_REST)
+    report = promote_corpus()
+    # b_007 states no figure, so it does not count against the verified share
+    assert "4 of 6 figures verified" in report
+    assert "THIN CORPUS: 7 bullets, 4 of 6 figures verified" in report
+
+
+def _bullets(n: int, figures: int, verified: int) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for i in range(n):
+        figure = i < figures
+        out.append(
+            {
+                "text_long": f"Cared for {i + 2} patients a shift." if figure else "Charted care.",
+                "metric_confidence": ("verified" if i < verified else "estimate")
+                if figure
+                else "none",
+            }
+        )
+    return out
+
+
+@pytest.mark.parametrize(
+    "n, figures, verified, thin",
+    [
+        (30, 0, 0, False),  # duty bullets with no number do not make a corpus thin
+        (30, 4, 4, False),
+        (30, 10, 3, True),  # 30% of the figures verified
+        (29, 0, 0, True),  # the bullet count still counts
+    ],
+)
+def test_is_thin(n: int, figures: int, verified: int, thin: bool) -> None:
+    from jobkit.onboarding.corpus_confirm import figure_counts, is_thin
+
+    bullets = _bullets(n, figures, verified)
+    assert figure_counts(bullets) == (figures, verified)
+    assert is_thin(bullets) is thin
+
+
+@pytest.fixture()
+def engineer(jobkit_home: Path) -> Path:
+    ingest_resume(FIXTURES / "onboarding_personas" / "engineer.txt")
+    return jobkit_home
+
+
+def test_resume_skills_reach_skill_index_only_when_confirmed(engineer: Path) -> None:
+    from jobkit.onboarding.corpus_confirm import build_corpus, load_draft
+    from jobkit.onboarding.files import setup_files
+
+    draft = _draft(engineer)
+    assert draft["skills_on_resume"] == [
+        "Go",
+        "Python",
+        "PostgreSQL",
+        "Kubernetes",
+        "AWS",
+        "Terraform",
+    ]
+    assert draft["skill_index"] == {}  # nothing carried over by itself
+    status = draft_status().render()
+    assert "Skills on the resume not decided yet (6): Go, Python" in status
+    out = update_draft(
+        {
+            "resume_skills": [
+                {"name": "go", "depth": "daily since 2017"},  # spelled as the resume does
+                {"name": "Terraform", "drop": True},
+            ]
+        }
+    )
+    assert "not decided yet (4): Python, PostgreSQL, Kubernetes, AWS" in out
+    draft = _draft(engineer)
+    assert draft["skill_index"] == {"Go": "daily since 2017"}
+    assert draft["skills_declined"] == ["Terraform"]
+    corpus = build_corpus(load_draft(setup_files()))
+    assert corpus["skill_index"] == {"Go": "daily since 2017"}
+
+
+@pytest.mark.parametrize(
+    "item, message",
+    [
+        ({"name": "Rust", "depth": "some"}, "not a skill the resume lists"),
+        ({"name": "Python"}, "depth is the person's own words"),
+        ({"name": "Python", "depth": "  "}, "depth is the person's own words"),
+        ({"name": "Python", "depth": "daily", "level": 3}, "unknown field"),
+    ],
+)
+def test_resume_skills_are_refused_without_the_persons_answer(
+    engineer: Path, item: dict[str, Any], message: str
+) -> None:
+    before = _draft(engineer)
+    with pytest.raises(SetupError, match=message):
+        update_draft({"resume_skills": [item]})
+    assert _draft(engineer) == before
+
+
+def test_licences_and_projects_are_offered_and_reach_the_profile(jobkit_home: Path) -> None:
+    """A licence line from the resume's other sections is offered like a
+    listed skill; kept, it is in skill_index under the resume's wording, so
+    the scorer's profile shows it. Nothing is carried over by itself."""
+    from jobkit.onboarding.corpus_confirm import build_corpus, load_draft
+    from jobkit.onboarding.files import setup_files
+
+    ingest_resume(FIXTURES / "onboarding_personas" / "rn.txt")
+    line = "Registered Nurse, Ohio Board of Nursing, active"
+    assert _draft(jobkit_home)["skill_index"] == {}
+    status = draft_status().render()
+    assert "Licences, certifications and projects on the resume not decided yet" in status
+    assert f"[LICENSES & CERTIFICATIONS] {line}" in status
+    update_draft({"resume_skills": [{"name": line, "depth": "active, renewed in 2025"}]})
+    assert f"] {line};" not in draft_status().render()
+    corpus = build_corpus(load_draft(setup_files()))
+    assert corpus["skill_index"] == {line: "active, renewed in 2025"}

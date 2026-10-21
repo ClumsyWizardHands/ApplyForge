@@ -590,3 +590,95 @@ def test_summary_without_headings_never_takes_a_role_header() -> None:
         "customers across the Mountain West."
     ]
     assert parsed.roles[0].company == "Fernbrook Software"
+
+
+# ---------------------------------------------------------------------------
+# resumes from other fields (fictional personas)
+# ---------------------------------------------------------------------------
+
+PERSONAS = FIXTURES / "onboarding_personas"
+
+
+@pytest.mark.parametrize("name", ["rn", "teacher", "engineer"])
+def test_persona_drafts_contain_no_sentence_absent_from_the_resume(
+    jobkit_home: Path, name: str
+) -> None:
+    """The mandatory onboarding test, on resumes with field-specific headings."""
+    ingest_resume(PERSONAS / f"{name}.txt")
+    draft = _draft(jobkit_home)
+    source = (jobkit_home / "data" / "setup" / "resume_source.txt").read_text()
+    _assert_only_resume_text(draft, source)
+    assert draft["roles"] and all(b["metric_confidence"] is None for b in draft["bullets"])
+
+
+@pytest.mark.parametrize(
+    "name, heading, first_title",
+    [
+        ("rn", "CLINICAL EXPERIENCE", "Staff Nurse"),
+        ("teacher", "TEACHING EXPERIENCE", "Science Teacher"),
+        ("engineer", "EXPERIENCE", "Senior Software Engineer"),
+    ],
+)
+def test_field_specific_experience_headings_hold_the_roles(
+    name: str, heading: str, first_title: str
+) -> None:
+    parsed = resume_parse.parse_resume((PERSONAS / f"{name}.txt").read_text())
+    assert heading in parsed.headings
+    assert len(parsed.roles) == 2 and all(r.bullets for r in parsed.roles)
+    assert parsed.roles[0].title == first_title
+
+
+def test_licenses_and_projects_are_kept_in_other_sections() -> None:
+    rn = resume_parse.parse_resume((PERSONAS / "rn.txt").read_text())
+    licenses = rn.other_sections["LICENSES & CERTIFICATIONS"]
+    assert licenses[0] == "Registered Nurse, Ohio Board of Nursing, active"
+    # the clinical roles never land in the licenses section
+    assert not any("Riverbend" in line for line in licenses)
+    teacher = resume_parse.parse_resume((PERSONAS / "teacher.txt").read_text())
+    assert teacher.other_sections["PORTFOLIO"] == [
+        "Water Cycle eLearning module, built in Articulate Rise",
+        "Lab safety scenario, built in Articulate Storyline",
+    ]
+    assert teacher.summary == ["Middle school science teacher moving into instructional design."]
+
+
+@pytest.mark.parametrize(
+    "line, kind",
+    [
+        ("Clinical Experience", "experience"),
+        ("NURSING EXPERIENCE", "experience"),
+        ("Clinical Rotations", "experience"),
+        ("Teaching History", "experience"),
+        ("Volunteer Experience", "other"),  # the exact name wins
+        ("Licensure", "credentials"),
+        ("Licenses & Certifications", "credentials"),
+        ("Portfolio", "projects"),
+        ("Freelance Projects", "projects"),
+        ("Head of Customer Experience", None),  # a job title, not a heading
+        ("I have experience", None),
+    ],
+)
+def test_heading_kinds(line: str, kind: str | None) -> None:
+    assert resume_parse.heading_kind(line) == kind
+
+
+def test_field_headings_are_not_called_non_standard() -> None:
+    from jobkit.onboarding import critique
+    from jobkit.onboarding.resume_parse import extraction_from_paste
+
+    text = (PERSONAS / "rn.txt").read_text()
+    titles = [
+        f.title
+        for f in critique.findings(resume_parse.parse_resume(text), extraction_from_paste(text))
+    ]
+    assert "No standard Experience heading" not in titles
+
+
+def test_no_roles_names_the_headings_it_saw(jobkit_home: Path) -> None:
+    text = (
+        "Morgan Ellis\nSUMMARY\n"
+        + "A long paragraph of words about me. " * 10
+        + "\nCAREER STORY\nWorked at several places doing several things.\n"
+    )
+    with pytest.raises(SetupError, match=r"headings found: SUMMARY\. Ask which one holds the jobs"):
+        ingest_resume(text=text)

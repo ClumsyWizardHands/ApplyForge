@@ -1,0 +1,14 @@
+# TEST PERSONA (fictional): interview answers for an account executive
+# search. Read by tests/test_onboarding_intake.py.
+tracks:
+  - name: Account Executive
+    titles: [Account Executive, Enterprise Account Executive]
+    comp_floor: 150000
+    comp_basis: ote
+    said: "AE roles, 150k OTE or more"
+  - name: Sales Manager
+    titles: [Sales Manager]
+    comp_floor: 140000
+    said: "first-line sales manager, 140k base"
+locations: { work_mode: remote_only, said: "remote only" }
+comp: { default_floor: 130000, said: "130k" }

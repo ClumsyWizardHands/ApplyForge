@@ -27,9 +27,12 @@
 #   comp_min_gte: N           published minimum (base; an OTE minimum never matches)
 #   comp_max_lt: N            published maximum below N
 #   comp_unpublished: true|false
-#   title_class: account_executive | sdr_bdr | sdr_bdr_manager
-#                             from the role tracks in filters.yaml (a founding/
-#                             first AE is not account_executive)
+#   title_class: <track id>   the job's role track in filters.yaml; any track
+#                             id works (registered_nurse, backend_engineer, ...).
+#                             A name that is no track id never matches, and
+#                             `jobkit doctor` warns about it. For
+#                             account_executive, a founding/first AE title is
+#                             not counted.
 #   flag_present: "<text>"    a sanity flag containing this text (e.g. "ote-unrealistic")
 #   any_of: [ {...}, {...} ]  at least one nested condition set holds
 
@@ -42,12 +45,13 @@ auto_approve: []
   # - when: { score_gte: 90, remote: true, comp_min_gte: 200000 }
   #   reason: "remote-high-base"
 
-auto_reject:
-  # Opportunistic companies only for genuinely strong fits.
-  - when: { tier: 3, score_lt: 70 }
-    reason: "tier3-below-bar"
-  # More examples:
+auto_reject: []
+  # Examples — uncomment and adjust. Every company a job feed, LinkedIn
+  # discovery or a pasted link adds is tier 3, so a tier-3 rule also applies
+  # to every feed job, and can override a track's lower min_score:
+  # - when: { tier: 3, score_lt: 70 }
+  #   reason: "tier3-below-bar"
   # - when: { tier: 2, score_lt: 70 }
   #   reason: "tier2-weak-fit"
-  # - when: { title_class: sdr_bdr, comp_max_lt: 60000 }
-  #   reason: "sdr-low-comp"
+  # - when: { title_class: my_role, comp_max_lt: 60000 }
+  #   reason: "low-comp"

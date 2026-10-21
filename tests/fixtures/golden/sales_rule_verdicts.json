@@ -1,0 +1,65 @@
+{
+ "stats": {
+  "auto_approved": 3,
+  "auto_rejected": 3,
+  "evaluated": 8
+ },
+ "verdicts": [
+  {
+   "company": "Co0",
+   "decision": "approve",
+   "reason": "tier1-quick-apply",
+   "status": "approved",
+   "title": "Enterprise Account Executive"
+  },
+  {
+   "company": "Co1",
+   "decision": "reject",
+   "reason": "ae-at-tier3-company",
+   "status": "rejected",
+   "title": "Enterprise Account Executive"
+  },
+  {
+   "company": "Co2",
+   "decision": "reject",
+   "reason": "ae-low-ceiling",
+   "status": "rejected",
+   "title": "Account Executive"
+  },
+  {
+   "company": "Co3",
+   "decision": null,
+   "reason": null,
+   "status": "queued",
+   "title": "Founding Account Executive"
+  },
+  {
+   "company": "Co4",
+   "decision": "approve",
+   "reason": "tier1-quick-apply",
+   "status": "approved",
+   "title": "Director of Sales"
+  },
+  {
+   "company": "Co5",
+   "decision": "reject",
+   "reason": "tier3-below-bar",
+   "status": "rejected",
+   "title": "Director of Sales"
+  },
+  {
+   "company": "Co6",
+   "decision": "approve",
+   "reason": "remote-high-base",
+   "status": "approved",
+   "title": "Head of Sales"
+  },
+  {
+   "company": "Co7",
+   "decision": null,
+   "reason": null,
+   "status": "queued",
+   "title": "Manager, Sales Development"
+  }
+ ]
+}

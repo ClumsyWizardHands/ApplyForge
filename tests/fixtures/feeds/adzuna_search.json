@@ -1,0 +1,48 @@
+{
+ "__note": "Hand-built in the shape of Adzuna's documented /v1/api/jobs/{country}/search response. Fictional employers. Not a live recording: record one with real keys before trusting field names.",
+ "count": 3,
+ "mean": 81250.0,
+ "results": [
+  {
+   "id": "4900000001",
+   "adref": "eyJhbGciOiJIUzI1NiJ9.fictional-1",
+   "title": "Registered Nurse - Medical/Surgical",
+   "company": {"display_name": "Riverbend Health System"},
+   "location": {"display_name": "Columbus, Franklin County", "area": ["US", "Ohio", "Franklin County", "Columbus"]},
+   "description": "Riverbend Health System is hiring a registered nurse for its medical/surgical unit. Twelve-hour shifts, rotating weekends.",
+   "redirect_url": "https://www.adzuna.com/land/ad/4900000001?se=fictional",
+   "created": "2026-10-15T09:30:00Z",
+   "salary_min": 78000,
+   "salary_max": 96000,
+   "salary_is_predicted": "0",
+   "category": {"label": "Healthcare & Nursing Jobs", "tag": "healthcare-nursing-jobs"},
+   "contract_time": "full_time"
+  },
+  {
+   "id": "4900000002",
+   "adref": "eyJhbGciOiJIUzI1NiJ9.fictional-2",
+   "title": "Charge Nurse, Emergency Department",
+   "company": {"display_name": "Scioto Valley Medical Center"},
+   "location": {"display_name": "Dublin, Franklin County", "area": ["US", "Ohio", "Franklin County", "Dublin"]},
+   "description": "Lead a shift team in a 40-bed emergency department.",
+   "redirect_url": "https://www.adzuna.com/land/ad/4900000002?se=fictional",
+   "created": "2026-10-14T17:05:00Z",
+   "salary_min": 88000,
+   "salary_max": 88000,
+   "salary_is_predicted": "1",
+   "category": {"label": "Healthcare & Nursing Jobs", "tag": "healthcare-nursing-jobs"}
+  },
+  {
+   "id": "4900000003",
+   "adref": "eyJhbGciOiJIUzI1NiJ9.fictional-3",
+   "title": "Telehealth Nurse (Remote)",
+   "company": {"display_name": "Lakeshore Virtual Care"},
+   "location": {"display_name": "Remote", "area": ["US"]},
+   "description": "Phone and video triage for a regional telehealth service.",
+   "redirect_url": "https://www.adzuna.com/land/ad/4900000003?se=fictional",
+   "created": "2026-10-13T08:00:00Z",
+   "salary_is_predicted": "0",
+   "category": {"label": "Healthcare & Nursing Jobs", "tag": "healthcare-nursing-jobs"}
+  }
+ ]
+}

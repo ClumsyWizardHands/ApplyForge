@@ -21,6 +21,15 @@ answered current: true; a role with a year-only or missing end is not
 confirmed until the human gives the end month or says it is current. The
 display location is a city, never empty: every tailored header shows it.
 
+Skills listed on the resume reach skill_index only one at a time, as the
+human confirms each (update_corpus_draft resume_skills): the name is copied
+from the resume as written, and the depth is the human's words, never a
+default. A skill the human declines is remembered so it is not asked again.
+Each line of the resume's other sections (licences and certifications,
+projects and portfolio pieces) is offered the same way: kept, it goes into
+skill_index under the line as the resume wrote it, so scoring and tailoring
+see a licence like any confirmed skill.
+
 The resume critique stays in its own file. Text reaches the corpus only as
 resume text the human kept or words the human gave."""
 
@@ -78,6 +87,8 @@ def load_draft(files: SetupFiles) -> dict[str, Any]:
     draft.setdefault("identity", {})
     draft.setdefault("skill_index", {})
     draft.setdefault("constraints", {})
+    draft.setdefault("skills_on_resume", [])
+    draft.setdefault("skills_declined", [])
     return draft
 
 
@@ -260,6 +271,24 @@ class DraftStatus:
             lines.append(
                 f"Positioning to confirm: {p.get('id')} {p.get('text')!r} (archetype: "
                 f"{p.get('archetype')!r}; ask what kind of role this line is for)"
+            )
+        undecided = undecided_skills(d)
+        if undecided:
+            lines.append(
+                f"Skills on the resume not decided yet ({len(undecided)}): "
+                + ", ".join(undecided)
+                + ". Ask one at a time whether jobkit may claim it and how deep (their words), "
+                "then update_corpus_draft resume_skills [{name, depth}] or [{name, drop: true}]."
+            )
+        others = undecided_other_lines(d)
+        if others:
+            lines.append(
+                f"Licences, certifications and projects on the resume not decided yet "
+                f"({len(others)}): "
+                + "; ".join(f"[{h}] {line}" for h, line in others)
+                + ". Ask one at a time whether applications may claim it, then "
+                "update_corpus_draft resume_skills [{name: <the line as written>, depth: "
+                "<their words>}] or [{name, drop: true}]."
             )
         if self.batch:
             lines.append(
@@ -444,6 +473,7 @@ UPDATE_KEYS = frozenset(
         "add_education",
         "positioning",
         "skill_index",
+        "resume_skills",
         "constraints",
         "voice_samples",
     }
@@ -705,6 +735,86 @@ def _apply_skill_index(draft: dict[str, Any], data: Any) -> None:
             idx[key] = " ".join(str(v).split())
 
 
+def _skill_key(name: str) -> str:
+    return " ".join(name.split()).casefold()
+
+
+def _decided(draft: dict[str, Any]) -> set[str]:
+    done = {_skill_key(str(k)) for k in draft.get("skill_index") or {}}
+    return done | {_skill_key(str(k)) for k in draft.get("skills_declined") or []}
+
+
+def undecided_skills(draft: dict[str, Any]) -> list[str]:
+    """Skills the resume lists that are neither in skill_index nor declined."""
+    done = _decided(draft)
+    return [
+        str(s)
+        for s in draft.get("skills_on_resume") or []
+        if str(s).strip() and _skill_key(str(s)) not in done
+    ]
+
+
+def other_section_lines(draft: dict[str, Any]) -> list[tuple[str, str]]:
+    """(heading, line) for every line of the resume's other sections
+    (licences and certifications, projects and portfolio), as written."""
+    out: list[tuple[str, str]] = []
+    for heading, lines in (draft.get("other_sections") or {}).items():
+        for line in lines or []:
+            text = " ".join(str(line).split())
+            if text:
+                out.append((str(heading), text))
+    return out
+
+
+def undecided_other_lines(draft: dict[str, Any]) -> list[tuple[str, str]]:
+    """Other-section lines neither in skill_index nor declined."""
+    done = _decided(draft)
+    return [(h, line) for h, line in other_section_lines(draft) if _skill_key(line) not in done]
+
+
+def _apply_resume_skills(draft: dict[str, Any], data: Any) -> None:
+    """The human's decision on each skill the resume lists: [{name, depth}]
+    puts it in skill_index under the resume's own spelling, with the depth in
+    the human's words; [{name, drop: true}] declines it. Only names the resume
+    lists are accepted (anything else goes through skill_index, in the
+    human's words)."""
+    if not isinstance(data, list) or not data:
+        raise SetupError("resume_skills must be a non-empty list of {name, depth} or {name, drop}")
+    on_resume = {_skill_key(str(s)): str(s) for s in draft.get("skills_on_resume") or []}
+    for _, line in other_section_lines(draft):  # a licence, certificate or project
+        on_resume.setdefault(_skill_key(line), line)
+    idx = draft["skill_index"]
+    declined = draft["skills_declined"]
+    for item in data:
+        if not isinstance(item, dict):
+            raise SetupError("resume_skills: each entry is an object {name, depth} or {name, drop}")
+        unknown = sorted(set(item) - {"name", "depth", "drop"})
+        if unknown:
+            raise SetupError(f"resume_skills: unknown field(s) {unknown}")
+        name = " ".join(str(item.get("name") or "").split())
+        resume_name = on_resume.get(_skill_key(name))
+        if resume_name is None:
+            raise SetupError(
+                f"resume_skills: {name!r} is not a skill the resume lists, or a line of its "
+                f"other sections ({', '.join(on_resume.values()) or 'none'}); add other "
+                "skills through skill_index, in the person's words"
+            )
+        if item.get("drop"):
+            idx.pop(resume_name, None)
+            if resume_name not in declined:
+                declined.append(resume_name)
+            continue
+        depth = item.get("depth")
+        if not isinstance(depth, str) or not depth.strip():
+            raise SetupError(
+                f"resume_skills: {resume_name}: depth is the person's own words (how much, how "
+                "recently, where they used it); ask, never fill it in"
+            )
+        idx[resume_name] = " ".join(depth.split())
+        if resume_name in declined:
+            declined.remove(resume_name)
+
+
 def _apply_constraints(draft: dict[str, Any], data: Any) -> None:
     if not isinstance(data, dict):
         raise SetupError("constraints must be an object")
@@ -746,6 +856,7 @@ _APPLY = {
     "add_education": _apply_add_education,
     "positioning": _apply_positioning,
     "skill_index": _apply_skill_index,
+    "resume_skills": _apply_resume_skills,
     "constraints": _apply_constraints,
     "voice_samples": _apply_voice,
 }
@@ -753,7 +864,8 @@ _APPLY = {
 
 def update_draft(changes: dict[str, Any], *, root: Path | None = None) -> str:
     """Apply the human's answers about identity, roles, education,
-    positioning, skill_index, constraints and voice samples. All or nothing."""
+    positioning, skill_index, resume_skills, constraints and voice samples.
+    All or nothing."""
     files = setup_files(root)
     draft = load_draft(files)
     if not isinstance(changes, dict) or not changes:
@@ -769,6 +881,7 @@ def update_draft(changes: dict[str, Any], *, root: Path | None = None) -> str:
         "education",
         "positioning",
         "skill_index",
+        "resume_skills",
         "constraints",
         "voice_samples",
     ):
@@ -855,28 +968,44 @@ def build_corpus(draft: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def figure_counts(bullets: list[dict[str, Any]]) -> tuple[int, int]:
+    """(bullets that state a figure, those whose figure is verified). A
+    bullet with no figure (a duty, a responsibility) counts in neither."""
+    with_figure = [b for b in bullets if isinstance(b, dict) and stated_figures(b)]
+    verified = sum(1 for b in with_figure if b.get("metric_confidence") == "verified")
+    return len(with_figure), verified
+
+
+def is_thin(bullets: list[dict[str, Any]]) -> bool:
+    """Under THIN_BULLETS bullets, or under THIN_VERIFIED of the figures
+    verified (when any bullet states a figure)."""
+    figures, verified = figure_counts(bullets)
+    return len(bullets) < THIN_BULLETS or (figures > 0 and verified / figures < THIN_VERIFIED)
+
+
 def health(corpus: dict[str, Any]) -> list[str]:
-    """Bullet count, metric coverage and tag distribution — and, under 30
-    bullets or 40% verified, a plain statement that the corpus is thin."""
+    """Bullet count, figures verified and tag distribution, and a plain
+    statement when the corpus is thin: under 30 bullets, or under 40% of the
+    stated figures verified."""
     bullets = corpus["bullets"]
     n = len(bullets)
     conf = Counter(str(b.get("metric_confidence")) for b in bullets)
-    verified = conf.get("verified", 0) / n if n else 0.0
+    figures, verified = figure_counts(bullets)
     tags = Counter(t for b in bullets for t in b.get("tags") or [])
     out = [
-        f"bullets: {n} · verified {conf.get('verified', 0)} ({verified:.0%}) · estimate "
+        f"bullets: {n} · {verified} of {figures} figures verified · estimate "
         f"{conf.get('estimate', 0)} · none {conf.get('none', 0)}",
         "top tags: " + (", ".join(f"{t} ({c})" for t, c in tags.most_common(10)) or "none"),
         f"positioning: {len(corpus['positioning'])} · stories: {len(corpus['stories'])} · "
         f"voice samples: {len(corpus['voice_samples'])} · skill_index: "
         f"{len(corpus['skill_index'])}",
     ]
-    if n < THIN_BULLETS or verified < THIN_VERIFIED:
+    if is_thin(bullets):
         out.append(
-            f"THIN CORPUS: {n} bullets, {verified:.0%} verified (the bar is {THIN_BULLETS} "
-            f"bullets and {THIN_VERIFIED:.0%} verified). Tailored resumes will be mediocre "
-            "until it grows: recover the numbers the resume left out (critique, 'Bullets with "
-            "no outcome') and add accomplishments it does not mention."
+            f"THIN CORPUS: {n} bullets, {verified} of {figures} figures verified (the bar is "
+            f"{THIN_BULLETS} bullets and {THIN_VERIFIED:.0%} of figures verified). Tailored "
+            "resumes will be thin until it grows. Add accomplishments the resume leaves out, "
+            "and give a source for the figures you have (critique, 'Evidence for every number')."
         )
     if not corpus["voice_samples"]:
         out.append(

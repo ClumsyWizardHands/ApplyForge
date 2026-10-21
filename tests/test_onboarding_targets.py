@@ -153,3 +153,53 @@ def test_workday_url_is_reported_not_polled(fresh: Path, boards: Boards) -> None
     )
     assert "NOT FOUND: Initech" in out and "workday" in out
     assert boards.calls == []
+
+
+# ---------------------------------------------------------------------------
+# feed-only discovery: employers with no board jobkit can poll
+# ---------------------------------------------------------------------------
+
+FEED_ONLY = "the hospitals I want all use Workday; I'll rely on the feeds"
+
+
+def test_feed_only_needs_no_company_and_no_network(fresh: Path, boards: Boards) -> None:
+    out = seed_targets([], feed_only_said=FEED_ONLY, client=_client(boards), delay=0)
+    assert boards.calls == []
+    assert "discovery comes from the feeds" in out
+    path = fresh / "config" / "targets.yaml"
+    assert path.read_text().startswith(GENERATED_MARK)
+    assert load_targets(path).companies == []
+    assert yaml.safe_load(path.read_text())["feed_only_said"] == FEED_ONLY
+    record = yaml.safe_load((fresh / "data" / "setup" / "targets.answers.yaml").read_text())
+    assert record["feed_only_said"] == FEED_ONLY
+
+
+def test_feed_only_then_companies_keeps_both(fresh: Path, boards: Boards) -> None:
+    seed_targets(None, feed_only_said=FEED_ONLY)
+    seed_targets(["Acme"], client=_client(boards), delay=0)
+    path = fresh / "config" / "targets.yaml"
+    data = yaml.safe_load(path.read_text())
+    assert data["feed_only_said"] == FEED_ONLY
+    assert [c.name for c in load_targets(path).companies] == ["Acme"]
+    record = yaml.safe_load((fresh / "data" / "setup" / "targets.answers.yaml").read_text())
+    assert record["feed_only_said"] == FEED_ONLY  # kept across calls
+    # said again: the one line is replaced, the companies stay
+    seed_targets([], feed_only_said="feeds only, for now")
+    text = path.read_text()
+    assert text.count("feed_only_said:") == 1
+    assert yaml.safe_load(text)["feed_only_said"] == "feeds only, for now"
+    assert [c.name for c in load_targets(path).companies] == ["Acme"]
+
+
+def test_feed_only_on_a_hand_written_file(jobkit_home: Path) -> None:
+    path = jobkit_home / "config" / "targets.yaml"
+    before = load_targets(path).companies
+    seed_targets([], feed_only_said=FEED_ONLY)
+    assert load_targets(path).companies == before
+    assert yaml.safe_load(path.read_text())["feed_only_said"] == FEED_ONLY
+
+
+def test_no_company_and_no_feed_only_is_refused(fresh: Path) -> None:
+    with pytest.raises(SetupError, match="feed_only_said"):
+        seed_targets([])
+    assert not (fresh / "config" / "targets.yaml").exists()

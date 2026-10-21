@@ -15,8 +15,8 @@ import httpx
 
 from jobkit import db as q
 from jobkit.adapters.feeds import FEEDS
-from jobkit.adapters.feeds.base import SearchSpec
-from jobkit.config import Filters, load_filters
+from jobkit.adapters.feeds.base import SearchPlace, SearchSpec, missing_keys
+from jobkit.config import Filters, load_filters, parse_adzuna_country
 from jobkit.log import log
 from jobkit.models import NormalizedJob
 from jobkit.normalize import (
@@ -65,6 +65,10 @@ def _spec_for(source: str, filters: Filters) -> SearchSpec | None:
         extra["series"] = ";".join(str(s) for s in codes)
     if cfg.get("pay_grade_low"):
         extra["pay_grade_low"] = str(cfg["pay_grade_low"])
+    if source == "usajobs" and cfg.get("full_description") is True:
+        extra["full_description"] = "1"  # duties, qualifications... not the summary alone
+    if source == "adzuna" and cfg.get("search_nationwide") is True:
+        extra["nationwide"] = "1"  # with locations: one location-free search too
     return SearchSpec(
         keywords=tuple(cfg.get("keywords", []) or cfg.get("what", [])),
         categories=tuple(cfg.get("categories", [])),
@@ -72,7 +76,30 @@ def _spec_for(source: str, filters: Filters) -> SearchSpec | None:
         max_days_old=int(cfg.get("max_days_old", 21)),
         salary_min=filters.lowest_comp_floor or None,
         extra=extra,
+        locations=_places_for(source, filters),
+        country=_adzuna_country(cfg) if source == "adzuna" else "us",
     )
+
+
+def _places_for(source: str, filters: Filters) -> tuple[SearchPlace, ...]:
+    """`feeds.adzuna.locations` / `feeds.usajobs.locations` as search places.
+    Absent: (), and the feed sends its location-free request."""
+    if source == "adzuna":
+        return tuple(SearchPlace(p.where, p.distance_km) for p in filters.adzuna_locations)
+    if source == "usajobs":
+        return tuple(SearchPlace(p.name, p.radius_miles) for p in filters.usajobs_locations)
+    return ()
+
+
+def _adzuna_country(cfg: dict[str, Any]) -> str:
+    """`feeds.adzuna.country`, default "us". Older templates wrote a value
+    nothing read, so one that is not a two-letter code is logged and the
+    search stays on "us" instead of failing the run."""
+    try:
+        return parse_adzuna_country(cfg)
+    except ValueError as e:
+        log("feeds.adzuna_country_ignored", value=str(cfg.get("country")), error=str(e))
+        return "us"
 
 
 def ingest_feed_jobs(
@@ -192,21 +219,28 @@ async def run_feeds(
             spec = _spec_for(source, filters)
             if spec is None:
                 continue
+            # a missing key is read from the environment, never guessed from
+            # an empty result: a keyed feed can return nothing on a quiet day
+            missing = missing_keys(feed)
+            if missing:
+                log("feeds.skipped_no_key", source=source, missing=missing)
+                results[source] = {
+                    "seen": 0,
+                    "rejected": 0,
+                    "merged": 0,
+                    "new": 0,
+                    "skipped_no_key": 1,
+                }
+                continue
             try:
                 jobs = await feed.search(client, spec)
-                if not jobs and getattr(feed, "requires_key", False):
-                    log("feeds.skipped_no_key", source=source)
-                    results[source] = {
-                        "seen": 0,
-                        "rejected": 0,
-                        "merged": 0,
-                        "new": 0,
-                        "skipped_no_key": 1,
-                    }
-                    continue
             except httpx.HTTPError as e:
                 log("feeds.failed", source=source, error=str(e))
                 results[source] = {"seen": 0, "rejected": 0, "merged": 0, "new": 0, "failed": 1}
+                continue
+            if not jobs and getattr(feed, "requires_key", False):
+                log("feeds.empty", source=source)
+                results[source] = {"seen": 0, "rejected": 0, "merged": 0, "new": 0, "empty": 1}
                 continue
             stats = ingest_feed_jobs(conn, source, jobs, filters)
             log("feeds.ok", source=source, **stats)

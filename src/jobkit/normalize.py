@@ -49,6 +49,28 @@ _METROS: list[tuple[str, str]] = [
     ("toronto", "toronto-metro"),
 ]
 
+# The US states each named metro bucket covers. A place outside these states
+# that lands in a metro bucket only by its spelling ("Mansfield, OH" holds
+# "sf"; "Newark, OH" is not Newark, NJ) is mis-filed: with
+# filters.locations.match_state the filter then also checks the posting's
+# state (config.Filters.bucket_states). Non-US metros cover no US state.
+METRO_STATES: dict[str, frozenset[str]] = {
+    "nyc-metro": frozenset({"NY", "NJ"}),
+    "sf-bay": frozenset({"CA"}),
+    "seattle-metro": frozenset({"WA"}),
+    "boston-metro": frozenset({"MA"}),
+    "la-metro": frozenset({"CA"}),
+    "chicago-metro": frozenset({"IL"}),
+    "austin-metro": frozenset({"TX"}),
+    "denver-metro": frozenset({"CO"}),
+    "dc-metro": frozenset({"DC", "VA", "MD"}),
+    "miami-metro": frozenset({"FL"}),
+    "atlanta-metro": frozenset({"GA"}),
+    "dallas-metro": frozenset({"TX"}),
+    "london-metro": frozenset(),
+    "toronto-metro": frozenset(),
+}
+
 # EEO/benefits boilerplate stripped before hashing so JDs don't look 40% identical
 _BOILERPLATE = re.compile(
     r"(equal (employment )?opportunity[^.]*\.|we (are|’re|'re) an equal[^.]*\."

@@ -78,7 +78,26 @@ def _queued(
 def test_title_class() -> None:
     assert _title_class("Enterprise Account Executive") == "account_executive"
     assert _title_class("Founding Account Executive") is None  # the good-deal carve-out
-    assert _title_class("Director of Sales") is None
+    # every track is a title class: a sales_exec rule now matches its titles
+    assert _title_class("Director of Sales") == "sales_exec"
+    assert _title_class("Founding Director of Sales") == "sales_exec"  # carve-out is AE-only
+    assert _title_class("SDR (AE track)") == "sdr_bdr"
+    assert _title_class("Deal Desk Analyst") is None  # an include pattern, not a track
+
+
+def test_title_classes_in_and_unknown() -> None:
+    from jobkit.config import load_filters
+
+    rules = {
+        "auto_approve": [{"when": {"title_class": "sales_exec"}}],
+        "auto_reject": [
+            {"when": {"any_of": [{"title_class": "registered_nurse"}, {"tier": 3}]}},
+            {"when": {"title_class": "sales_exec"}},
+        ],
+    }
+    assert rules_mod.title_classes_in(rules) == ["sales_exec", "registered_nurse"]
+    assert rules_mod.unknown_title_classes(rules, load_filters()) == ["registered_nurse"]
+    assert rules_mod.unknown_title_classes(RULES, load_filters()) == []
 
 
 def test_auto_approve_tier1_clean(conn: sqlite3.Connection) -> None:

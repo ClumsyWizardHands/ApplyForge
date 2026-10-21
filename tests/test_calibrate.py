@@ -7,7 +7,11 @@ from __future__ import annotations
 import json
 import sqlite3
 
+import yaml
+
+from jobkit.config import Filters
 from jobkit.onboarding.calibrate import calibrate
+from tests.conftest import FIXTURES
 from tests.test_filter import _insert
 
 
@@ -81,3 +85,23 @@ def test_calibration_proposes_nothing_from_thin_data(conn: sqlite3.Connection) -
     cal = calibrate(conn)
     assert cal.decisions == 0
     assert "meaningful at 50+" in cal.render()
+
+
+def test_reanchor_proposal_names_the_active_scoring_prompt(conn: sqlite3.Connection) -> None:
+    """Approvals clustered in a narrow band: the proposal names the prompt
+    file that scored them (score_fit.md for the sales profile,
+    score_fit_general.md under prompt_set general). Still only a proposal."""
+    for i in range(6):
+        jid = _insert(conn, external_id=f"k{i}", title="Backend Engineer")
+        conn.execute(
+            "INSERT INTO decisions (job_id, decision, reason, score_at_decision, auto) "
+            "VALUES (?, 'approve', 'human', ?, 0)",
+            (jid, 80 + i),
+        )
+    conn.commit()
+    sales = calibrate(conn).render()
+    assert "Re-anchor prompts/score_fit.md with" in sales
+    engineer = Filters(raw=yaml.safe_load((FIXTURES / "personas" / "engineer.yaml").read_text()))
+    general = calibrate(conn, engineer).render()
+    assert "Re-anchor prompts/score_fit_general.md with" in general
+    assert "explicit per-item acceptance" in general

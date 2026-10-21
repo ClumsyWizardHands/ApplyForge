@@ -18,27 +18,52 @@ RULES_PATH = "config/autoapprove.yaml"
 
 _FOUNDING_PAT = re.compile(r"\b(founding|first)\b", re.I)
 
-# Role tracks (filters.yaml `tracks`, the one owner) that are never an AE, even
-# when the title mentions one: "SDR (AE track)", "BDR → Account Executive".
-SDR_BDR_TRACKS = frozenset({"sdr_bdr", "sdr_bdr_manager"})
+# The one track with a carve-out (see _title_class). An SDR/BDR title that
+# mentions an AE ("SDR (AE track)") is placed by its own, earlier track.
 AE_TRACK = "account_executive"
 
 
 def _title_class(title: str, filters: Filters | None = None) -> str | None:
-    """The standing-rules title class, read from the filters.yaml track
-    classifier (Filters.track_for), which is the one owner of what an AE is.
+    """The standing-rules title class: the title's track id, read from the
+    filters.yaml track classifier (Filters.track_for), the one owner of what
+    each track is. A title on no track has no class (None).
 
-    An SDR/BDR title returns its track id and is never account_executive. An
-    account_executive-track title is account_executive unless it is a founding
-    or first AE (the good-deal carve-out). Review 2026-10-08: a second AE regex
-    here ("account executive|ae") disagreed with the track, so "Senior Sales
-    Executive" passed the filter at the AE floor but escaped the AE rules."""
+    One carve-out, for account_executive only: a founding or first AE has no
+    class, so the AE rules never auto-reject the good deal. An SDR/BDR title
+    keeps its own track id and is never account_executive."""
     track = (filters or load_filters()).track_for(title)
-    if track in SDR_BDR_TRACKS:
-        return track
-    if track == AE_TRACK and not _FOUNDING_PAT.search(title):
-        return AE_TRACK
-    return None
+    if track == AE_TRACK and _FOUNDING_PAT.search(title):
+        return None
+    return track
+
+
+def title_classes_in(rules: dict[str, Any]) -> list[str]:
+    """Every `title_class` value named in an autoapprove.yaml mapping
+    (auto_approve and auto_reject, any_of included), in order, deduplicated."""
+    found: list[str] = []
+
+    def walk(when: Any) -> None:
+        if not isinstance(when, dict):
+            return
+        for key, want in when.items():
+            if key == "title_class":
+                found.append(str(want))
+            elif key == "any_of" and isinstance(want, list):
+                for w in want:
+                    walk(w)
+
+    for section in ("auto_approve", "auto_reject"):
+        for rule in rules.get(section) or []:
+            if isinstance(rule, dict):
+                walk(rule.get("when"))
+    return list(dict.fromkeys(found))
+
+
+def unknown_title_classes(rules: dict[str, Any], filters: Filters) -> list[str]:
+    """The title_class values that name no track id. Such a rule never
+    matches; run_standing_rules logs a warning and `jobkit doctor` reports it."""
+    ids = set(filters.track_ids)
+    return [c for c in title_classes_in(rules) if c not in ids]
 
 
 def _cond_matches(when: dict[str, Any], job: dict[str, Any]) -> bool:
@@ -99,6 +124,14 @@ def run_standing_rules(conn: sqlite3.Connection) -> dict[str, int]:
     """Apply autoapprove.yaml to the queue. Returns counts."""
     rules = _load_rules()
     filters = load_filters()
+    unknown = unknown_title_classes(rules, filters)
+    if unknown:
+        log(
+            "standing_rules.unknown_title_class",
+            title_classes=unknown,
+            tracks=filters.track_ids,
+            note="a rule naming one of these never matches",
+        )
     rows = conn.execute(
         """SELECT j.id, j.title, j.remote, j.comp_min, j.comp_max, c.tier,
                   sc.fit_score, s.flags, fs.friction_score AS friction,

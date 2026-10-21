@@ -1,0 +1,17 @@
+{
+ "Account Executive (SDR to AE track)": "sdr_bdr",
+ "BDR Team Lead": "sdr_bdr_manager",
+ "Deal Desk Analyst": null,
+ "Director of Sales": null,
+ "Enterprise Account Executive": "account_executive",
+ "First AE": null,
+ "Founding Account Executive": null,
+ "Head of Sales": null,
+ "Manager, Sales Development": "sdr_bdr_manager",
+ "Revenue Operations Manager": null,
+ "SDR": "sdr_bdr",
+ "Sales Development Representative": "sdr_bdr",
+ "Senior Sales Executive": "account_executive",
+ "Software Engineer": null,
+ "VP of Revenue": null
+}

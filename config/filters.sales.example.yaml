@@ -1,0 +1,296 @@
+# config/filters.sales.example.yaml — an example filters.yaml for a sales
+# search: SDR/BDR, account executive, sales management and sales leadership.
+#
+# This is a TEMPLATE, kept as a worked example. The neutral starting point is
+# config/filters.example.yaml, and the setup interview (say "set up jobkit" in
+# Claude) writes config/filters.yaml from your own answers. To start from this
+# one instead, copy it to config/filters.yaml and edit it.
+# `uv run jobkit doctor` checks that config/filters.yaml is there and loads.
+#
+# One knob, one owner: every setting below is read by the code, and lives here
+# and nowhere else. Companies and tiers are in targets.yaml; the standing
+# approve/reject rules in autoapprove.yaml; writing style in
+# banned_phrases.yaml; commute times in commute_table.yaml.
+#
+# Evaluation order: deterministic filters (this file's `filters:` block, free)
+# → sanity checks (remote_policy, comp_sanity: an LLM reads the JD) → standing
+# rules (autoapprove.yaml). Every rejection is logged with the layer and reason.
+#
+# After changing titles, locations or comp floors, run `uv run jobkit refilter`
+# (MCP: refilter) so open jobs rejected under the old settings are re-checked.
+
+# Which scoring prompts to use. sales: the sales-calibrated prompts
+# (prompts/score_fit.md). general: the field-neutral ones. Absent means sales.
+prompt_set: sales
+
+filters:
+  # ---- role tracks ----------------------------------------------------------
+  # The kinds of role you are after, as an ordered list. Each track is an id and
+  # the title regex (Python, case-insensitive with (?i)) that puts a posting in
+  # it. First match wins, so list leadership before individual-contributor
+  # tracks: "SDR Manager" must be a manager before it can be an SDR.
+  #   * every track's title_regex is also an include pattern (do not repeat it
+  #     in include_titles below);
+  #   * comp.track_floors (below) and the standing rules refer to tracks by id;
+  #   * scoring and tailoring emphasis follow the track (prompts/select_bullets.md).
+  # Track ids the code gives a meaning to:
+  #   account_executive          standing rules' `title_class: account_executive`
+  #   sdr_bdr, sdr_bdr_manager   never treated as an AE by the standing rules,
+  #                              even when the title says "AE track"
+  #   sales_exec                 director / VP / CRO emphasis when tailoring
+  # Any other id works for filtering, floors, scoring and title_class.
+  #
+  # active (default true): false PAUSES a track. Its titles are still
+  # classified (so they never fall through to a later track) but the filter
+  # rejects them as track_paused:<id>. Set it back to true and run
+  # `jobkit refilter` to bring those postings back.
+  tracks:
+    - id: sdr_bdr_manager
+      active: true
+      title_regex: '(?i)\b(sdr|bdr|sales development|business development|account development)\b.{0,25}\b(manager|lead|leader|director|head)\b|\b(manager|director|head|lead)\b.{0,15}\b(sdr|bdr|sales development|business development|account development)\b'
+    - id: sales_exec
+      active: true
+      title_regex: '(?i)\b(director|head|vp|vice president|chief)\b.{0,30}\b(sales|revenue|gtm|go.to.market|growth)\b|\b(sales|revenue)\b.{0,20}\b(director|leader|vp|officer)\b|\bchief (revenue|sales) officer\b'
+    # Individual-contributor SDR/BDR roles. Keep this track even if you do not
+    # want them: it claims SDR/BDR titles, so "SDR (AE track)" never counts as
+    # an Account Executive. Set active: false to pause it instead of deleting it.
+    - id: sdr_bdr
+      active: true
+      title_regex: '(?i)\b(sdr|bdr|adr|sales development|business development|account development|market development)\b'
+    - id: account_executive
+      active: true
+      title_regex: '(?i)\b(account executive|sales executive)\b|\bae\b'
+
+  # Roles you want outside every track. A title must match a track or one of
+  # these. They never release a title a paused track claims first. Titles
+  # matching no track get the default comp floor (comp.floor).
+  include_titles:
+    - '(?i)\bsales (manager|lead)\b'
+    - '(?i)\b(founding|first)\b.{0,15}\b(ae|account executive|gtm|sales)\b'
+    - '(?i)\b(revenue|sales) operations\b.{0,20}\b(director|lead|manager)\b'
+    - '(?i)\b(sales|revenue|gtm|go.to.market)\b.{0,10}\benablement\b'
+
+  # Any match rejects, even when a track or include pattern matched.
+  exclude_titles:
+    - '(?i)\b(intern|internship|apprentice)\b'
+    - '(?i)\b(contract|contractor|1099|temp)\b'
+    - '(?i)\b(door.to.door|field canvass(er|ing)?)\b'
+
+  # ---- locations -------------------------------------------------------------
+  # Where a posting that is NOT remote may be. Each entry is a city or metro
+  # name; jobkit places it in a location bucket with the same rules it uses for
+  # postings (src/jobkit/normalize.py): big metros group their cities
+  # ("Brooklyn", "Manhattan" → nyc-metro; "Cambridge" → boston-metro), and any
+  # other city matches postings whose location starts with it ("Columbus"
+  # matches "Columbus, OH"). Empty = remote roles only.
+  # The places you list (and their US states: "Ohio" also accepts "OH") also
+  # count as acceptable geo restrictions in the remote check below.
+  locations:
+    allowed: []           # e.g. ["Chicago", "Evanston"] or ["Denver", "Boulder"]
+    accept_remote: true   # remote postings pass wherever the company is
+
+  # ---- compensation ----------------------------------------------------------
+  # A posting is rejected only when it PUBLISHES a range whose ceiling is under
+  # the floor; unpublished comp always passes to the next stage. Floors are
+  # compared with comp in `currency` only (no FX conversion).
+  comp:
+    floor: 100000          # PLACEHOLDER: the default floor, for titles that match no track
+    # Per-track floors (keys are track ids from `tracks`, nowhere else).
+    # basis: base = a base-salary floor. basis: ote = an on-target-earnings
+    # floor: a posted BASE figure passes at floor × ote_base_share, a posted
+    # OTE figure must reach the full floor.
+    track_floors:          # PLACEHOLDERS: set your own numbers
+      sdr_bdr:           { floor: 70000,  basis: ote }
+      sdr_bdr_manager:   { floor: 110000, basis: base }
+      account_executive: { floor: 125000, basis: ote }
+      sales_exec:        { floor: 160000, basis: base }
+    ote_base_share: 0.6    # base ≈ 60% of OTE in a typical 60/40 plan
+    currency: USD
+
+  freshness:
+    max_age_days: 30       # postings older than this are rejected (stale:<days>d)
+
+  blocklist_companies: []  # substrings of company names you will not work for
+
+# ---- gates -------------------------------------------------------------------
+gates:
+  # Scored jobs at or above this reach your review queue; below it they are
+  # rejected as score_below_surface (re-run `jobkit rescore` after a change).
+  min_score_to_surface: 65
+
+# ---- schedule -----------------------------------------------------------------
+schedule:
+  # When the nightly run happens, local time, as a QUOTED "HH:MM" (an unquoted
+  # 2:00 is a number in YAML). `jobkit schedule install` (macOS launchd) reads
+  # it; re-run install after changing it. Scheduled tasks in the Claude app,
+  # if you use those instead, keep their own times.
+  nightly_at: "02:00"
+  # The digest, get_queue and get_stats warn when the last successful board
+  # poll or nightly run is older than this many hours.
+  stale_after_hours: 36
+
+# ---- application tracking ---------------------------------------------------------
+tracking:
+  # A submitted application with no recorded response is marked ghosted after
+  # this many days (a status change only; nothing is sent).
+  ghost_after_days: 30
+  # When true, the scheduled daily run also reads your email for employer
+  # replies, through Claude's email connector (read-only). When false or
+  # absent it skips that step. Asking Claude to check your email works either way.
+  email_check: true
+
+# ---- remote reality check (sanity layer: an LLM reads the JD) -------------------
+remote_policy:
+  reject_onsite: true            # a JD that is really onsite is rejected
+  max_office_days_per_week: 2    # hybrid with more office days than this is rejected
+  # Hybrid roles need an entry for their location bucket in commute_table.yaml;
+  # over this many minutes they are rejected. No entry = rejected as unknown
+  # commute (relocation cities excepted).
+  max_commute_minutes: 60
+  # Cities you would MOVE to: they pass the location filter like allowed
+  # places, and the commute cap does not apply. Need not be repeated above.
+  relocation_cities: []          # e.g. ["Austin", "Denver"]
+  # A posting restricted to a place ("US only", "EST hours") passes when the
+  # restriction names one of these, as a whole word or phrase. Your allowed
+  # places and relocation cities (and their US states) are added automatically.
+  acceptable_geo_restrictions: ["US", "USA", "U.S.", "United States", "US Remote",
+                                "North America", "AMER", "Americas",
+                                "Eastern Time", "Central Time", "Mountain Time", "Pacific Time",
+                                "EST", "ET", "CST", "MST", "PST", "PT"]
+
+# ---- resume header location -----------------------------------------------------
+# What city the tailored resume and letter header shows, per job. A positioning
+# choice, separate from where you live (application FORMS always use the real
+# address in data/answer_bank.yaml). The first rule whose `when` matches wins,
+# else `default`, else identity.display_location in your career corpus.
+# Conditions: job_state (a postal code, or a list), job_city_in (a list,
+# whole-word match on the posting location), remote (true/false).
+location_strategy:
+  rules: []
+  # rules:
+  #   - { when: { job_state: IL }, use: "Chicago, IL" }
+  #   - { when: { remote: true }, use: "Chicago, IL" }
+  # default: "Chicago, IL"
+
+# ---- tailoring ------------------------------------------------------------------
+resume:
+  # Every role that ended within this many years (and the current one) gets at
+  # least one bullet; older roles without one fold into "Earlier experience".
+  recent_role_years: 5
+
+self_review:
+  # After each draft (resume selection, cover letter, drafted form answer) the
+  # strong model reviews it against the JD and your corpus. This caps the
+  # revise rounds of a passing resume selection per run; a revision ships only
+  # if it passes every check. Letters and answers are never revised. 0 =
+  # review and report only.
+  max_revision_rounds: 1
+
+questions:
+  # Facts only you know that would close gaps in open jobs, asked in the
+  # digest, `jobkit questions` and MCP get_questions: at most this many per
+  # day (answered or declined ones still count). 0 = ask nothing.
+  max_per_day: 3
+
+# ---- comp sanity (sanity layer) -----------------------------------------------
+comp_sanity:
+  max_range_width_pct: 0.6                 # a wider published range is flagged "range-dodge"
+  flag_missing_range_when_required: true   # flag no range where pay-transparency law requires one
+  # with high demand in the JD, a published ceiling under this is flagged "underpriced"
+  underpriced_below: 160000
+  # a published ceiling at or above this, with no base-vs-OTE basis, is flagged "ote-basis-unclear"
+  ote_unclear_from: 200000
+  # always: the OTE flags apply to every title; ote_tracks: only to titles whose
+  # comp floor (comp.track_floors) has basis ote
+  ote_check: always
+
+# ---- aggregator feeds -------------------------------------------------------------
+# Discovery beyond your target companies. A feed row is never canonical: when
+# the same posting also arrives from a company's own ATS board, the ATS record
+# wins (it has the real apply URL and the form). Titles are pre-filtered with
+# the tracks and include/exclude patterns above.
+feeds:
+  adzuna:                        # needs ADZUNA_APP_ID + ADZUNA_APP_KEY in .env; skipped without
+    enabled: true
+    # one API call per phrase per run (free tier ~250 calls/day)
+    keywords: ["account executive", "sales director", "head of sales",
+               "sales development manager", "revenue operations"]
+    max_days_old: 21
+  usajobs:                       # federal roles; needs USAJOBS_API_KEY + USAJOBS_USER_AGENT_EMAIL
+    enabled: false
+    keywords: ["Program Manager"]  # searched as position titles
+    remote_only: true
+    full_description: true       # duties, qualifications and education, not the summary alone
+    # series: ["1101", "0343"]     # optional OPM occupational series codes
+    # pay_grade_low: 12            # optional minimum GS grade for the series search
+  arbeitnow: { enabled: true, remote_only: true }
+  remotive:  { enabled: true, categories: ["sales", "business"] }
+  remoteok:  { enabled: true }
+  himalayas: { enabled: true }
+  consider:                      # VC portfolio job boards
+    enabled: true
+    categories: ["sales"]
+  cosnetwork: { enabled: false } # chiefofstaff.network RSS; enable for Chief of Staff roles
+  # getro: robots.txt disallows the search endpoint (hard rule 11). Keep disabled.
+  getro: { enabled: false }
+  # a16z: experimental parser, currently broken. Keep disabled.
+  a16z: { enabled: false }
+  # ---- LinkedIn guest (logged-out) job search: discovery only ----
+  # CLAUDE.md hard rule 11 exception; docs/why-no-linkedin.md. OFF unless you
+  # turn it on. `jobkit linkedin-discover` / MCP linkedin_discover, and a
+  # nightly stage after the feeds. Never logged in, no cookies, no proxies, no
+  # browser; an honest User-Agent "jobkit/0.1 (...; contact: <JOBKIT_CONTACT_EMAIL,
+  # else the answer bank email>)". That contact goes to LinkedIn with every
+  # request: set JOBKIT_CONTACT_EMAIL in .env to an address that is NOT your
+  # LinkedIn login if you want the two kept apart. Stops for the day on HTTP
+  # 429/999/403/401, any redirect (authwall/login/checkpoint), a CAPTCHA or
+  # challenge page at any status (Cloudflare's too) or a search page with no
+  # job card that is not the empty no-results page. Still against LinkedIn's
+  # User Agreement: turning it on is your decision. No LinkedIn job row is
+  # stored: a card enters jobkit directly only when its apply link resolves to
+  # the employer's Greenhouse/Lever/Ashby board; otherwise only the company
+  # name goes to the discovery queue (the discovery stage finds its board).
+  # One run at a time (a lock).
+  linkedin_guest:
+    enabled: false
+    # at most 4, from your active tracks
+    keywords: ["account executive", "sales director", "head of sales"]
+    # workplace: remote | hybrid | onsite | any (LinkedIn's f_WT filter).
+    # Add your own metro, e.g. { location: "Chicago, Illinois", workplace: hybrid }
+    locations:
+      - { location: "United States", workplace: remote }
+    posted_within_days: 7            # f_TPR=r604800
+    # Caps per LOCAL calendar day, counted across runs. Ceilings in code (6, 40):
+    # a higher value fails at load. When keyword x location pairs outnumber the
+    # searches, the pairs rotate by day.
+    max_search_requests_per_day: 6
+    # 0: posting pages are not fetched. The logged-out posting page no longer
+    # carries the employer's apply URL (its Apply button opens a sign-in
+    # modal), so a page buys nothing; the company name goes to the discovery
+    # queue instead. Raise it (<= 40) only if LinkedIn shows the apply URL to
+    # logged-out visitors again.
+    max_detail_requests_per_day: 0
+    min_delay_seconds: 3             # randomized between this and 2x; floor 3
+
+# ---- aggregator / LinkedIn jobs -> the employer's own board -------------------------
+# `jobkit resolve-boards` / MCP resolve_boards, and the nightly stage
+# resolve-boards (after discovery, before filter). For each feed job that
+# passes the filter (and each LinkedIn card whose company was queued), find the
+# company's Greenhouse/Lever/Ashby board (boards jobkit has, the registry, then
+# a slug probe of name variants such as acme, acme-careers, acmehq) and the
+# posting with the same title AND an agreeing location (same metro, or both
+# US-wide remote). One agreeing posting: it is ingested and the feed row merged
+# into it (the ATS row wins, rule 10). None or several: nothing is picked and
+# the job is flagged board-match-ambiguous for you (digest, get_queue).
+# Only public board APIs, the honest jobkit User-Agent, one request at a time.
+board_resolution:
+  enabled: true
+  probe_cache_days: 14               # a company is slug-probed at most once per 14 days
+  delay_seconds: 1                   # between requests to the ATS APIs; floor 1
+  max_requests_per_run: 300          # board-listing requests per run; ceiling 1000
+
+# ---- application friction -----------------------------------------------------------
+# How expensive an application form is to fill, from its fields (captured
+# overnight). Shown in the queue; standing rules can use friction_lte.
+friction:
+  weights: { field_count: 1, required_count: 2, novel_question_count: 5, has_assessment: 40 }

@@ -1,87 +1,169 @@
-# Why no LinkedIn?
+# LinkedIn
 
-People expect a job-search tool to start with LinkedIn. jobkit doesn't, on purpose. This page explains what we found and what jobkit does instead.
+ApplyForge (the `jobkit` command) reads jobs from employers' own job boards. If
+you turn it on, it also runs a few logged-out LinkedIn searches a day to find
+company names, then looks for those jobs on each company's own board. This
+page covers what LinkedIn allows, what ApplyForge does, and the risk you take on.
 
-**Update 2026-10-12.** Finding 2 below was wrong about what is technically possible, and is corrected. LinkedIn has a logged-out ("guest") job search that answers a plain HTTP request: no browser, no login. jobkit now has a discovery-only mode that uses it, off by default ([Discovery-only mode](#discovery-only-mode-2026-10-12) below). It is still against LinkedIn's User Agreement; CLAUDE.md hard rule 11 allows it only as an opt-in for low-volume, logged-out discovery, which each user decides on for their own checkout.
+## What LinkedIn allows
 
-## What we found
+- **No job API for applicants.** LinkedIn's job data is available through its
+  Talent Solutions partner programs, which are for employers, recruiters and
+  their hiring systems. There is no public API for searching or applying as a
+  candidate.
+- **Its terms forbid automated access**, logged in or not, and LinkedIn detects
+  it. It answers a client it refuses with HTTP 999 or 429, or redirects it to a
+  sign-in wall or a security check.
+- **A logged-out job search exists.** LinkedIn serves a guest job search to
+  anyone as plain HTML: `GET
+  https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=…&location=…`
+  returns up to 10 job cards (LinkedIn job id, title, company, location, date
+  posted), and `GET …/jobs-guest/jobs/api/jobPosting/<id>` returns one posting.
+  Both answered an ordinary HTTP client with an honest User-Agent and no
+  cookies when checked in October 2026.
+- **Applying needs an account.** On the logged-out posting page, the Apply
+  button opens a "Join or sign in" box, and the employer's apply link is not in
+  the page. Easy Apply happens inside LinkedIn, needs an account, and has no
+  applicant-side API.
+- **A LinkedIn job link doesn't say where to apply.** A link like
+  `linkedin.com/jobs/view/1234567890` names LinkedIn's copy of the posting, not
+  the employer's hiring system.
 
-**1. LinkedIn has no job-data API for job seekers.**
-LinkedIn's job data is only available through its Talent Solutions partner programs, which are for employers, recruiters and the hiring systems they use. There is no public API for searching jobs or applying as a candidate. (SPEC.md §2.2 lists this as a dead end, next to the retired Indeed Publisher API.)
+## What ApplyForge doesn't do
 
-**2. LinkedIn has strict no-bot rules, and it enforces them. (Corrected 2026-10-12.)**
-LinkedIn's User Agreement prohibits bots, scrapers and any other automated access, logged in or not, and LinkedIn actively detects them.
+ApplyForge doesn't log in to LinkedIn or drive a browser there. Logged-in
+automation is what LinkedIn suspends accounts for, and losing your profile,
+network and recruiter messages in the middle of a search is a serious loss. It
+also doesn't try to get past bot detection or solve CAPTCHAs. Browser
+automation is also slow and costly next to a job board, which answers one
+request with every open role at a company, in structured data.
 
-The earlier version of this page said the only way to search LinkedIn without an API was to drive a browser window logged in as you. That was wrong. LinkedIn serves a logged-out ("guest") job search to anyone, as plain HTML fragments: `GET https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=…&location=…` returns up to 10 job cards (LinkedIn job id, title, company, location, date posted), and `GET …/jobs-guest/jobs/api/jobPosting/<id>` returns one posting. We verified both live on 2026-10-12 with an ordinary HTTP client, an honest User-Agent naming jobkit, and no cookies or login: every request was answered with HTTP 200. So the limit on logged-out search is LinkedIn's rules, not a technical barrier.
+## Discovery mode (off by default)
 
-What is still true:
-- **Applying needs a login.** On the logged-out posting page, the Apply button of a posting that applies on the employer's site now opens a "Join or sign in" box. The employer's apply link is not in the page (older guest pages included it; on 2026-10-12, none of the four postings we checked did). Easy Apply happens inside LinkedIn and needs an account too.
-- **Logged-in automation risks your account.** Driving a browser logged in as you is what LinkedIn bans accounts for: your profile, your network and your recruiter messages, lost in the middle of a job search. jobkit never does it.
-- **LinkedIn blocks automated guests.** A client it refuses gets HTTP 999 or 429, or is redirected to a sign-in wall ("authwall") or a security check. jobkit stops when it gets any of these (see below).
+`jobkit linkedin-discover [--dry-run]` (Claude tool
+`linkedin_discover(confirm=false)`) and a nightly stage right after the feeds
+use the logged-out search, for discovery only. It is the one exception to the
+project's no-scraping rule (CLAUDE.md hard rule 11). It is off until you set
+`feeds.linkedin_guest.enabled: true` in `config/filters.yaml`. While it is off,
+the nightly `linkedin-guest` stage does nothing and
+`linkedin_discover(confirm=true)` refuses to start.
 
-**3. Browser automation is slow and expensive compared to job boards.**
-Driving a browser means an AI looks at the page, decides where to click, waits for it to load, and repeats, for every search and every posting. Each step costs AI tokens and seconds. A company job board answers one request with every open role in clean, structured data: a whole company in under a second, for free. Getting the same postings through a LinkedIn browser window would cost far more and take far longer, for jobs jobkit can already read at the source.
+It only helps for employers that also post on Greenhouse, Lever or Ashby,
+because those are the boards ApplyForge can look the job up on.
 
-**4. The tools that do it break jobkit's own safety rules.**
-We reviewed the open-source LinkedIn "auto-appliers" (docs/research-2026-09-02.md). They work by:
-- hiding the automation from bot detection (for example, "undetected" browser drivers),
-- storing your LinkedIn password in plain text, and
-- in some cases, paying a service to solve CAPTCHAs.
+### What it does
 
-jobkit never evades bot detection and never solves CAPTCHAs (hard rules 2 and 11). The best-known project, AIHawk, deleted its application code in 2026.
+1. **A few searches a day.** Up to 4 `keywords` in your `locations`, posted in
+   the last `posted_within_days` (7). The setup interview writes the keywords
+   from your track titles (the first four) and the locations from your places,
+   plus "United States, remote" when you accept remote work. Each location has
+   a `workplace`: remote, hybrid, onsite or any. If the `keywords` key is
+   missing, jobkit falls back to built-in sales titles, and `jobkit doctor`
+   warns when that would happen on a search with no sales track.
+2. **Each card is filtered.** Cards seen in the last 14 days are skipped.
+   Titles go through the filter's blocklist, exclude, include and paused-track
+   rules; rejections are logged and recorded as `linkedin_guest/<id>`.
+3. **Known boards are skipped.** If ApplyForge already polls the company's board,
+   the card is skipped: the board already gives ApplyForge that job.
+4. **Otherwise only the company name is kept.** It goes to the discovery queue
+   (source `linkedin_guest`, no URL).
+5. **The employer's board is found.** The discovery stage, which runs right
+   after, looks the name up in the board registry (about 15,000 public
+   Greenhouse, Lever and Ashby boards) and adds the company's board; the next
+   poll reads it, and the employer's postings go through filter and scoring as
+   usual. The `resolve-boards` stage that follows also looks for the card's own
+   posting (same title and an agreeing location) on the company's board, and
+   ingests it when exactly one fits (see [Finding the employer's own
+   posting](how-it-works.md#finding-the-employers-own-posting)).
 
-**5. "Easy Apply" has no applicant-side submit API either.**
-Like every applicant tracking system jobkit supports, LinkedIn's Easy Apply only accepts submissions through LinkedIn's own interface. The only programmatic channels belong to employers (hard rule 9).
+The LinkedIn run itself never adds or polls a board on a company-name match.
+The only way a LinkedIn card brings a posting straight in is an "apply on
+company site" link that resolves to the employer's board, and logged-out pages
+don't show that link, so in practice step 4 applies. No job row, source or
+queue entry ever holds a LinkedIn URL or a LinkedIn copy of a posting; a
+LinkedIn find enters ApplyForge only as the employer's own record.
 
-**6. A LinkedIn job link doesn't tell jobkit where to apply.**
-A link like `linkedin.com/jobs/view/1234567890` names LinkedIn's copy of the posting, not the employer's hiring system. Visiting it logged out doesn't help either: since at least 2026-10-12 the logged-out page no longer contains the employer's apply link (finding 2). The discovery-only mode therefore finds the employer's board by company name instead.
+### Limits
 
-## Discovery-only mode (2026-10-12)
+All of these are in `feeds.linkedin_guest` in `config/filters.yaml`.
 
-CLAUDE.md hard rule 11 ("no scraping of gated sites") has one exception: LinkedIn's logged-out job search, for discovery only. `jobkit linkedin-discover` (MCP `linkedin_discover`) and a nightly stage right after the feeds use it. It is **off** until you set `feeds.linkedin_guest.enabled: true` in `config/filters.yaml`.
+- **Never logged in.** Plain HTTP GETs to
+  `www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search`: no browser,
+  no cookies kept or sent, no proxies, no disguised browser identity.
+- **An honest User-Agent:** `jobkit/0.1 (personal job-search tool; logged-out
+  job discovery, a few requests a day; contact: …)`. The contact is
+  `JOBKIT_CONTACT_EMAIL` from `.env`, else your answer bank's email; with
+  neither, nothing is sent. LinkedIn sees that address with every request, so
+  set `JOBKIT_CONTACT_EMAIL` to a different address if you want it kept apart
+  from your LinkedIn login.
+- **A few requests a day:** at most `max_search_requests_per_day` (6) searches
+  per local calendar day, and `max_detail_requests_per_day` posting pages (0,
+  because the logged-out page no longer carries the apply link). Requests are
+  `min_delay_seconds` (3) to twice that apart, randomised. 6 and 40 are
+  ceilings and 3 seconds is a floor: more searches or posting pages, or a
+  shorter delay, fails at load. Requests are counted as
+  `linkedin_guest.request` events when sent, so the caps apply across runs.
+  With more keyword and location pairs than searches, the pairs rotate by day.
+- **It stops on any block.** HTTP 429, 999, 403 or 401, any redirect (sign-in
+  wall, login, checkpoint), a CAPTCHA or challenge page at any status
+  (including Cloudflare's "Just a moment..." check, usually HTTP 503), or a
+  search page with no job card that isn't the empty no-results page ends the
+  run, records a `linkedin_guest.blocked` event, and skips LinkedIn until the
+  next local calendar day. The day's block is read again before every request,
+  so a block recorded by any run stops the others. A block isn't a stage
+  failure; the run doesn't retry around it. A network error or 5xx ends the run
+  without closing the day (`jobkit linkedin-discover` exits 1).
+- **One run at a time.** A run holds an exclusive lock on
+  `data/jobkit.db.linkedin_guest.lock` for its whole length. A second run
+  started meanwhile sends nothing and reports `busy`.
+  `linkedin_discover(confirm=true)` also refuses while a nightly or `run-all` is
+  in progress. The delay between requests also holds from one run to the next.
 
-What it does:
-1. A few logged-out searches a day: up to 4 keywords (default: account executive, sales manager, sales director, head of sales) in your locations (default: United States remote), posted in the last 7 days.
-2. Each card's title goes through jobkit's own title rules (exclude and include lists, paused tracks; anything with "engineer" is out). Cards seen in the last 14 days are skipped.
-3. If jobkit already polls the company's board, the card is skipped: jobkit already gets that job from the board.
-4. Otherwise only the company name goes to the discovery queue (source `linkedin_guest`).
-5. The discovery stage, which runs right after, looks the name up in jobkit's board registry (about 15,000 public Greenhouse, Lever and Ashby boards). If it finds the company's board, it adds it, and the next poll reads it. The employer's own postings become jobs, with the real application forms, and go through the normal filter, scoring and tailoring. This takes about one night longer than polling the board at once, but rule 11's exception lets a LinkedIn posting into jobkit directly only through its "apply on company site" link, and the logged-out pages no longer show that link. A company name alone only goes to the queue.
+### What you see
 
-jobkit never stores a LinkedIn job row, LinkedIn job link or LinkedIn copy of a posting. A LinkedIn find enters jobkit only as the employer's ATS record (hard rule 10).
+`--dry-run` (and `linkedin_discover()` without `confirm=true`) prints today's
+plan, the budget used, the block state and whether a run is in progress,
+without contacting LinkedIn. Each run prints, and records as a
+`linkedin_guest.run` event, what each card became; `linkedin_guest.seen` events
+keep each card's outcome. The digest's "LinkedIn guest discovery" line sums the
+day: searches made, new jobs found on employer boards, companies queued, and
+whether LinkedIn blocked the run.
 
-Limits, all in `feeds.linkedin_guest` (config/filters.yaml):
-- **Never logged in.** Plain HTTP requests (no browser), no cookies kept or sent, no proxies, no disguised browser identity.
-- **An honest User-Agent:** `jobkit/0.1 (personal job-search tool; logged-out job discovery, a few requests a day; contact: …)`. The contact is `JOBKIT_CONTACT_EMAIL` from `.env`, or else your answer-bank email. LinkedIn sees this address with every request, so if you want it kept apart from your LinkedIn login, set `JOBKIT_CONTACT_EMAIL` to a different address. With no contact set, jobkit makes no requests.
-- **A few requests a day:** at most 6 searches per local calendar day (`max_search_requests_per_day`, default 6). Posting pages are off (`max_detail_requests_per_day: 0`) because they no longer carry the apply link. Requests are 3 to 6 seconds apart (`min_delay_seconds`, randomized up to twice that). Every request is counted as it is sent, so the caps apply across runs. These numbers are upper limits: a higher value in the config is refused, and raising one would mean changing hard rule 11, not the config.
-- **It stops on any block.** HTTP 429, 999, 403 or 401, any redirect (to the sign-in wall, the login page or a security checkpoint), a CAPTCHA or challenge page with any status (LinkedIn's own, or the Cloudflare "Just a moment..." check, which usually comes back as HTTP 503), or a search page that has no job cards and is not the empty no-results page ends the run immediately. jobkit records a `linkedin_guest.blocked` event and skips LinkedIn until the next calendar day. Every run checks for that event again before each request, so no run keeps going after another one was blocked. It never retries around a block and never solves a CAPTCHA (hard rule 2).
-- **One run at a time.** A run holds a lock for its whole length. A second run started meanwhile (for example `jobkit linkedin-discover` while the nightly run is in its LinkedIn stage) sends nothing and reports `busy`, so requests never go out from two runs at once, and the 3 to 6 seconds between requests also hold from one run to the next.
+### The risk
 
-The digest gets a line for the day: searches made, new jobs found through the employer's board, companies queued, and whether LinkedIn blocked us.
+This mode is against LinkedIn's User Agreement, which forbids automated access
+whether or not you are logged in. Turning it on is your decision, for
+low-volume, logged-out discovery. Because no request is logged in, your
+LinkedIn account isn't involved, but LinkedIn can still block the address the
+requests come from.
 
-**The terms-of-service caveat.** This mode is still against LinkedIn's User Agreement, which forbids automated access whether or not you are logged in. Turning it on means accepting that, for low-volume, logged-out discovery (CLAUDE.md rule 11). Because no request is logged in, your LinkedIn account is not involved, but LinkedIn can still block the address the requests come from.
+Indeed and Glassdoor are out of scope: ApplyForge doesn't scrape them, logged in or
+out, and doesn't use API keys that weren't issued to you. Indeed's Publisher
+API was retired in 2023.
 
-**Indeed and Glassdoor stay out.** jobkit doesn't scrape them, logged in or out, and doesn't use API keys that weren't issued to you. Indeed's Publisher API was retired in 2023, and SPEC.md §2.2 still lists it as a dead end.
+## Using LinkedIn alongside ApplyForge
 
-## What jobkit does instead
+- **Paste the employer's link.** See a job on LinkedIn? Click "Apply on company
+  website" and give that link to Claude (or `jobkit add-url <link>`). A
+  Greenhouse, Lever or Ashby link joins your pipeline: scored, tailored and
+  filled. A link on another system is named, and you apply on the employer's
+  site.
+- **Do the human parts by hand:** messaging recruiters and hiring managers,
+  asking for referrals, and keeping your profile current. Recruiters cross-check
+  it, so your title there should match your resume. A referral usually gets more
+  attention than a cold application.
 
-Most jobs on LinkedIn are copies of a posting that also lives on the employer's own careers page. jobkit goes to the source:
+## Possible later steps
 
-- **Company job boards.** jobkit reads the public Greenhouse, Lever and Ashby boards of the companies on your watch list every night. You get the same jobs, usually earlier, with the real application form, which LinkedIn doesn't give you.
-- **Job feeds.** Adzuna and the remote-job feeds surface companies you didn't know to watch, and jobkit adds their boards when it finds them.
-- **Links you paste.** See a job on LinkedIn? Click **"Apply on company website"** and give that link to jobkit (`jobkit add-url <link>`, or just paste it to Claude). If the link points at Greenhouse, Lever or Ashby, the job joins your normal pipeline: scored, tailored and pre-filled.
-- **Planned:** reading your LinkedIn job-alert *emails* (not LinkedIn itself) and pulling out the company apply links automatically. This is the approved direction (docs/research-2026-09-02.md) but isn't built yet.
+These stay within the limits above: no automated logged-in browsing, and
+nothing that hides from bot detection.
 
-## What LinkedIn is still best for
-
-Use LinkedIn by hand for what automation can't do well: messaging recruiters and hiring managers, asking for referrals, and keeping your profile current. Recruiters cross-check it, so your title there should match your resume. A referral from a real person still beats any number of cold applications.
-
-## Roadmap: LinkedIn in a future version
-
-LinkedIn is too large a part of how people find jobs to leave out for good. The discovery-only mode above is the first step. Later steps stay within the rules above (no automated logged-in browsing, no evading bot detection). Directions worth exploring:
-
-- **Job-alert emails.** Read your LinkedIn job-alert emails and pull out the company apply links automatically (already approved, not yet built).
-- **Your own LinkedIn data.** LinkedIn lets every member download their data, including connections. Importing that file would let jobkit spot people you already know at companies in your queue, and suggest referrals.
-- **Outreach drafts.** jobkit drafts recruiter and hiring-manager messages from your fact file; you send them yourself on LinkedIn.
-- **Assisted browsing.** While you browse LinkedIn yourself, Claude reads the posting you have open and adds the job to your pipeline. You drive; nothing runs unattended.
-- **Official access.** If LinkedIn opens a job-seeker API or partner program, use it.
-
+- **Job-alert emails.** Read your LinkedIn job-alert emails and pull out the
+  company apply links (approved, not built).
+- **Your own LinkedIn data.** LinkedIn lets members download their data,
+  including connections. Importing that file would let ApplyForge point out people
+  you already know at companies in your queue.
+- **Assisted browsing.** While you browse LinkedIn yourself, Claude reads the
+  posting you have open and adds the job to your pipeline.
+- **Official access.** If LinkedIn opens a job-seeker API or partner program,
+  use it.

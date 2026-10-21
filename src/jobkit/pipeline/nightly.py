@@ -1,7 +1,7 @@
 """`jobkit nightly`: the one unattended run a night (approved 2026-10-08).
 
 It is run-all (poll, feeds, discovery, filter, triage, form specs, standing
-rules, tailor, follow-ups) with one more stage before the digest:
+rules, tailor, ghost-close) with one more stage before the digest:
 
 * **stage**: every approved job whose application is tailored and has not
   been staged since (except one whose cover letter the claim judge never

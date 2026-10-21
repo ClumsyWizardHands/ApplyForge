@@ -173,8 +173,8 @@ def test_other_tracks_unaffected(cfg: Filters, title: str) -> None:
 # roles the test profile targets through a non-track include_titles pattern
 # (revenue or sales operations, deal desk, sales compensation) or as an AE.
 # The rule has no exception: the title's FIRST matching track is paused, so it
-# is held. These wrongful holds are accepted and listed in the README ("Known
-# wrongful holds").
+# is held. These wrongful holds are accepted and listed in docs/how-it-works.md
+# ("Known wrongful holds").
 ACCEPTED_WRONGFUL_HOLDS = [
     "Business Development Executive",
     "Revenue Operations, Business Development",
@@ -194,9 +194,10 @@ def test_an_include_never_releases_a_paused_title(cfg: Filters, title: str) -> N
     assert reject_reason_now(_row(title), cfg) == "track_paused:sdr_bdr"
 
 
-def test_the_readme_lists_the_known_wrongful_holds() -> None:
-    readme = (Path(__file__).resolve().parent.parent / "README.md").read_text()
-    section = readme[readme.index("Known wrongful holds") :]
+def test_the_docs_list_the_known_wrongful_holds() -> None:
+    doc = Path(__file__).resolve().parent.parent / "docs" / "how-it-works.md"
+    text = doc.read_text()
+    section = text[text.index("Known wrongful holds") :]
     for title in ("Business Development Executive", "Revenue Operations, Business Development"):
         assert title in section, title
 

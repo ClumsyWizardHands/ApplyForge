@@ -1,7 +1,7 @@
 """Background processes started from the MCP server (audit 2026-10-08 §3 item 6).
 
 The MCP tools that start work in the background (approve -> tailor, retailor,
-stage_forms, restage, open_queue, run_followups) used to run
+stage_forms, restage, open_queue) used to run
 `uv run --no-sync jobkit …` with all output thrown away and return canned
 success text. `--no-sync` also meant they ran a frozen install that ignored
 source edits.

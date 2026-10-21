@@ -18,7 +18,14 @@ polled): its tier still applies to postings the feeds find there.
 
 An existing config/targets.yaml is never rewritten: new companies are
 appended to it as text, so its comments and order stay; companies already in
-it (same name, or same board) are skipped."""
+it (same name, or same board) are skipped.
+
+Many employers (hospitals, school districts, government, most large
+companies) use an ATS jobkit cannot poll. A person whose employers are all
+like that can say so instead of naming companies: `feed_only_said`, in their
+words, is written to targets.yaml (`feed_only_said:`) and to the record, and
+setup_status then counts the target step as done, with a warning that
+postings come only from the feeds."""
 
 from __future__ import annotations
 
@@ -220,7 +227,7 @@ async def discover_all(
 # targets.yaml
 # ---------------------------------------------------------------------------
 
-TARGETS_HEADER = f"""{GENERATED_MARK} — config/targets.yaml
+TARGETS_INTRO = f"""{GENERATED_MARK} — config/targets.yaml
 #
 # The companies whose public job boards jobkit polls directly, from your answers
 # (data/setup/targets.answers.yaml). Each entry quotes what you said and how
@@ -231,9 +238,10 @@ TARGETS_HEADER = f"""{GENERATED_MARK} — config/targets.yaml
 # board: the public ATS board (greenhouse | lever | ashby) and its token. A
 # company without a board is recorded (its tier applies) but not polled.
 # Add companies with seed_targets, or by hand in the same shape.
-
-companies:
 """
+TARGETS_HEADER = TARGETS_INTRO + "\ncompanies:\n"
+FEED_ONLY_KEY = "feed_only_said"
+_FEED_ONLY_LINE = re.compile(rf"(?m)^{FEED_ONLY_KEY}:.*$")
 
 
 def _q(s: str) -> str:
@@ -335,10 +343,64 @@ def write_targets(
     return added, skipped
 
 
-def _record(files_root: Path | None, companies: list[CompanyAnswer], results: list[Found]) -> None:
+def feed_only_said(path: Path) -> str:
+    """The person's words for relying on the feeds alone, from targets.yaml
+    (empty when absent or unreadable)."""
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) if path.is_file() else None
+    except (OSError, yaml.YAMLError):
+        return ""
+    if not isinstance(data, dict):
+        return ""
+    return " ".join(str(data.get(FEED_ONLY_KEY) or "").split())
+
+
+def write_feed_only(said: str, *, root: Path | None = None) -> None:
+    """Record in config/targets.yaml that discovery comes from the feeds:
+    `feed_only_said:` above `companies:`, in the person's words. Creates the
+    file (with no companies) when it is missing; replaces an earlier
+    feed_only_said line; never touches the companies."""
+    words = " ".join(said.split())[:300]
+    if not words:
+        raise SetupError("feed_only_said: the person's own words, not empty")
+    files = setup_files(root)
+    path = files.config_file("targets.yaml")
+    _, _, text = _existing(path)
+    line = f"{FEED_ONLY_KEY}: {_q(words)}"
+    block = (
+        "# Discovery comes from the aggregator feeds: your employers have no board\n"
+        "# jobkit can poll. In your words:\n" + line + "\n"
+    )
+    if text is None:
+        new_text = TARGETS_INTRO + "\n" + block + "\ncompanies: []\n"
+    elif _FEED_ONLY_LINE.search(text):
+        new_text = _FEED_ONLY_LINE.sub(lambda _m: line, text, count=1)
+    else:
+        m = re.search(r"(?m)^companies:", text)
+        if m is None:
+            raise SetupError("config/targets.yaml has no `companies:` key; fix it first")
+        new_text = text[: m.start()] + block + "\n" + text[m.start() :]
+    try:
+        Targets.model_validate(yaml.safe_load(new_text) or {})
+    except Exception as e:  # noqa: BLE001
+        raise SetupError(f"the updated targets.yaml would not load: {e}") from e
+    write_text_atomic(path, new_text)
+
+
+def _record(
+    files_root: Path | None,
+    companies: list[CompanyAnswer],
+    results: list[Found],
+    feed_only: str = "",
+) -> None:
     files = setup_files(files_root)
     prev = load_yaml(files.targets_record)
     entries = list((prev or {}).get("companies") or []) if isinstance(prev, dict) else []
+    extra: dict[str, Any] = {}
+    if isinstance(prev, dict) and prev.get(FEED_ONLY_KEY):
+        extra = {FEED_ONLY_KEY: prev[FEED_ONLY_KEY], "feed_only_on": prev.get("feed_only_on")}
+    if feed_only:
+        extra = {FEED_ONLY_KEY: " ".join(feed_only.split()), "feed_only_on": today()}
     for c, f in zip(companies, results, strict=True):
         entries.append(
             {
@@ -357,28 +419,45 @@ def _record(files_root: Path | None, companies: list[CompanyAnswer], results: li
     write_text_atomic(
         files.targets_record,
         f"{GENERATED_MARK} — companies you named, and what discovery found.\n"
-        + dump_yaml({"companies": entries}),
+        + dump_yaml({**extra, "companies": entries}),
     )
 
 
 def seed_targets(
-    companies: list[Any],
+    companies: list[Any] | None,
     *,
     probe: bool = True,
     include_not_found: bool = True,
+    feed_only_said: str = "",
     client: httpx.AsyncClient | None = None,
     delay: float = PROBE_DELAY_S,
     root: Path | None = None,
 ) -> str:
     """Discover and verify each company's board, append them to
-    config/targets.yaml, and report what was found and what was not."""
-    parsed = parse_companies(companies)
+    config/targets.yaml, and report what was found and what was not.
+    `feed_only_said` (the person's words) records that discovery comes from
+    the feeds; with it, no company is needed."""
+    parsed = parse_companies(companies or [])
+    said = " ".join((feed_only_said or "").split())
+    if not parsed and not said:
+        raise SetupError(
+            "name at least one company, or pass feed_only_said with the person's words when "
+            "their employers have no board jobkit can poll"
+        )
+    head: list[str] = []
+    if said:
+        write_feed_only(said, root=root)
+        head.append(
+            "recorded in config/targets.yaml: discovery comes from the feeds "
+            f'(you said: "{said[:200]}")'
+        )
     if not parsed:
-        raise SetupError("name at least one company")
+        _record(root, [], [], said)
+        return "\n".join(head)
     results = asyncio.run(discover_all(parsed, client, probe=probe, delay=delay))
-    _record(root, parsed, results)
+    _record(root, parsed, results, said)
     added, skipped = write_targets(results, include_not_found=include_not_found, root=root)
-    lines = []
+    lines = list(head)
     verified = [f for f in results if f.verified]
     unverified = [f for f in results if f.ats and not f.verified]
     missing = [f for f in results if not f.ats]

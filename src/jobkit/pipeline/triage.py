@@ -33,7 +33,7 @@ from jobkit import llm, paths
 from jobkit.config import Filters, load_filters, read_config_yaml
 from jobkit.log import log
 from jobkit.normalize import JD_MISSING_REASON, jd_is_missing, jd_text_length
-from jobkit.pipeline.filter import defers_to_remote_check
+from jobkit.pipeline.filter import defers_to_remote_check, matched_place_bucket
 from jobkit.validate.claims import never_claim_for_prompt
 from jobkit.validate.provenance import constraints, corpus_hash
 
@@ -55,11 +55,14 @@ def _jd_text(jd_html: str, limit: int = 12000) -> str:
     return text[:limit]
 
 
-# A candidate role counts toward "years in sales" when its title is a sales
-# title: one the role-track classifier places (Filters.track_for, the one owner
-# of what an SDR or AE is), or one that says "sales" ("Sales Manager", "Inside
-# Sales Specialist"). A Program Manager role is not counted.
+# prompt_set sales (the default): a candidate role counts toward "years in
+# sales" when its title is a sales title: one the role-track classifier places
+# (Filters.track_for, the one owner of what an SDR or AE is), or one that says
+# "sales" ("Sales Manager", "Inside Sales Specialist"). A Program Manager role
+# is not counted.
 _SALES_WORD = re.compile(r"(?i)\bsales\b")
+# prompt_set general: only roles whose title one of the person's tracks places
+TARGET_TRACK_YEARS_LABEL = "YEARS IN ROLES ON THE TARGET TRACKS"
 
 
 def month_index(ym: object) -> int | None:
@@ -84,7 +87,9 @@ def _profile_summary(
     2026-10-08 §2 item 6: the old profile had bullet text and tags only, so
     the scorer guessed tenure and seniority). Every role with its title,
     company, dates and years in role, its bullets grouped under it; total
-    years in sales roles; education; skill depth; the never-claim lists.
+    years in sales roles (prompt_set general: years in roles on the target
+    tracks, counting only titles a track places); education; skill depth; the
+    never-claim lists.
 
     Years are computed as of `today`, which is printed in the profile: the
     rendered prompt (and so the score cache key, llm.cache_key_for) changes
@@ -107,6 +112,7 @@ def _profile_summary(
         text = str(b.get("text_short") or b.get("text_long") or "").strip()
         return f"  - {text}" + (f" [{tags}]" if tags else "")
 
+    general = filters.prompt_set == "general"
     lines: list[str] = []
     sales_months: set[int] = set()
     sales_titles: list[str] = []
@@ -124,8 +130,13 @@ def _profile_summary(
         dates = f"{role.get('start') or '?'} – {'present (current role)' if current else end_raw}"
         lines.append(f"- {title} · {str(role.get('company') or '').strip()} · {dates}{span}")
         lines += [bullet_line(b) for b in by_role.pop(str(role.get("id") or ""), [])]
-        if title and (filters.track_for(title) is not None or _SALES_WORD.search(title)):
-            sales_titles.append(title)
+        track = filters.track_for(title) if title else None
+        if general:
+            counted = track is not None
+        else:
+            counted = bool(title) and (track is not None or bool(_SALES_WORD.search(title)))
+        if counted:
+            sales_titles.append(f"{title} [{track}]" if general else title)
             if start is not None and end is not None:
                 sales_months.update(range(start, end))
     orphans = [b for bs in by_role.values() for b in bs]
@@ -136,7 +147,8 @@ def _profile_summary(
     out = [
         f"ROLES (most recent first; years in role computed as of {today:%Y-%m}):",
         *lines,
-        f"TOTAL YEARS IN SALES ROLES: {len(sales_months) / 12:.1f} "
+        f"{TARGET_TRACK_YEARS_LABEL if general else 'TOTAL YEARS IN SALES ROLES'}: "
+        f"{len(sales_months) / 12:.1f} "
         f"(titles counted: {'; '.join(sales_titles) or 'none'})",
     ]
     if starts:
@@ -230,17 +242,30 @@ def run_extract(conn: sqlite3.Connection, limit: int | None = None) -> int:
     return _extract_rows(conn, rows)
 
 
+# The requirement-extraction prompt of each prompt_set. The sales one keeps its
+# original name and cache key; the general one has mixed-field examples.
+EXTRACT_PROMPTS = {"sales": "extract_requirements", "general": "extract_requirements_general"}
+
+
+def extract_prompt_name(filters: Filters | None = None) -> str:
+    """The extraction prompt file (prompts/<name>.md) for the active prompt set."""
+    return EXTRACT_PROMPTS[(filters or load_filters()).prompt_set]
+
+
 def _extract_rows(conn: sqlite3.Connection, rows: list[sqlite3.Row]) -> int:
     """Extract and store the requirements of these jobs (JD-less ones already
     refused by the caller). Commits; returns how many were stored."""
-    prompt = llm.PromptFile("extract_requirements")
+    name = extract_prompt_name()
+    prompt = llm.PromptFile(name)
+    # the sales prompt's cache key is unchanged; the general one names itself
+    key_head = "extract" if name == EXTRACT_PROMPTS["sales"] else f"extract-{name}"
 
     def fetch(wconn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
         return llm.call_json(
             wconn,
             "extract",
             prompt.render(title=row["title"], jd=_jd_text(row["jd_html"])),
-            cache_key=f"extract:{row['jd_hash']}:{prompt.version}",
+            cache_key=f"{key_head}:{row['jd_hash']}:{prompt.version}",
         )
 
     done = 0
@@ -346,8 +371,14 @@ def run_remote_check(conn: sqlite3.Connection, limit: int | None = None) -> dict
         actual = data.get("remote_actual", "unclear")
         days = _int(data.get("office_days_required"), -1)
         days_val = days if days >= 0 else None
-        commute = _commute_minutes(row["location_bucket"], remote_cfg)
-        relocation = row["location_bucket"] in relocation_buckets
+        bucket = row["location_bucket"]
+        # with filters.locations.match_state, "Columbus OH" counts as the
+        # allowed "Columbus, OH" (filter.matched_place_bucket): use its bucket
+        place_bucket = matched_place_bucket(row["location_raw"], filters)
+        if place_bucket and _commute_minutes(bucket, remote_cfg) is None:
+            bucket = place_bucket
+        commute = _commute_minutes(bucket, remote_cfg)
+        relocation = bucket in relocation_buckets
         # the filter passed this posting because its location only says "US"
         # or nothing: the office, if any, cannot be placed from the location
         unplaced = defers_to_remote_check(row["location_bucket"], row["location_raw"])
@@ -412,7 +443,7 @@ def run_remote_check(conn: sqlite3.Connection, limit: int | None = None) -> dict
 
 def run_comp_check(conn: sqlite3.Connection, limit: int | None = None) -> dict[str, int]:
     filters = load_filters()
-    comp_cfg = filters.raw.get("comp_sanity", {})
+    cs = filters.comp_sanity
     prompt = llm.PromptFile("comp_sanity")
     rows = conn.execute(
         """SELECT j.* FROM jobs j JOIN sanity s ON s.job_id = j.id
@@ -468,15 +499,16 @@ def run_comp_check(conn: sqlite3.Connection, limit: int | None = None) -> dict[s
         flags = json.loads(srow["flags"] or "[]") if srow else []
         demand = _int(data.get("demand_score"), 0)
         verdict = "unknown"
+        if published and width is not None and width > cs.max_range_width_pct:
+            flags.append(f"range-dodge: width {width:.0%}")
+        if required and not published and cs.flag_missing_range_when_required:
+            flags.append("no-range-where-required")
         if (
             published
-            and width is not None
-            and width > float(comp_cfg.get("max_range_width_pct", 0.6))
+            and demand >= 75
+            and row["comp_max"]
+            and row["comp_max"] < cs.underpriced_below
         ):
-            flags.append(f"range-dodge: width {width:.0%}")
-        if required and not published and comp_cfg.get("flag_missing_range_when_required", True):
-            flags.append("no-range-where-required")
-        if published and demand >= 75 and row["comp_max"] and row["comp_max"] < 160000:
             verdict = "underpriced"
             flags.append(
                 f"underpriced: demand {demand} (roles={data.get('breadth_roles')}) "
@@ -488,9 +520,15 @@ def run_comp_check(conn: sqlite3.Connection, limit: int | None = None) -> dict[s
             flags.append(f"role-sprawl: {data.get('breadth_roles')} jobs in one posting")
         basis = str(data.get("comp_basis") or "unclear")
         realism = str(data.get("ote_realism") or "n/a")
-        if realism == "inflated":
+        # comp_sanity.ote_check: "always", or only titles whose floor is OTE
+        ote_applies = (
+            cs.ote_check == "always" or filters.comp_floor_for(row["title"]).basis == "ote"
+        )
+        if not ote_applies:
+            pass
+        elif realism == "inflated":
             flags.append(f"ote-unrealistic: {str(data.get('ote_rationale', ''))[:120]}")
-        elif published and basis == "unclear" and (row["comp_max"] or 0) >= 200000:
+        elif published and basis == "unclear" and (row["comp_max"] or 0) >= cs.ote_unclear_from:
             flags.append("ote-basis-unclear: big number, base-vs-OTE not stated")
         conn.execute(
             """UPDATE sanity SET comp_published=?, comp_required_by_law=?,
@@ -518,11 +556,49 @@ def run_comp_check(conn: sqlite3.Connection, limit: int | None = None) -> dict[s
 # ---- stage 6: score ----
 
 # One `score_profile` event per score written (detail: profile_hash,
-# prompt_version): which corpus a score was made against. pipeline/rescore.py
-# re-scores the jobs whose newest one is not the current corpus hash (package
-# 3, 2026-10-09). A score with no such event predates the record: stale.
+# prompt_version, prompt): which corpus and which scoring prompt a score was
+# made with. pipeline/rescore.py re-scores the jobs whose newest one names
+# another corpus hash or another prompt. A score with no such event predates
+# the record: stale. An event without "prompt" was written by score_fit.
 SCORE_PROFILE_EVENT = "score_profile"
 NO_CORPUS = "no-corpus"
+
+# The scoring prompt of each prompt_set (Filters.prompt_set, absent = sales)
+SALES_SCORE_PROMPT = "score_fit"
+SCORE_PROMPTS = {"sales": SALES_SCORE_PROMPT, "general": "score_fit_general"}
+GENERAL_SCORE_PROMPT = SCORE_PROMPTS["general"]
+NO_PIVOT_NOTE = "none"
+_SLOT = re.compile(r"\{([a-z_]+)\}")
+
+
+def score_prompt_name(filters: Filters | None = None) -> str:
+    """The scoring prompt file (prompts/<name>.md) for the active prompt set."""
+    return SCORE_PROMPTS[(filters or load_filters()).prompt_set]
+
+
+def render_once(pf: llm.PromptFile, **values: str) -> str:
+    """Fill a prompt's {slots} in one pass: a value is never scanned again, so
+    text the person wrote (corpus bullets, track ids, emphasis) that happens
+    to contain "{title}" or "{pivot_note}" is sent as written. Every slot in
+    the prompt must be given (an unfilled one would reach the model as
+    literal text); raises ValueError naming the missing ones."""
+    missing = sorted({m for m in _SLOT.findall(pf.body)} - set(values))
+    if missing:
+        raise ValueError(f"prompt slots not filled: {missing}")
+    return _SLOT.sub(lambda m: values.get(m.group(1), m.group(0)), pf.body)
+
+
+def pivot_note(title: str, filters: Filters) -> str:
+    """The CAREER-CHANGE NOTE for the general score prompt: names the title's
+    track when that track is marked `pivot: true`, else "none"."""
+    track = filters.track_of(title)
+    if track is None or not track.pivot:
+        return NO_PIVOT_NOTE
+    return (
+        f"this job is on the candidate's {track.id} track, which they marked as a "
+        "career change: they are moving into this kind of role from other work. "
+        "Apply step 5 and the CAREER-CHANGE BAND."
+    )
 
 
 def current_profile_hash() -> str:
@@ -544,13 +620,25 @@ def score_rows(
     prompt: llm.PromptFile | None = None,
     profile: str | None = None,
     profile_hash: str | None = None,
+    filters: Filters | None = None,
 ) -> dict[int, int]:
     """Score each row (a job with its extracted requirements: id, title,
     company_name, jd_hash, must_have, nice_to_have, implied, disqualifier)
     against the current profile. Writes `scores` and one score_profile event
     per job, commits, and returns {job_id: score}. A job whose reply has no
-    usable score is skipped and logged. Callers refuse JD-less jobs first."""
-    pf: llm.PromptFile = prompt or llm.PromptFile("score_fit")
+    usable score is skipped and logged. Callers refuse JD-less jobs first.
+
+    The prompt is chosen here, so triage, rescore and extract_and_score all
+    score with the active prompt set's file (score_prompt_name). prompt_set
+    sales renders score_fit.md exactly as before; general fills
+    score_fit_general.md in one pass (render_once) with each job's
+    CAREER-CHANGE NOTE."""
+    filters = filters or load_filters()
+    pname = score_prompt_name(filters)
+    if prompt is not None:
+        pname = GENERAL_SCORE_PROMPT if "{pivot_note}" in prompt.body else SCORE_PROMPTS["sales"]
+    pf: llm.PromptFile = prompt or llm.PromptFile(pname)
+    general = pname == GENERAL_SCORE_PROMPT
     prof: str = _profile_summary() if profile is None else profile
     phash = profile_hash or current_profile_hash()
 
@@ -559,6 +647,20 @@ def score_rows(
             k: json.loads(row[k] or "[]")
             for k in ("must_have", "nice_to_have", "implied", "disqualifier")
         }
+        if general:
+            return llm.call_json(
+                wconn,
+                "score",
+                render_once(
+                    pf,
+                    title=str(row["title"] or ""),
+                    company=str(row["company_name"] or ""),
+                    requirements=json.dumps(reqs, indent=1),
+                    profile=prof,
+                    pivot_note=pivot_note(str(row["title"] or ""), filters),
+                ),
+                cache_key=f"score:{row['jd_hash']}:{pname}:{pf.version}",
+            )
         return llm.call_json(
             wconn,
             "score",
@@ -590,13 +692,14 @@ def score_rows(
                 pf.version,
             ),
         )
+        # the sales prompt's event keeps its original shape (no "prompt" key);
+        # rescore reads a missing name as score_fit
+        detail: dict[str, str] = {"profile_hash": phash, "prompt_version": pf.version}
+        if pname != SALES_SCORE_PROMPT:
+            detail["prompt"] = pname
         conn.execute(
             q.RECORD_EVENT,
-            {
-                "job_id": row["id"],
-                "kind": SCORE_PROFILE_EVENT,
-                "detail": json.dumps({"profile_hash": phash, "prompt_version": pf.version}),
-            },
+            {"job_id": row["id"], "kind": SCORE_PROFILE_EVENT, "detail": json.dumps(detail)},
         )
         out[int(row["id"])] = score
     conn.commit()
@@ -604,7 +707,6 @@ def score_rows(
 
 
 def run_score(conn: sqlite3.Connection, limit: int | None = None) -> int:
-    prompt = llm.PromptFile("score_fit")
     profile = _profile_summary()
     rows = conn.execute(
         """SELECT j.*, r.must_have, r.nice_to_have, r.implied, r.disqualifier
@@ -615,7 +717,7 @@ def run_score(conn: sqlite3.Connection, limit: int | None = None) -> int:
         (limit or 10**9,),
     ).fetchall()
     rows = _refuse_missing_jd(conn, rows, "score")
-    done = len(score_rows(conn, rows, prompt=prompt, profile=profile))
+    done = len(score_rows(conn, rows, profile=profile))
     log("score.done", jobs=done, of=len(rows))
     return done
 
@@ -663,10 +765,13 @@ def score_gate_reason(score: int, min_score: int) -> str:
 
 
 def run_queue(conn: sqlite3.Connection, filters: Filters | None = None) -> int:
+    """The queue gate: a scored, filtered job at or above its gate is queued,
+    one below it is rejected (score_below_surface). The gate is the job's
+    track min_score when the track sets one, else gates.min_score_to_surface
+    (Filters.min_score_for)."""
     filters = filters or load_filters()
-    min_score = filters.min_score_to_surface
     rows = conn.execute(
-        """SELECT j.id, j.jd_html, sc.fit_score FROM jobs j
+        """SELECT j.id, j.title, j.jd_html, sc.fit_score FROM jobs j
            JOIN scores sc ON sc.job_id = j.id
            WHERE j.status = 'filtered' AND j.closed_at IS NULL"""
     ).fetchall()
@@ -674,6 +779,7 @@ def run_queue(conn: sqlite3.Connection, filters: Filters | None = None) -> int:
     rows = _refuse_missing_jd(conn, rows, "queue")
     queued = 0
     for row in rows:
+        min_score = filters.min_score_for_title(str(row["title"] or ""))
         if row["fit_score"] >= min_score:
             conn.execute("UPDATE jobs SET status='queued' WHERE id=?", (row["id"],))
             queued += 1

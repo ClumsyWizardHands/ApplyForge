@@ -108,6 +108,40 @@ def test_profile_tolerates_a_sparse_corpus() -> None:
     assert "EDUCATION" not in profile and "NEVER CLAIM" not in profile
 
 
+def test_general_profile_counts_target_track_roles_for_a_career_changer() -> None:
+    """prompt_set general: the tenure line counts only titles a track places,
+    names each one's track, and a teacher moving into instructional design
+    shows her classroom years on the classroom track (and none on the new
+    one) rather than "years in sales"."""
+    teacher = Filters(
+        raw=yaml.safe_load((TEST_CONFIG.parent / "personas" / "teacher_to_id.yaml").read_text())
+    )
+    corpus = {
+        "roles": [
+            {
+                "id": "r1",
+                "company": "Maple Grove Middle School",
+                "title": "Science Teacher",
+                "start": "2018-08",
+            },
+            {
+                "id": "r0",
+                "company": "Fernhill Garden Center",
+                "title": "Sales Associate",
+                "start": "2015-05",
+                "end": "2018-06",
+            },
+        ],
+        "bullets": [{"id": "b1", "role_id": "r1", "text_short": "Wrote unit assessments."}],
+    }
+    profile = triage._profile_summary(corpus=corpus, filters=teacher, today=TODAY)
+    assert (
+        "YEARS IN ROLES ON THE TARGET TRACKS: 8.2 "
+        "(titles counted: Science Teacher [classroom_teacher])" in profile
+    )
+    assert "SALES" not in profile
+
+
 def _score_env(
     conn: sqlite3.Connection, jobkit_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> tuple[dict[str, int], list[str]]:

@@ -1,0 +1,602 @@
+[
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-salesforce",
+  "kind": "tool",
+  "label": "Salesforce",
+  "loose": "(?<![A-Za-z0-9])(?:salesforce|sfdc)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:salesforce|sfdc)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-hubspot",
+  "kind": "tool",
+  "label": "HubSpot",
+  "loose": "(?<![A-Za-z0-9])(?:hub\\s?spot)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:hub\\s?spot)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-gong",
+  "kind": "tool",
+  "label": "Gong",
+  "loose": "(?<![A-Za-z0-9])(?:gong(?:\\.io)?)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:gong(?:\\.io)?)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 32,
+  "key": "tool-chorus",
+  "kind": "tool",
+  "label": "Chorus",
+  "loose": "(?<![A-Za-z0-9])(?:Chorus(?:\\.ai)?)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:Chorus(?:\\.ai)?)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 32,
+  "key": "tool-outreach",
+  "kind": "tool",
+  "label": "Outreach",
+  "loose": "(?<![A-Za-z0-9])(?:Outreach(?:\\.io)?)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:Outreach(?:\\.io)?)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-salesloft",
+  "kind": "tool",
+  "label": "Salesloft",
+  "loose": "(?<![A-Za-z0-9])(?:sales\\s?loft)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:sales\\s?loft)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-clari",
+  "kind": "tool",
+  "label": "Clari",
+  "loose": "(?<![A-Za-z0-9])(?:clari)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:clari)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-linkedin-sales-navigator",
+  "kind": "tool",
+  "label": "LinkedIn Sales Navigator",
+  "loose": "(?<![A-Za-z0-9])(?:(?:linkedin\\s+)?sales\\s?nav(?:igator)?)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:(?:linkedin\\s+)?sales\\s?nav(?:igator)?)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-zoominfo",
+  "kind": "tool",
+  "label": "ZoomInfo",
+  "loose": "(?<![A-Za-z0-9])(?:zoom\\s?info)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:zoom\\s?info)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-cognism",
+  "kind": "tool",
+  "label": "Cognism",
+  "loose": "(?<![A-Za-z0-9])(?:cognism)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:cognism)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-apollo",
+  "kind": "tool",
+  "label": "Apollo",
+  "loose": "(?<![A-Za-z0-9])(?:apollo(?:\\.io)?)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:apollo(?:\\.io)?)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-6sense",
+  "kind": "tool",
+  "label": "6sense",
+  "loose": "(?<![A-Za-z0-9])(?:6\\s?sense)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:6\\s?sense)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-lusha",
+  "kind": "tool",
+  "label": "Lusha",
+  "loose": "(?<![A-Za-z0-9])(?:lusha)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:lusha)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-seamless-ai",
+  "kind": "tool",
+  "label": "Seamless.AI",
+  "loose": "(?<![A-Za-z0-9])(?:seamless\\.ai)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:seamless\\.ai)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-highspot",
+  "kind": "tool",
+  "label": "Highspot",
+  "loose": "(?<![A-Za-z0-9])(?:highspot)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:highspot)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 32,
+  "key": "tool-seismic",
+  "kind": "tool",
+  "label": "Seismic",
+  "loose": "(?<![A-Za-z0-9])(?:Seismic)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:Seismic)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-marketo",
+  "kind": "tool",
+  "label": "Marketo",
+  "loose": "(?<![A-Za-z0-9])(?:marketo)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:marketo)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-pardot",
+  "kind": "tool",
+  "label": "Pardot",
+  "loose": "(?<![A-Za-z0-9])(?:pardot)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:pardot)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-tableau",
+  "kind": "tool",
+  "label": "Tableau",
+  "loose": "(?<![A-Za-z0-9])(?:tableau)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:tableau)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-looker",
+  "kind": "tool",
+  "label": "Looker",
+  "loose": "(?<![A-Za-z0-9])(?:looker)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:looker)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-power-bi",
+  "kind": "tool",
+  "label": "Power BI",
+  "loose": "(?<![A-Za-z0-9])(?:power\\s?bi)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:power\\s?bi)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-zoho",
+  "kind": "tool",
+  "label": "Zoho",
+  "loose": "(?<![A-Za-z0-9])(?:zoho)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:zoho)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-pipedrive",
+  "kind": "tool",
+  "label": "Pipedrive",
+  "loose": "(?<![A-Za-z0-9])(?:pipedrive)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:pipedrive)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-microsoft-dynamics",
+  "kind": "tool",
+  "label": "Microsoft Dynamics",
+  "loose": "(?<![A-Za-z0-9])(?:(?:microsoft\\s+|ms\\s+)?dynamics\\s?(?:365|crm))(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:(?:microsoft\\s+|ms\\s+)?dynamics\\s?(?:365|crm))(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-aircall",
+  "kind": "tool",
+  "label": "Aircall",
+  "loose": "(?<![A-Za-z0-9])(?:aircall)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:aircall)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-dialpad",
+  "kind": "tool",
+  "label": "Dialpad",
+  "loose": "(?<![A-Za-z0-9])(?:dialpad)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:dialpad)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-orum",
+  "kind": "tool",
+  "label": "Orum",
+  "loose": "(?<![A-Za-z0-9])(?:orum)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:orum)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 32,
+  "key": "tool-nooks",
+  "kind": "tool",
+  "label": "Nooks",
+  "loose": "(?<![A-Za-z0-9])(?:Nooks)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:Nooks)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-demandbase",
+  "kind": "tool",
+  "label": "Demandbase",
+  "loose": "(?<![A-Za-z0-9])(?:demandbase)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:demandbase)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-bombora",
+  "kind": "tool",
+  "label": "Bombora",
+  "loose": "(?<![A-Za-z0-9])(?:bombora)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:bombora)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-gainsight",
+  "kind": "tool",
+  "label": "Gainsight",
+  "loose": "(?<![A-Za-z0-9])(?:gainsight)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:gainsight)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "tool-vidyard",
+  "kind": "tool",
+  "label": "Vidyard",
+  "loose": "(?<![A-Za-z0-9])(?:vidyard)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:vidyard)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 32,
+  "key": "tool-clay",
+  "kind": "tool",
+  "label": "Clay",
+  "loose": "(?<![A-Za-z0-9])(?:Clay)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:Clay)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "method-meddpicc",
+  "kind": "method",
+  "label": "MEDDPICC",
+  "loose": "(?<![A-Za-z0-9])(?:meddpicc|meddicc|medpicc|meddpic)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:meddpicc|meddicc|medpicc|meddpic)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "method-meddic",
+  "kind": "method",
+  "label": "MEDDIC",
+  "loose": "(?<![A-Za-z0-9])(?:meddic)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:meddic)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "method-challenger",
+  "kind": "method",
+  "label": "Challenger",
+  "loose": "(?<![A-Za-z0-9])(?:challenger(?:\\s+sale)?)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:challenger(?:\\s+sale)?)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "method-spin-selling",
+  "kind": "method",
+  "label": "SPIN Selling",
+  "loose": "(?<![A-Za-z0-9])(?:spin\\s+selling)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:spin\\s+selling)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "method-sandler",
+  "kind": "method",
+  "label": "Sandler",
+  "loose": "(?<![A-Za-z0-9])(?:sandler)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:sandler)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "method-command-of-the-message",
+  "kind": "method",
+  "label": "Command of the Message",
+  "loose": "(?<![A-Za-z0-9])(?:command\\s+of\\s+the\\s+message|force\\s+management)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:command\\s+of\\s+the\\s+message|force\\s+management)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "method-value-selling",
+  "kind": "method",
+  "label": "Value Selling",
+  "loose": "(?<![A-Za-z0-9])(?:value\\s+selling)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:value\\s+selling)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "method-solution-selling",
+  "kind": "method",
+  "label": "Solution Selling",
+  "loose": "(?<![A-Za-z0-9])(?:solution\\s+selling)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:solution\\s+selling)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 34,
+  "key": "method-gap-selling",
+  "kind": "method",
+  "label": "Gap Selling",
+  "loose": "(?<![A-Za-z0-9])(?:gap\\s+selling)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:gap\\s+selling)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "",
+  "flags": 32,
+  "key": "method-bant",
+  "kind": "method",
+  "label": "BANT",
+  "loose": "(?<![A-Za-z0-9])(?:BANT)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:BANT)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you managed SDRs or BDRs (a sales development team)?",
+  "flags": 34,
+  "key": "exp-sdr-bdr-team-management",
+  "kind": "experience",
+  "label": "SDR/BDR team management",
+  "loose": "(?<![A-Za-z0-9])(?:(?:manag|lead|coach|ran|run)\\w*\\s+(?:an?\\s+|the\\s+)?(?:sdrs?|bdrs?|sales development|business development rep\\w*)|(?:sdr|bdr|sales development)\\s+(?:team\\s+)?(?:management|leadership|manager))(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:(?:manag|lead|coach|ran|run)\\w*\\s+(?:an?\\s+|the\\s+)?(?:sdrs?|bdrs?|sales development|business development rep\\w*)|(?:sdr|bdr|sales development)\\s+(?:team\\s+)?(?:management|leadership|manager))(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you sold in healthcare (providers, payers, health tech)?",
+  "flags": 34,
+  "key": "exp-healthcare",
+  "kind": "experience",
+  "label": "healthcare",
+  "loose": "(?<![A-Za-z0-9])(?:health\\s?care|health[-\\s]?tech|medical|clinical|hospitals?|life sciences|pharma\\w*)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:health\\s?care|health[-\\s]?tech|medical|clinical|hospitals?|life sciences|pharma\\w*)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you sold to banks, fintechs or other financial services firms?",
+  "flags": 34,
+  "key": "exp-financial-services",
+  "kind": "experience",
+  "label": "financial services",
+  "loose": "(?<![A-Za-z0-9])(?:fin[-\\s]?tech|financial (?:services|institutions?)|banking|banks)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:fin[-\\s]?tech|financial (?:services|institutions?)|banking|banks)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you sold to law firms or the legal industry?",
+  "flags": 34,
+  "key": "exp-legal-industry",
+  "kind": "experience",
+  "label": "legal industry",
+  "loose": "(?<![A-Za-z0-9])(?:legal (?:industry|profession|tech|market|domain|sector)|legaltech|law firms?|attorneys|lawyers)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:legal (?:industry|profession|tech|market|domain|sector)|legaltech|law firms?|attorneys|lawyers)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you sold to government or the public sector?",
+  "flags": 34,
+  "key": "exp-public-sector",
+  "kind": "experience",
+  "label": "public sector",
+  "loose": "(?<![A-Za-z0-9])(?:public sector|government|govtech|federal agenc\\w*|state and local|sled)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:public sector|government|govtech|federal agenc\\w*|state and local|sled)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you sold cybersecurity products?",
+  "flags": 34,
+  "key": "exp-cybersecurity",
+  "kind": "experience",
+  "label": "cybersecurity",
+  "loose": "(?<![A-Za-z0-9])(?:cyber\\s?security|security (?:products?|software|sales|buyers|market)|infosec|endpoint|edr|siem|zero trust)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:cyber\\s?security|security (?:products?|software|sales|buyers|market)|infosec|endpoint|edr|siem|zero trust)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you sold developer tools or infrastructure software?",
+  "flags": 34,
+  "key": "exp-developer-tools",
+  "kind": "experience",
+  "label": "developer tools",
+  "loose": "(?<![A-Za-z0-9])(?:developer[-\\s]tools|dev\\s?tools|infrastructure (?:software|buyers)|developer (?:platforms?|audiences?|buyers)|selling to developers)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:developer[-\\s]tools|dev\\s?tools|infrastructure (?:software|buyers)|developer (?:platforms?|audiences?|buyers)|selling to developers)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you sold to technical buyers (engineers, CTOs, IT leaders)?",
+  "flags": 34,
+  "key": "exp-technical-buyers",
+  "kind": "experience",
+  "label": "technical buyers",
+  "loose": "(?<![A-Za-z0-9])(?:technical (?:buyers|stakeholders|audiences?|selling|decision[-\\s]makers)|engineering (?:buyers|leaders))(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:technical (?:buyers|stakeholders|audiences?|selling|decision[-\\s]makers)|engineering (?:buyers|leaders))(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you run partnerships, alliances or channel sales?",
+  "flags": 34,
+  "key": "exp-partnerships",
+  "kind": "experience",
+  "label": "partnerships",
+  "loose": "(?<![A-Za-z0-9])(?:partnerships?\\s+(?:experience|management|development|sales|structuring|team|role)|partner (?:management|sales|ecosystem|relationships?)|channel (?:sales|partners?)|alliances|resellers?)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:partnerships?\\s+(?:experience|management|development|sales|structuring|team|role)|partner (?:management|sales|ecosystem|relationships?)|channel (?:sales|partners?)|alliances|resellers?)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you planned or carved sales territories?",
+  "flags": 34,
+  "key": "exp-territory-planning",
+  "kind": "experience",
+  "label": "territory planning",
+  "loose": "(?<![A-Za-z0-9])(?:territory (?:planning|design|management|strategy|carving))(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:territory (?:planning|design|management|strategy|carving))(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you presented or reported to a board of directors?",
+  "flags": 34,
+  "key": "exp-board-level-exposure",
+  "kind": "experience",
+  "label": "board-level exposure",
+  "loose": "(?<![A-Za-z0-9])(?:board[-\\s]level|board of directors|board (?:meetings?|reporting|presentations?|decks?))(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:board[-\\s]level|board of directors|board (?:meetings?|reporting|presentations?|decks?))(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you sold in a product-led growth (PLG) motion?",
+  "flags": 34,
+  "key": "exp-product-led-growth",
+  "kind": "experience",
+  "label": "product-led growth",
+  "loose": "(?<![A-Za-z0-9])(?:product[-\\s]led|plg)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:product[-\\s]led|plg)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you done cold calling or outbound prospecting yourself?",
+  "flags": 34,
+  "key": "exp-cold-calling",
+  "kind": "experience",
+  "label": "cold calling",
+  "loose": "(?<![A-Za-z0-9])(?:cold[-\\s]call(?:ing|s)?|outbound prospecting)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:cold[-\\s]call(?:ing|s)?|outbound prospecting)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you hired sales reps?",
+  "flags": 34,
+  "key": "exp-hiring-sales-reps",
+  "kind": "experience",
+  "label": "hiring sales reps",
+  "loose": "(?<![A-Za-z0-9])(?:(?:hiring|recruiting) (?:reps|sdrs|bdrs|aes|sales\\w*))(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:(?:hiring|recruiting) (?:reps|sdrs|bdrs|aes|sales\\w*))(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you sold usage-based or consumption-priced products?",
+  "flags": 34,
+  "key": "exp-usage-based-pricing",
+  "kind": "experience",
+  "label": "usage-based pricing",
+  "loose": "(?<![A-Za-z0-9])(?:usage[-\\s]based|consumption[-\\s]based)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:usage[-\\s]based|consumption[-\\s]based)(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you sold internationally (EMEA, APAC, LATAM)?",
+  "flags": 34,
+  "key": "exp-international-sales",
+  "kind": "experience",
+  "label": "international sales",
+  "loose": "(?<![A-Za-z0-9])(?:emea|apac|latam|international (?:sales|markets?))(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:emea|apac|latam|international (?:sales|markets?))(?![A-Za-z0-9])"
+ },
+ {
+  "ask": "Have you worked hands-on with marketing automation?",
+  "flags": 34,
+  "key": "exp-marketing-automation",
+  "kind": "experience",
+  "label": "marketing automation",
+  "loose": "(?<![A-Za-z0-9])(?:marketing automation)(?![A-Za-z0-9])",
+  "loose_flags": 34,
+  "pattern": "(?<![A-Za-z0-9])(?:marketing automation)(?![A-Za-z0-9])"
+ }
+]

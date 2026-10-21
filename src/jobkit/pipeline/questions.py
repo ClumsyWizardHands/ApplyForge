@@ -13,7 +13,10 @@ Where questions come from (aggregate):
   gap is never a question, and neither is an experience gap about tenure or
   degree ("3+ years closing", "limited enterprise exposure"): the corpus dates
   already state those facts. A gap with no known topic is not asked; the
-  self-review asks the open-ended ones.
+  self-review asks the open-ended ones. Under filters.yaml `prompt_set:
+  general` the experience questions are worded for any field ("Have you
+  worked in healthcare ...?", GENERAL_ASK) and gap text is not matched against
+  the sales tool and method lists; TOPICS itself is the same for both.
 
 A topic the corpus already answers is never asked. A tool or method only by a
 skill_index key that is it (in_skill_index: "Clari", not "Clari dashboards")
@@ -340,6 +343,58 @@ TOPICS: tuple[Topic, ...] = (
 )
 TOPIC_BY_KEY: dict[str, Topic] = {t.key: t for t in TOPICS}
 
+# ---- prompt_set general (filters.yaml `prompt_set: general`) ----
+# TOPICS above is the sales vocabulary and stays exactly as it is: the claims
+# validator imports it (validate/claims.py, unsourced_tool). Under prompt_set
+# general the questions are worded for any field instead:
+# * an experience topic asks the question below (keyed by topic key), never
+#   "Have you sold ...?";
+# * gap text is not matched against the sales tool and method lists (they
+#   would read "Clay County Schools" as the Clay tool), so no tool or method
+#   question comes from a gap. A self-review question about a tool or method
+#   is still asked, worded "Have you used ...?";
+# * nothing else changes: the answer rules, the refusals and what a
+#   confirmed answer writes are the same for both prompt sets.
+# With prompt_set absent ("sales") every question is worded as before.
+GENERAL = "general"
+GENERAL_ASK: dict[str, str] = {
+    "exp-sdr-bdr-team-management": "Have you managed SDRs or BDRs (a sales development team)?",
+    "exp-healthcare": "Have you worked in healthcare (providers, payers, health tech)?",
+    "exp-financial-services": (
+        "Have you worked in financial services (banks, fintechs or similar firms)?"
+    ),
+    "exp-legal-industry": "Have you worked in the legal industry or with law firms?",
+    "exp-public-sector": "Have you worked in government or the public sector?",
+    "exp-cybersecurity": "Have you worked in cybersecurity?",
+    "exp-developer-tools": "Have you worked with developer tools or infrastructure software?",
+    "exp-technical-buyers": (
+        "Have you worked with technical stakeholders (engineers, CTOs, IT leaders)?"
+    ),
+    "exp-partnerships": "Have you worked with partners, alliances or resellers?",
+    "exp-territory-planning": "Have you planned or managed a territory?",
+    "exp-board-level-exposure": "Have you presented or reported to a board of directors?",
+    "exp-product-led-growth": "Have you worked on a product-led growth (PLG) product or team?",
+    "exp-cold-calling": "Have you done cold calling or outbound prospecting yourself?",
+    "exp-hiring-sales-reps": "Have you hired sales reps?",
+    "exp-usage-based-pricing": "Have you worked with usage-based or consumption-priced products?",
+    "exp-international-sales": "Have you worked across international markets (EMEA, APAC, LATAM)?",
+    "exp-marketing-automation": "Have you worked hands-on with marketing automation?",
+}
+
+
+def active_prompt_set() -> str:
+    """filters.yaml `prompt_set` ("sales" when absent). A missing filters.yaml
+    reads as "sales", the questions' behaviour before prompt_set existed; one
+    that does not parse raises SourceError (the questions show "Questions
+    unavailable", as for a corpus that does not parse)."""
+    try:
+        return load_filters().prompt_set
+    except FileNotFoundError:
+        return "sales"
+    except yaml.YAMLError as e:
+        raise _parse_error(Path("config/filters.yaml"), e) from e
+
+
 _OVERQUALIFIED = re.compile(r"(?i)^\s*over-?qualifi")
 # tenure and degree: judgments about facts the corpus dates already state
 _SHORTFALL = re.compile(
@@ -365,15 +420,36 @@ def _tokens(s: object) -> list[str]:
     return [t for t in re.split(r"[^a-z0-9]+", str(s or "").lower()) if t]
 
 
-def topics_in_gap(gap: str) -> list[Topic]:
+# Under prompt_set general, a gap line is matched with these patterns instead
+# of the topic's own (TOPICS stays as it is: validate/claims.py reads it). In
+# a software or IT gap "endpoint" is usually an API endpoint, so cybersecurity
+# needs a security word around it.
+_GENERAL_GAP_PATTERNS: dict[str, re.Pattern[str]] = {
+    "exp-cybersecurity": re.compile(
+        r"(?<![A-Za-z0-9])(?:cyber\s?security|security (?:products?|software|sales|buyers"
+        r"|market)|infosec|endpoint (?:security|protection|detection)|(?-i:EDR|XDR|SIEM)"
+        r"|siem|zero trust)(?![A-Za-z0-9])",
+        re.I,
+    ),
+}
+
+
+def topics_in_gap(gap: str, *, prompt_set: str = "sales") -> list[Topic]:
     """The topics one gap-report line names. None for an overqualification
-    gap; no experience topic when the gap is about tenure or degree."""
+    gap; no experience topic when the gap is about tenure or degree. Under
+    prompt_set general, experience topics only (GENERAL_ASK), some matched
+    with a narrower pattern (_GENERAL_GAP_PATTERNS)."""
     text = str(gap or "").strip()
     if not text or _OVERQUALIFIED.match(text):
         return []
     shortfall = _SHORTFALL.search(text) is not None
+    general = prompt_set == GENERAL
     return [
-        t for t in TOPICS if not (t.kind == "experience" and shortfall) and t.pattern.search(text)
+        t
+        for t in TOPICS
+        if not (t.kind == "experience" and shortfall)
+        and not (general and t.kind in SKILL_KINDS)
+        and (_GENERAL_GAP_PATTERNS.get(t.key, t.pattern) if general else t.pattern).search(text)
     ]
 
 
@@ -540,20 +616,24 @@ class Question:
         return " ".join(parts) or "It would close a gap in the jobs below."
 
 
-def _topic_question(t: Topic) -> Question:
+def _topic_question(t: Topic, prompt_set: str = "sales") -> Question:
+    general = prompt_set == GENERAL
     if t.kind == "tool":
         text = (
             f"Have you used {t.label} hands-on? If yes: at which job, for how long, and "
             "what you did with it."
         )
     elif t.kind == "method":
-        text = (
-            f"Have you run deals or coached a team on {t.label}? If yes: at which job, "
-            "and how you used it."
+        stem = (
+            f"Have you used {t.label}?"
+            if general
+            else f"Have you run deals or coached a team on {t.label}?"
         )
+        text = f"{stem} If yes: at which job, and how you used it."
     else:
+        ask = GENERAL_ASK.get(t.key, t.ask) if general else t.ask
         text = (
-            f"{t.ask} Your corpus does not record it. If yes: at which job, what you did, "
+            f"{ask} Your corpus does not record it. If yes: at which job, what you did, "
             "and one concrete result (with a number if you have one)."
         )
     return Question(key=t.key, kind=t.kind, label=t.label, question=text)
@@ -596,11 +676,18 @@ def settled_keys(conn: sqlite3.Connection) -> dict[str, str]:
     return out
 
 
-def aggregate(conn: sqlite3.Connection, corpus: dict[str, Any] | None = None) -> list[Question]:
+def aggregate(
+    conn: sqlite3.Connection,
+    corpus: dict[str, Any] | None = None,
+    *,
+    prompt_set: str | None = None,
+) -> list[Question]:
     """Every open question, deduplicated by key and ranked: most open jobs
     helped first, then the highest summed fit score of those jobs, then key.
-    Read-only."""
+    `prompt_set` None means the configured one (active_prompt_set); it only
+    words the questions and picks the gap topics (GENERAL_ASK). Read-only."""
     corpus = load_corpus() if corpus is None else corpus
+    prompt_set = active_prompt_set() if prompt_set is None else prompt_set
     facts = corpus_fact_text(corpus)
     settled = settled_keys(conn)
     answered: dict[str, bool] = {}
@@ -614,10 +701,10 @@ def aggregate(conn: sqlite3.Connection, corpus: dict[str, Any] | None = None) ->
     for r in conn.execute(q.OPEN_JOBS_WITH_GAPS):
         job = _job(r, "id")
         for gap in _loads_list(r["gaps"]):
-            for t in topics_in_gap(gap):
+            for t in topics_in_gap(gap, prompt_set=prompt_set):
                 if t.key in settled or known(t):
                     continue
-                qn = found.setdefault(t.key, _topic_question(t))
+                qn = found.setdefault(t.key, _topic_question(t, prompt_set))
                 qn.jobs[job.job_id] = job
                 if gap not in qn.gap_examples:
                     qn.gap_examples.append(gap)
@@ -633,7 +720,7 @@ def aggregate(conn: sqlite3.Connection, corpus: dict[str, Any] | None = None) ->
         if topic is not None:
             if topic.key in settled or known(topic):
                 continue
-            qn = found.setdefault(topic.key, _topic_question(topic))
+            qn = found.setdefault(topic.key, _topic_question(topic, prompt_set))
         else:
             key = normalize_key(d["key"])
             if not key or key in settled:
@@ -789,8 +876,7 @@ def pending_proposals(path: Path | None = None) -> list[dict[str, Any]]:
 #   at ledgerline" is one: a hyphenated word is one word, and "no-code" is not "no".
 #
 # Skill proposals fail closed (review 2026-10-09). A skill_index key is a name
-# a tailored resume may list whatever its value says, and Hard Rule 1 now
-# allows unattended submission. "Definitely not", "Clari? no", "My manager
+# a tailored resume may list whatever its value says. "Definitely not", "Clari? no", "My manager
 # used Clari; I did not" and "Only HubSpot and Salesforce" were facts, and one
 # confirm put Clari into skill_index. Then (package S, review 2026-10-09)
 # naming the tool was enough: "Clari? Only heard of it", "Clari was on my

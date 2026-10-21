@@ -1,0 +1,29 @@
+# TEST PERSONA (fictional): interview answers for a registered nurse who
+# wants on-site work around Columbus, Ohio, paid by the hour. Read by
+# tests/test_onboarding_intake.py with rn.txt as the resume.
+tracks:
+  - name: Registered Nurse
+    titles: [Registered Nurse, Staff Nurse, Clinical Nurse, RN]
+    should_match: ["Staff Nurse, ICU", "Clinical Nurse II", "Registered Nurse - Med/Surg"]
+    should_not_match: [Nurse Practitioner, Licensed Practical Nurse]
+    comp_floor: 42
+    said: "staff or clinical nurse, ICU or med-surg, at least $42 an hour"
+exclude_titles:
+  items: [Travel, PRN]
+  said: "no travel contracts, no PRN"
+seniority_floor: { level: no_internships, said: "anything but student roles" }
+locations:
+  work_mode: onsite_ok
+  accept_remote: false
+  places: [Columbus]
+  state: OH
+  nearby: { Dublin: 20, Westerville: 25, Upper Arlington: 15 }
+  max_commute_minutes: 40
+  commute_minutes: { Columbus: 15 }
+  said: "on site around Columbus, 40 minutes at most"
+comp:
+  default_floor: 40
+  unit: hourly
+  hours_per_week: 36
+  said: "$40 an hour for anything else, three 12-hour shifts a week"
+federal: { wanted: true, said: "the VA hospital would be fine" }

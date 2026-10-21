@@ -2,9 +2,12 @@
 # spending a token.
 #
 # This is the TEMPLATE. Your own copy, config/filters.yaml, is personal and
-# gitignored. The setup interview writes it for you (say "set up jobkit" in
-# Claude); or copy this file to config/filters.yaml and edit it.
-# `uv run jobkit doctor` checks that it is there and loads.
+# gitignored. The setup interview writes it for you from your answers (say
+# "set up jobkit" in Claude). To write it by hand, copy this file to
+# config/filters.yaml and replace the placeholder track. For a worked sales
+# example, see config/filters.sales.example.yaml.
+# `uv run jobkit doctor` checks that it is there and loads, and warns while the
+# placeholder track is still in it.
 #
 # One knob, one owner: every setting below is read by the code, and lives here
 # and nowhere else. Companies and tiers are in targets.yaml; the standing
@@ -18,58 +21,59 @@
 # After changing titles, locations or comp floors, run `uv run jobkit refilter`
 # (MCP: refilter) so open jobs rejected under the old settings are re-checked.
 
+# Which scoring prompts to use. general: field-neutral (prompts/score_fit_general.md).
+# sales: the sales-calibrated prompts (prompts/score_fit.md). Absent means sales.
+prompt_set: general
+
 filters:
   # ---- role tracks ----------------------------------------------------------
   # The kinds of role you are after, as an ordered list. Each track is an id and
   # the title regex (Python, case-insensitive with (?i)) that puts a posting in
-  # it. First match wins, so list leadership before individual-contributor
-  # tracks: "SDR Manager" must be a manager before it can be an SDR.
+  # it. First match wins, so list the more specific track first ("Nurse
+  # Manager" before "Nurse").
   #   * every track's title_regex is also an include pattern (do not repeat it
   #     in include_titles below);
-  #   * comp.track_floors (below) and the standing rules refer to tracks by id;
-  #   * scoring and tailoring emphasis follow the track (prompts/select_bullets.md).
-  # Track ids the code gives a meaning to:
-  #   account_executive          standing rules' `title_class: account_executive`
-  #   sdr_bdr, sdr_bdr_manager   never treated as an AE by the standing rules,
-  #                              even when the title says "AE track"
-  #   sales_exec                 director / VP / CRO emphasis when tailoring
-  # Any other id works for filtering, floors and scoring.
+  #   * comp.track_floors (below) and the standing rules' title_class refer to
+  #     tracks by id.
+  # Optional per track:
+  #   active (default true): false pauses the track. Its titles are still
+  #     classified (so they never fall through to a later track) but the filter
+  #     rejects them as track_paused:<id>.
+  #   pivot (default false): you are moving into this kind of role from other
+  #     work. The fit score then reads your background as a career change.
+  #   min_score (0-100): this track's queue gate, in place of
+  #     gates.min_score_to_surface. A career change usually needs a lower one
+  #     (45-50), because years in the new title start at zero.
+  #   emphasis: one line, in your words, about what should lead your resume
+  #     for this kind of role.
   #
-  # active (default true): false PAUSES a track. Its titles are still
-  # classified (so they never fall through to a later track) but the filter
-  # rejects them as track_paused:<id>. Set it back to true and run
-  # `jobkit refilter` to bring those postings back.
+  # Replace the placeholder below with your own tracks. Examples:
+  #
+  #   - id: backend_engineer
+  #     title_regex: '(?i)^(?=.*\b(engineer|developer)\b)(?=.*\b(back[\s-]*end|platform|api|software)\b)'
+  #     emphasis: "APIs and services I designed and ran in production"
+  #   - id: registered_nurse
+  #     title_regex: '(?i)\b(registered nurse|staff nurse|clinical nurse|rn)\b'
+  #   - id: instructional_designer
+  #     title_regex: '(?i)\b(instructional (designer|technologist)|learning (designer|experience designer)|e-?learning developer|curriculum (designer|developer))\b'
+  #     pivot: true
+  #     min_score: 50
+  #     emphasis: "curriculum I designed and the digital modules I built"
   tracks:
-    - id: sdr_bdr_manager
+    - id: my_role
       active: true
-      title_regex: '(?i)\b(sdr|bdr|sales development|business development|account development)\b.{0,25}\b(manager|lead|leader|director|head)\b|\b(manager|director|head|lead)\b.{0,15}\b(sdr|bdr|sales development|business development|account development)\b'
-    - id: sales_exec
-      active: true
-      title_regex: '(?i)\b(director|head|vp|vice president|chief)\b.{0,30}\b(sales|revenue|gtm|go.to.market|growth)\b|\b(sales|revenue)\b.{0,20}\b(director|leader|vp|officer)\b|\bchief (revenue|sales) officer\b'
-    # Individual-contributor SDR/BDR roles. Keep this track even if you do not
-    # want them: it claims SDR/BDR titles, so "SDR (AE track)" never counts as
-    # an Account Executive. Set active: false to pause it instead of deleting it.
-    - id: sdr_bdr
-      active: true
-      title_regex: '(?i)\b(sdr|bdr|adr|sales development|business development|account development|market development)\b'
-    - id: account_executive
-      active: true
-      title_regex: '(?i)\b(account executive|sales executive)\b|\bae\b'
+      title_regex: '(?i)\bREPLACE ME\b'   # PLACEHOLDER: your job title words
 
   # Roles you want outside every track. A title must match a track or one of
   # these. They never release a title a paused track claims first. Titles
   # matching no track get the default comp floor (comp.floor).
-  include_titles:
-    - '(?i)\bsales (manager|lead)\b'
-    - '(?i)\b(founding|first)\b.{0,15}\b(ae|account executive|gtm|sales)\b'
-    - '(?i)\b(revenue|sales) operations\b.{0,20}\b(director|lead|manager)\b'
-    - '(?i)\b(sales|revenue|gtm|go.to.market)\b.{0,10}\benablement\b'
+  include_titles: []
 
-  # Any match rejects, even when a track or include pattern matched.
+  # Any match rejects, even when a track or include pattern matched. Add the
+  # schedules and job types you would refuse when they show in the title
+  # (for example '(?i)\bper diem\b' or '(?i)\b(contract|temp)\b').
   exclude_titles:
     - '(?i)\b(intern|internship|apprentice)\b'
-    - '(?i)\b(contract|contractor|1099|temp)\b'
-    - '(?i)\b(door.to.door|field canvass(er|ing)?)\b'
 
   # ---- locations -------------------------------------------------------------
   # Where a posting that is NOT remote may be. Each entry is a city or metro
@@ -81,24 +85,23 @@ filters:
   # The places you list (and their US states: "Ohio" also accepts "OH") also
   # count as acceptable geo restrictions in the remote check below.
   locations:
-    allowed: []           # e.g. ["Chicago", "Evanston"] or ["Denver", "Boulder"]
+    allowed: []           # e.g. ["Chicago", "Evanston"] or ["Columbus", "Dublin"]
     accept_remote: true   # remote postings pass wherever the company is
+    # match_state: true   # with places written "Columbus, OH": a posting in that
+    #                     # town must also be in that state (keeps out Columbus, GA)
 
   # ---- compensation ----------------------------------------------------------
   # A posting is rejected only when it PUBLISHES a range whose ceiling is under
   # the floor; unpublished comp always passes to the next stage. Floors are
-  # compared with comp in `currency` only (no FX conversion).
+  # yearly figures, compared with comp in `currency` only (no FX conversion).
+  # Paid by the hour? Multiply: $40 an hour at 40 hours a week is 40 x 2080 = 83200.
   comp:
-    floor: 100000          # PLACEHOLDER: the default floor, for titles that match no track
+    floor: 60000           # PLACEHOLDER: the default floor, for titles that match no track
     # Per-track floors (keys are track ids from `tracks`, nowhere else).
-    # basis: base = a base-salary floor. basis: ote = an on-target-earnings
-    # floor: a posted BASE figure passes at floor × ote_base_share, a posted
-    # OTE figure must reach the full floor.
-    track_floors:          # PLACEHOLDERS: set your own numbers
-      sdr_bdr:           { floor: 70000,  basis: ote }
-      sdr_bdr_manager:   { floor: 110000, basis: base }
-      account_executive: { floor: 125000, basis: ote }
-      sales_exec:        { floor: 160000, basis: base }
+    # basis: base = a base-pay floor. basis: ote = an on-target-earnings
+    # floor (commission roles): a posted BASE figure passes at
+    # floor × ote_base_share, a posted OTE figure must reach the full floor.
+    track_floors: {}       # e.g. { my_role: { floor: 70000, basis: base } }
     ote_base_share: 0.6    # base ≈ 60% of OTE in a typical 60/40 plan
     currency: USD
 
@@ -111,6 +114,7 @@ filters:
 gates:
   # Scored jobs at or above this reach your review queue; below it they are
   # rejected as score_below_surface (re-run `jobkit rescore` after a change).
+  # A track's own min_score takes its place for that track.
   min_score_to_surface: 65
 
 # ---- schedule -----------------------------------------------------------------
@@ -124,13 +128,15 @@ schedule:
   # poll or nightly run is older than this many hours.
   stale_after_hours: 36
 
-# ---- follow-ups -----------------------------------------------------------------
-# Drafted for you after you mark an application submitted; sending is always
-# manual. kind: status_check | hiring_manager_note | close_as_ghosted.
-followups:
-  - { days_after_submit: 7,  kind: status_check }
-  - { days_after_submit: 14, kind: hiring_manager_note, only_if_contact_known: true }
-  - { days_after_submit: 30, kind: close_as_ghosted, auto_close: true }
+# ---- application tracking ---------------------------------------------------------
+tracking:
+  # A submitted application with no recorded response is marked ghosted after
+  # this many days (a status change only; nothing is sent).
+  ghost_after_days: 30
+  # When true, the scheduled daily run also reads your email for employer
+  # replies, through Claude's email connector (read-only). When false or
+  # absent it skips that step. Asking Claude to check your email works either way.
+  email_check: true
 
 # ---- remote reality check (sanity layer: an LLM reads the JD) -------------------
 remote_policy:
@@ -189,32 +195,44 @@ questions:
 comp_sanity:
   max_range_width_pct: 0.6                 # a wider published range is flagged "range-dodge"
   flag_missing_range_when_required: true   # flag no range where pay-transparency law requires one
+  # with high demand in the JD, a published ceiling under this is flagged
+  # "underpriced"; about 1.25 x your lowest floor (the interview sets it)
+  underpriced_below: 75000
+  # a published ceiling at or above this, with no base-vs-OTE basis, is flagged "ote-basis-unclear"
+  ote_unclear_from: 200000
+  # ote_tracks: the two OTE flags apply only to titles whose comp floor has
+  # basis ote (commission roles); always: to every title
+  ote_check: ote_tracks
 
 # ---- aggregator feeds -------------------------------------------------------------
 # Discovery beyond your target companies. A feed row is never canonical: when
 # the same posting also arrives from a company's own ATS board, the ATS record
 # wins (it has the real apply URL and the form). Titles are pre-filtered with
-# the tracks and include/exclude patterns above.
+# the tracks and include/exclude patterns above. The setup interview fills the
+# keywords and locations from your answers.
 feeds:
   adzuna:                        # needs ADZUNA_APP_ID + ADZUNA_APP_KEY in .env; skipped without
-    enabled: true
+    enabled: false               # turn on once the keywords are your job titles
     # one API call per phrase per run (free tier ~250 calls/day)
-    keywords: ["account executive", "sales director", "head of sales",
-               "sales development manager", "revenue operations"]
+    keywords: []                 # e.g. ["registered nurse", "staff nurse"]
     max_days_old: 21
+    # locations: [{ where: "Columbus, OH", distance_km: 40 }]   # for hybrid or on-site work
+    # search_nationwide: true    # with locations: also one search with no place, for remote jobs
   usajobs:                       # federal roles; needs USAJOBS_API_KEY + USAJOBS_USER_AGENT_EMAIL
     enabled: false
-    keywords: ["Program Manager"]  # searched as position titles
+    keywords: []                 # searched as position titles
     remote_only: true
-    # series: ["1101", "0343"]     # optional OPM occupational series codes
+    full_description: true       # duties, qualifications and education, not the summary alone
+    # locations: [{ name: "Columbus, Ohio", radius_miles: 25 }]
+    # series: ["0610", "1750"]     # optional OPM occupational series codes
     # pay_grade_low: 12            # optional minimum GS grade for the series search
   arbeitnow: { enabled: true, remote_only: true }
-  remotive:  { enabled: true, categories: ["sales", "business"] }
+  remotive:  { enabled: true, categories: [] }   # [] = every category; the title filter decides
   remoteok:  { enabled: true }
   himalayas: { enabled: true }
   consider:                      # VC portfolio job boards
     enabled: true
-    categories: ["sales"]
+    categories: []
   cosnetwork: { enabled: false } # chiefofstaff.network RSS; enable for Chief of Staff roles
   # getro: robots.txt disallows the search endpoint (hard rule 11). Keep disabled.
   getro: { enabled: false }
@@ -239,7 +257,7 @@ feeds:
   linkedin_guest:
     enabled: false
     # at most 4, from your active tracks
-    keywords: ["account executive", "sales director", "head of sales"]
+    keywords: ["REPLACE ME"]         # PLACEHOLDER: your job titles
     # workplace: remote | hybrid | onsite | any (LinkedIn's f_WT filter).
     # Add your own metro, e.g. { location: "Chicago, Illinois", workplace: hybrid }
     locations:

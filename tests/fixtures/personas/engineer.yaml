@@ -1,0 +1,50 @@
+# TEST PERSONA — not a template. A fictional backend engineer searching for
+# remote work. tests/test_prompt_set.py loads it; nothing copies it into the
+# test sandbox's config/ unless a test does so itself.
+
+prompt_set: general
+
+filters:
+  tracks:
+    - id: backend_engineer
+      title_regex: '(?i)\b(back.?end|software|platform|api)\b.{0,20}\b(engineer|developer)\b'
+      emphasis: "Services I built and ran in production, and the scale they handled"
+    - id: engineering_manager
+      active: false
+      title_regex: '(?i)\bengineering manager\b'
+
+  exclude_titles:
+    - '(?i)\b(intern|internship)\b'
+
+  locations:
+    allowed: []
+    accept_remote: true
+
+  comp:
+    floor: 150000
+    currency: USD
+
+  freshness:
+    max_age_days: 21
+
+gates:
+  min_score_to_surface: 65
+
+tracking:
+  ghost_after_days: 21
+
+comp_sanity:
+  max_range_width_pct: 0.6
+  flag_missing_range_when_required: true
+  underpriced_below: 187500
+  ote_check: ote_tracks
+
+feeds:
+  adzuna:
+    enabled: false
+    keywords: ["backend engineer", "platform engineer"]
+  linkedin_guest:
+    enabled: false
+    keywords: ["backend engineer", "platform engineer"]
+    locations:
+      - { location: "United States", workplace: remote }

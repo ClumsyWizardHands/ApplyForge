@@ -35,12 +35,14 @@ from typing import Any
 
 from jobkit import db as q
 from jobkit.adapters.ats.greenhouse import comp_basis
+from jobkit.autofill.options import US_STATES, states_in
 from jobkit.config import Filters, load_filters
 from jobkit.log import log
 from jobkit.normalize import (
     cluster_key,
     location_bucket,
     mentions_non_us,
+    mentions_us,
     mentions_us_country,
     names_no_specific_place,
 )
@@ -71,15 +73,64 @@ def defers_to_remote_check(bucket: str, location_raw: str | None) -> bool:
     return bucket in UNKNOWN_LOCATION_BUCKETS and not mentions_non_us(loc)
 
 
+def _wrong_state(location_raw: str, states: frozenset[str] | None) -> str | None:
+    """With filters.locations.match_state: why a posting in an allowed town's
+    bucket is somewhere else ("other-state" for "Columbus, GA" when "Columbus,
+    OH" is allowed, "outside-us" for "Dublin, Ireland"), or None. A location
+    that names no state and no foreign place passes, as before."""
+    if states is None:
+        return None
+    named = states_in(location_raw)
+    if named:
+        return None if named & states else "other-state"
+    # the town itself may share a foreign city's name ("Dublin"): look past it
+    rest = location_raw.partition(",")[2]
+    if mentions_non_us(rest) and not mentions_us(location_raw):
+        return "outside-us"
+    return None
+
+
+_WORD = re.compile(r"[A-Za-z]+")
+
+
+def matched_place_bucket(location_raw: str | None, filters: Filters) -> str | None:
+    """With filters.locations.match_state: the bucket of the allowed place a
+    location names in a format the bucket does not catch ("Columbus OH",
+    "OH-Columbus", "US-OH-Columbus" for "Columbus, OH"): the town's words in
+    order plus the state as an UPPERCASE code or its full name. None otherwise."""
+    if not filters.match_state or not location_raw:
+        return None
+    words = _WORD.findall(location_raw)
+    lower = [w.lower() for w in words]
+    for town, states, bucket in filters.state_places:
+        town_words = [w.lower() for w in _WORD.findall(town)]
+        n = len(town_words)
+        if not n or not any(lower[i : i + n] == town_words for i in range(len(lower) - n + 1)):
+            continue
+        text = " ".join(lower)
+        for code in states:
+            if code in words or re.search(rf"\b{US_STATES[code].lower()}\b", text):
+                return bucket
+    return None
+
+
 def _location_reason(row: Mapping[str, Any], filters: Filters) -> str | None:
     """The accepted places come from config (Filters.accepted_location_buckets:
-    filters.locations.allowed, remote_policy.relocation_cities, accept_remote)."""
+    filters.locations.allowed, remote_policy.relocation_cities, accept_remote).
+    With filters.locations.match_state, a place written with its state also
+    checks the posting's state (_wrong_state, matched_place_bucket)."""
     bucket = str(row["location_bucket"])
     if bucket == "remote-intl":
         return f"location:{bucket}"  # remote=1 does not make a non-US hire eligible
     if row["remote"] == 1 and filters.accept_remote:
         return None
     if bucket in filters.accepted_location_buckets:
+        if filters.match_state:
+            wrong = _wrong_state(str(row["location_raw"] or ""), filters.bucket_states(bucket))
+            if wrong:
+                return f"location:{bucket}:{wrong}"
+        return None
+    if matched_place_bucket(row["location_raw"], filters):
         return None
     if defers_to_remote_check(bucket, row["location_raw"]):
         return None

@@ -37,10 +37,9 @@ PROMPTS_DIR = Path("prompts")
 
 # ---- model choice: the ONE owner (CLAUDE.md "one knob, one owner") ----
 # stage -> tier. Haiku for triage; Opus for everything an employer reads
-# (tailor, cover, novel answers — followups reuse "cover") and for the
-# self-review of those drafts (pipeline/self_review.py) and for the claim
-# judge that gates every letter and drafted answer (validate/claim_judge.py);
-# Sonnet for the critic.
+# (tailor, cover, novel answers), for the self-review of those drafts
+# (pipeline/self_review.py) and for the claim judge that gates every letter
+# and drafted answer (validate/claim_judge.py); Sonnet for the critic.
 STAGE_TIER: dict[str, str] = {
     "extract": "haiku",
     "remote": "haiku",

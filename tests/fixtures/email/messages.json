@@ -1,0 +1,57 @@
+{
+  "_note": "Hand-written messages in the shape an email connector returns (sender, subject, snippet, date, id, link). Every company, person and address is fictional.",
+  "greenhouse_rejection": {
+    "sender": "Northwind Health Recruiting <no-reply@us.greenhouse-mail.io>",
+    "subject": "Your application to Northwind Health",
+    "snippet": "Hi Jordan, thank you for your interest in the Clinical Operations Manager role at Northwind Health. After careful review, we have decided to move forward with other candidates whose experience more closely matches our needs.",
+    "received_at": "Tue, 13 Oct 2026 14:05:11 -0400",
+    "message_id": "18f2a6c4d1e0b001",
+    "link": "https://mail.google.com/mail/u/0/#all/18f2a6c4d1e0b001",
+    "outcome": "rejected"
+  },
+  "scheduling_link_interview": {
+    "sender": "Dana Okafor <dana.okafor@brightlinerobotics.example>",
+    "subject": "Next steps for the Support Engineer role",
+    "snippet": "Hi Jordan, thanks for applying! We'd love to set up a 30 minute call with our support lead. Please pick a time that works for you here: https://scheduling.example.com/brightline-recruiting/support-intro",
+    "received_at": "2026-10-14T16:20:00Z",
+    "message_id": "18f2a6c4d1e0b002",
+    "link": "https://mail.google.com/mail/u/0/#all/18f2a6c4d1e0b002",
+    "outcome": "interview"
+  },
+  "hireflix_video_interview": {
+    "sender": "Hireflix <noreply@hireflix.com>",
+    "subject": "Juniper Learning has invited you to a one-way video interview",
+    "snippet": "Juniper Learning would like you to record answers to 4 questions for the Instructional Designer position. The interview link expires in 5 days.",
+    "received_at": "2026-10-15",
+    "message_id": "18f2a6c4d1e0b003",
+    "link": "https://mail.google.com/mail/u/0/#all/18f2a6c4d1e0b003",
+    "outcome": "interview"
+  },
+  "ashby_acknowledgement": {
+    "sender": "Juniper Learning <no-reply@ashbyhq.com>",
+    "subject": "Thanks for applying to Juniper Learning!",
+    "snippet": "We have received your application for Instructional Designer and our team will review it. This is an automated message; please do not reply.",
+    "received_at": "2026-10-02T09:01:44Z",
+    "message_id": "18f2a6c4d1e0b004",
+    "link": "https://mail.google.com/mail/u/0/#all/18f2a6c4d1e0b004",
+    "outcome": "acknowledged"
+  },
+  "generic_same_company": {
+    "sender": "Northwind Health Talent <talent@northwindhealth.example>",
+    "subject": "Quick question about your application",
+    "snippet": "Hi Jordan, could you tell us your earliest start date? Thanks, Northwind Health Talent Team",
+    "received_at": "2026-10-16T12:00:00Z",
+    "message_id": "18f2a6c4d1e0b005",
+    "link": "",
+    "outcome": "recruiter_question"
+  },
+  "newsletter": {
+    "sender": "Career Tips Weekly <news@careertipsweekly.example>",
+    "subject": "5 ways to stand out in interviews",
+    "snippet": "This week: how to prepare for a panel interview, and what to ask at the end.",
+    "received_at": "2026-10-16T07:00:00Z",
+    "message_id": "18f2a6c4d1e0b006",
+    "link": "",
+    "outcome": null
+  }
+}

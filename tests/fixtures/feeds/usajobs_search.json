@@ -1,0 +1,90 @@
+{
+ "__note": "Hand-built in the shape of the USAJOBS Search API (data.usajobs.gov/api/Search) response. Fictional agency and ids. Not a live recording.",
+ "LanguageCode": "EN",
+ "SearchParameters": {},
+ "SearchResult": {
+  "SearchResultCount": 2,
+  "SearchResultCountAll": 2,
+  "SearchResultItems": [
+   {
+    "MatchedObjectId": "900000101",
+    "MatchedObjectDescriptor": {
+     "PositionID": "FEA-27-0101",
+     "PositionTitle": "Clinical Nurse",
+     "PositionURI": "https://www.usajobs.gov:443/GetJob/ViewDetails/900000101",
+     "ApplyURI": [
+      "https://www.usajobs.gov:443/GetJob/ViewDetails/900000101?PostingChannelID=fictional"
+     ],
+     "PositionLocationDisplay": "Columbus, Ohio",
+     "OrganizationName": "Federal Example Health Agency",
+     "DepartmentName": "Department of Examples",
+     "PositionRemuneration": [
+      {
+       "MinimumRange": "79000.0",
+       "MaximumRange": "118500.0",
+       "RateIntervalCode": "PA",
+       "Description": "Per Year"
+      }
+     ],
+     "PublicationStartDate": "2026-10-14T00:00:00.0000",
+     "ApplicationCloseDate": "2026-10-28T23:59:59.9970",
+     "UserArea": {
+      "Details": {
+       "JobSummary": "Provide nursing care to patients in an outpatient clinic.",
+       "WhoMayApply": {
+        "Name": "United States Citizens",
+        "Code": ""
+       },
+       "TeleworkEligible": false,
+       "RemoteIndicator": false,
+       "MajorDuties": [
+        "Assess, plan, carry out and evaluate nursing care for adult patients seen in a primary care clinic.",
+        "Give medications and treatments as ordered and record care in the electronic health record.",
+        "Teach patients and families about care plans, medications and follow-up visits.",
+        "Work with physicians, pharmacists and social workers to coordinate each patient's care."
+       ],
+       "Requirements": "Must be a U.S. citizen. Must pass a background check and a pre-employment physical.",
+       "Education": "A degree or diploma from a nursing program accredited at the time of graduation."
+      }
+     },
+     "QualificationSummary": "To qualify, you must hold a current, full and unrestricted registered nurse license in a State, the District of Columbia or a U.S. territory, and have at least one year of professional nursing experience in an ambulatory or outpatient care setting."
+    }
+   },
+   {
+    "MatchedObjectId": "900000102",
+    "MatchedObjectDescriptor": {
+     "PositionID": "FEA-27-0102",
+     "PositionTitle": "Nurse Educator",
+     "PositionURI": "https://www.usajobs.gov:443/GetJob/ViewDetails/900000102",
+     "ApplyURI": [
+      "https://www.usajobs.gov:443/GetJob/ViewDetails/900000102?PostingChannelID=fictional"
+     ],
+     "PositionLocationDisplay": "Multiple Locations",
+     "OrganizationName": "Federal Example Health Agency",
+     "DepartmentName": "Department of Examples",
+     "PositionRemuneration": [
+      {
+       "MinimumRange": "44.10",
+       "MaximumRange": "57.33",
+       "RateIntervalCode": "PH",
+       "Description": "Per Hour"
+      }
+     ],
+     "PublicationStartDate": "2026-10-12T00:00:00.0000",
+     "ApplicationCloseDate": "2026-10-26T23:59:59.9970",
+     "UserArea": {
+      "Details": {
+       "JobSummary": "Design and teach continuing-education courses for nursing staff.",
+       "WhoMayApply": {
+        "Name": "Current federal employees",
+        "Code": ""
+       },
+       "TeleworkEligible": true,
+       "RemoteIndicator": true
+      }
+     }
+    }
+   }
+  ]
+ }
+}

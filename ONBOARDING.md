@@ -14,7 +14,7 @@ Onboarding is a conversation that produces all four. Budget about an hour. It ru
 
 **Where the output goes.** Everything onboarding writes is the person's own and stays on their machine: `data/career_corpus.yaml`, `data/answer_bank.yaml`, the draft, critique and interview answers in `data/` (`data/setup/`), and `config/filters.yaml`, `commute_table.yaml`, `targets.yaml`, `autoapprove.yaml` and `banned_phrases.yaml`. All of it is gitignored. The repository ships only the `*.example.yaml` templates; the data templates describe a fictional person, and no answer is ever taken from them (hard rule 7 below). Never restore a config file from git history; older commits hold another person's configuration.
 
-**The ordering is not arbitrary.** Resume first, interview second. Interviewing someone about what job they want, cold, produces vague answers. Interviewing them *against their own resume* produces specific ones:
+**Resume first, interview second.** Interviewing someone about what job they want, cold, produces vague answers. Interviewing them *against their own resume* produces specific ones:
 
 > Bad: "What kind of roles are you targeting?" Good: "Your last two roles were a store manager and then a support lead. Do you want to manage a team again, or move into the customer success work you did on the side? Those pull toward different postings and I'd filter differently."
 
@@ -26,9 +26,9 @@ Onboarding is a conversation that produces all four. Budget about an hour. It ru
 
 ### 1.1 Parse
 
-Accept PDF, DOCX, or plain text. Extract to structured intermediate: contact block, roles (company, title, dates, location), bullets under each role, education, skills section, any summary/objective.
+Accept PDF, DOCX, HTML or plain text. Extract to structured intermediate: contact block, roles (company, title, dates, location), bullets under each role, education, skills section, any summary/objective.
 
-Use a layout-aware parse — two-column resumes and text in tables are the common failure. If extraction confidence is low, say so and ask the user to paste the text instead. **Never silently guess at a garbled parse.** Pasted text (and a plain-text file) is the user's own text, not a parse: never refuse it on a dictionary-word measure, because company, product and tool names are not dictionary words and a technical resume scores low without being garbled. Refuse it only when it is too short or full of unreadable characters, and then ask for the text from the original document, not for the same paste again.
+Use a layout-aware parse — two-column resumes and text in tables are the common failure. If extraction confidence is low, say so and ask the user to paste the text instead. **Don't guess at a garbled parse.** Pasted text (and a plain-text file) is the user's own text, not a parse: never refuse it on a dictionary-word measure, because company, product and tool names are not dictionary words and a technical resume scores low without being garbled. Refuse it only when it is too short or full of unreadable characters, and then ask for the text from the original document, not for the same paste again.
 
 ### 1.2 Propose a corpus draft
 
@@ -45,7 +45,7 @@ Walk the bullets in batches of five. For each, the human does one of: **keep as-
 
 A bullet that states a figure cannot be `none` and needs `evidence`. "States a figure" means its final wording (`text_long` or `text_short`) contains a number, or its `metric` holds one. The wording is read again on every decision and at promotion, so an edit that adds a number, or a keep that clears `metric`, cannot get a figure past these checks.
 
-This is the single highest-leverage 20 minutes in the whole system. Every downstream fabrication guard keys off these two fields. Under `drift.estimate_style: hedged` (config/banned_phrases.yaml), a bullet marked `estimate` gets hedged language in generated output and a bullet marked `verified` gets stated flatly. Under `confident` (the setting since 2026-10-08), both are stated plainly, but exactly as written: the same value and unit, ranges whole, and "+"/"up to" kept. `metric_confidence` is recorded the same way in both.
+Take care with these two fields: every fact check later reads them. Under `drift.estimate_style: hedged` (config/banned_phrases.yaml), a bullet marked `estimate` gets hedged language in generated output and a bullet marked `verified` gets stated flatly. Under `confident`, both are stated plainly, but exactly as written: the same value and unit, ranges whole, and "+"/"up to" kept. `metric_confidence` is recorded the same way in both.
 
 Also generate `text_short` for each kept bullet — a compressed variant for tight layouts. **Show both and get confirmation**; a bad compression is a fabrication risk. The draft starts `text_short` as the bullet's own resume text; a shorter variant goes into the corpus only as the human approved it, word for word (`confirm_bullets` `text_short`).
 
@@ -53,7 +53,7 @@ Also generate `text_short` for each kept bullet — a compressed variant for tig
 
 Separate output, not folded into the corpus. Blunt and specific:
 
-- **Bullets with no outcome.** "Managed the CRM migration" — managed it to what result? These are the weakest lines on any resume and there are usually six of them.  
+- **Bullets with no outcome.** "Managed the CRM migration": managed it to what result? These are the weakest lines on a resume.  
 - **Unquantified claims that could be quantified.** Flag with a prompt: what was the number?  
 - **Verb monotony.** If eleven bullets start with "Led" or "Managed," say so.  
 - **Claims with no evidence.** Anything the human couldn't source in 1.3 — either find the evidence or cut it.  
@@ -65,15 +65,15 @@ Deliver as a prioritized list, not a wall. Top five things to fix, then the rest
 
 ### 1.5 Fill the gaps by interview
 
-For every bullet the critique flagged as unquantified, ask directly: *"Roughly how many? Over what period? Compared to what before?"* Recover numbers the resume left out. This routinely adds 8–12 usable metrics that were never on the page, and it is the most valuable output of the entire onboarding.
+For every bullet the critique flagged as unquantified, ask directly: *"Roughly how many? Over what period? Compared to what before?"* Missing numbers often turn up this way. A recovered number goes into the corpus only as the human states it, with their own `metric_confidence` and `evidence`.
 
-Add STAR `stories[]` the same way, for the three or four accomplishments the human describes with most energy.
+Planned: add STAR `stories[]` the same way, for the three or four accomplishments the human describes with most energy. Today stories are added to the corpus by hand.
 
-Finally, collect 2–3 short samples of the human's own unassisted prose — an email they're proud of, a doc intro, anything they actually wrote. Store as `voice_samples[]` in the corpus. The cover-letter prompt uses them as few-shot voice grounding, which attacks slop at generation time instead of leaving the authenticity review to catch it after the fact.
+Finally, collect 2–3 short samples of the human's own unassisted prose — an email they're proud of, a doc intro, anything they actually wrote. Store as `voice_samples[]` in the corpus. The cover-letter prompt uses them as examples of the person's voice, so the letter starts closer to how they write instead of relying on the authenticity review to catch it afterwards.
 
 ### 1.6 Write
 
-Emit `data/career_corpus.yaml`. Report bullet count, metric coverage (% with `verified` confidence), and tag distribution. A corpus under 30 bullets or under 40% verified metrics will produce mediocre tailoring — say so plainly rather than declaring success.
+Emit `data/career_corpus.yaml`. Report the bullet count, how many of the bullets that state a figure are `verified`, and the tag distribution. A corpus with under 30 bullets, or with under 40% of its figure-stating bullets verified, will produce thin tailoring: say so plainly. Bullets that describe duties with no figure don't count against the share, which matters for fields such as nursing and teaching where many good bullets have no number.
 
 ---
 
@@ -85,37 +85,40 @@ Conversational and branching, not a form. Reads the corpus from Phase 1 and asks
 
 ### 2.1 Direction
 
-- Continue the current trajectory, or pivot? If pivot, toward what, and what in the corpus supports it?  
+- Continue the current trajectory, or change fields? If changing, toward what, and what in the corpus supports it? A track for the new field is marked `pivot: true`, usually with a lower `min_score`, so its jobs are scored as a career change and still reach the queue.  
+- For each kind of role: which titles it goes by (Claude proposes typical titles and the person keeps or drops each), the word every title has and the words that narrow it, and, in the person's own words, what should lead their resume for it (`emphasis`).  
 - Which of your tagged skill clusters do you want the next role built around — and which do you want *less* of? (The second half is the one people skip and it's the more useful filter.)  
 - IC or management? Both acceptable, or a real preference?  
 - Title bands you'd accept. Title bands you'd refuse.
 
 ### 2.2 Constraints
 
+- Salary or hourly? For hourly pay, the rate and hours a week; the floor is written as a yearly figure with the arithmetic in a comment.  
 - Comp floor — the number below which you'd decline regardless. Not the target, the floor. Always ask the default floor (titles outside every track), even when each track has its own: the answer bank's single salary-expectation figure is measured against it. `run_intake` refuses answers without one, and names any track whose floor is under it, because salary-expectation fields on that track's jobs are left blank and flagged.  
 - Comp target — what a good outcome looks like.  
-- Remote / hybrid / onsite. If hybrid: max days, max commute.  
+- Remote / hybrid / onsite. If hybrid or onsite: max days, max commute, the state they live in, and nearby towns they would commute to, each with minutes.  
+- US federal jobs: wanted or not (turns on USAJOBS).  
 - Geographic restrictions you'd accept or refuse.  
 - **Display location.** Ask this explicitly — it is a positioning decision most people make by accident. What the resume header says need not be the town on your utility bill, and the right answer often varies by job. Confirm the real address separately, for forms. The corpus records one display city (`identity.display_location`, never empty: every tailored header shows one); per-job variation is `location_strategy` in `filters.yaml`.  
-- Timeline. Urgent search, active-but-patient, or passive? This sets `volume_mode` and the friction thresholds.
+- Timeline. Urgent search, active-but-patient, or passive? Planned: the timeline answer will set `volume_mode`; today the template's `volume_mode` and friction thresholds are kept.
 
 ### 2.3 Company shape
 
 - Stage: pre-seed, Series A–B, growth, public, agency, nonprofit, government.  
 - Size bands.  
-- Sectors you want. **Sectors you'd refuse** — this is the highest-signal question in the interview and it should be asked directly.  
+- Sectors you want. **Sectors you'd refuse**: ask directly; it rules out more postings than any other answer.  
 - Named dream companies. These become tier 1 immediately.  
 - Named companies you'd never work for. These become the blocklist.
 
 ### 2.4 Dealbreakers
 
-Ask explicitly rather than inferring: on-call rotation, travel percentage, security clearance requirements, equity-heavy comp structures, contract or 1099, unpaid take-home assessments over N hours, RTO mandates, industries with ethical objections.
+Ask explicitly rather than inferring: schedules or job types they would refuse (nights, per diem, contract), on-call rotation, travel percentage, security clearance requirements, equity-heavy comp structures, contract or 1099, unpaid take-home assessments over N hours, RTO mandates, industries with ethical objections.
 
-Each answer becomes a `filters.yaml` entry with a rejection reason string, so the log tells you *why* something was killed.
+Today only refused titles and schedules (`exclude_titles`) and refused companies (`blocklist_companies`) become filters, each with a rejection reason string, so the log tells you *why* something was killed. The other dealbreakers don't become filters yet.
 
 ### 2.5 Seed the target list
 
-From sector + stage + size + geography, propose 30–60 companies. Run board discovery on all of them. Report which have discoverable boards and which don't. Ask the human to add anyone missing.
+First say which employers jobkit can watch directly: those on Greenhouse, Lever or Ashby, mostly tech companies and startups. If the person's employers are elsewhere (hospitals, schools, government and most large employers use Workday, iCIMS, Taleo or similar), record that they will rely on the feeds (`feed_only_said`, in their words) and move on. Otherwise, from sector + stage + size + geography, propose 30–60 companies. Run board discovery on all of them. Report which have discoverable boards and which don't. Ask the human to add anyone missing.
 
 Aggregator feeds (SPEC.md §2.2) then grow the list on their own — this is only the seed.
 
@@ -127,15 +130,15 @@ Then continue to 2.7 and 2.8 — onboarding is not done when the filters are wri
 
 ### 2.7 Populate the Answer Bank
 
-Walk the ~30 recurring screening questions conversationally and write `data/answer_bank.yaml`. Ask each one out loud — never assume, never inherit from the example file: work authorization and sponsorship (a wrong answer is misrepresentation, not a typo), notice period, start date, comp expectation strategy and floor, relocation, onsite tolerance, non-compete status (ask directly — for anyone who has held a sales or leadership role a restrictive covenant is a live possibility), references, how-did-you-hear preference, and the EEO block, where "decline to self-identify" is an explicit, valid choice and an absent entry means the field stays blank and flagged. This is fifteen minutes that converts the submit queue from "fill out a form" to "glance and click," which is the entire point of the system.
+Walk the ~30 recurring screening questions conversationally and write `data/answer_bank.yaml`. Ask each one out loud — never assume, never inherit from the example file: work authorization and sponsorship (a wrong answer is misrepresentation), notice period, start date, comp expectation strategy and floor, relocation, onsite tolerance, non-compete status (ask directly — for anyone who has held a sales or leadership role a restrictive covenant is a live possibility), references, how-did-you-hear preference, and the EEO block, where "decline to self-identify" is an explicit, valid choice and an absent entry means the field stays blank and flagged. With these answers saved, most form fields fill themselves.
 
-### 2.8 Seed standing rules
+### 2.8 Seed standing rules (planned)
 
-Propose 3–6 `auto_approve` / `auto_reject` rules derived from the interview answers — e.g., *"tier 1, score ≥ 85, no sanity flags → auto-approve?"* The human accepts or rejects each rule individually. Accepted rules go live immediately: auto-approved jobs are tailored and staged without asking and appear in the digest as done-FYI. This makes the system automatic from day one; calibration (Phase 3) then refines the set from observed behavior rather than creating it from nothing. Never seed a rule that duplicates a sanity-layer control — remote conflict, commute, and underpriced belong to `remote_policy` and `comp_sanity`.
+Not built yet: today `autoapprove.yaml` starts with no rules. The design: propose 3–6 `auto_approve` / `auto_reject` rules derived from the interview answers — e.g., *"tier 1, score ≥ 85, no sanity flags → auto-approve?"* The human accepts or rejects each rule individually. Accepted rules go live immediately: auto-approved jobs are tailored and staged without asking and appear in the digest as done-FYI. Calibration (Phase 3) then refines the set from observed behavior. Never seed a rule that duplicates a sanity-layer control — remote conflict, commute, and underpriced belong to `remote_policy` and `comp_sanity`.
 
 ### 2.9 First run and the daily run
 
-The `jobkit-setup` skill ends the interview by running `jobkit doctor` until only warnings remain, starting the first `jobkit nightly` run, and scheduling the daily one: a scheduled task in the Claude app whose prompt only points at `.claude/skills/jobkit-scheduled-run/SKILL.md` in the checkout (so the routine updates with the code), with the macOS LaunchAgent (`jobkit schedule install`) as the fallback. Each is created only on the person's explicit yes. Nothing is approved during setup: the person approves jobs by number afterwards ("what's in the queue", the `jobkit-daily` skill), and always clicks submit.
+The `jobkit-setup` skill ends the interview by running `jobkit doctor` until only warnings remain, starting the first `jobkit nightly` run, and scheduling the daily one: a scheduled task in the Claude app whose prompt only points at `.claude/skills/jobkit-scheduled-run/SKILL.md` in the checkout (so the routine updates with the code), with the macOS LaunchAgent (`jobkit schedule install`) as the fallback. Each is created only on the person's explicit yes. Nothing is approved during setup: the person approves jobs by number afterwards ("what's in the queue", the `jobkit-daily` skill), and presses submit on each application.
 
 ---
 
@@ -166,10 +169,10 @@ Present as numbered proposals. Human accepts or rejects each. Accepted changes a
 | `ingest_resume(path, text)` | Parse (or take pasted text), write the corpus draft and the critique (a separate file) |
 | `corpus_draft_status(batch_size)` | What is left to confirm; the next five bullets |
 | `confirm_bullets(decisions)` | Human confirmation loop: keep / edit / add the number / drop, sets `metric_confidence` + `evidence` |
-| `update_corpus_draft(changes)` | Identity (display location asked, never read), roles, education, positioning, `skill_index`, constraints, voice samples |
+| `update_corpus_draft(changes)` | Identity (display location asked, never read), roles, education, positioning, `skill_index`, the resume's skills (each kept with the person's own description of depth, or dropped), constraints, voice samples |
 | `promote_corpus()` | Writes `career_corpus.yaml` once everything is confirmed; reports corpus health honestly |
 | `run_intake(answers)` | Claude conducts the branching interview; this writes `filters.yaml` (each setting commented with the answer) + `commute_table.yaml` |
-| `seed_targets(companies)` | Board discovery (URL, registry, public-endpoint probe) for the companies named; appends `targets.yaml` |
+| `seed_targets(companies, feed_only_said)` | Board discovery (URL, registry, public-endpoint probe) for the companies named; appends `targets.yaml`. With no companies, records `feed_only_said` instead |
 | `calibrate()` | Decision-log analysis, numbered config proposals |
 | `corpus_health()` | Bullet count, metric coverage, tag distribution, gaps vs recent postings |
 | `answer_bank_questions()` | The screening questions in interview order, with what is set |
@@ -184,7 +187,7 @@ Present as numbered proposals. Human accepts or rejects each. Accepted changes a
 2. **`metric_confidence` and `evidence` are set by the human, never defaulted.** Every fabrication guard downstream depends on them.  
 3. **Never invent a company, role, date, or credential.** If the parse is ambiguous, ask. A role is current only when the resume says so ("Present") or the human answers that it is: a year-only or missing end date is asked, never left to read as current. Confirm the company's name as the human writes it, not as a registered entity name or a resume abbreviation — it will render on every generated document.  
 4. **Never let `display_location` reach an application form field.** Forms take the real address from `answer_bank.yaml`.  
-5. **Report corpus weakness honestly.** Under 30 bullets or under 40% verified metrics is a thin corpus. Say so rather than declaring onboarding complete.  
+5. **Report corpus weakness honestly.** Under 30 bullets, or under 40% of the figure-stating bullets verified, is a thin corpus. Say so rather than declaring onboarding complete.  
 6. **Calibration proposes; the human disposes.** No config change is applied without explicit acceptance.  
 7. **Screening answers are asked, never assumed.** Every `answer_bank.yaml` entry is set by the human in 2.7 — nothing inherited from the example file. A wrong screening answer is misrepresentation.
 

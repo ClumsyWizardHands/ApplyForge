@@ -99,7 +99,11 @@ def update_corpus_draft(changes: dict[str, Any] | str) -> str:
     education [{index, school?, degree?, years?, drop?}] — confirms each;
       add_education [{school, degree?, years?}];
     positioning [{id?, text?, archetype?, drop?}] — the person's own words;
-    skill_index {skill: depth}; constraints {never_claim_titles,
+    resume_skills [{name, depth} | {name, drop: true}] — one skill the
+      resume lists at a time: whether jobkit may claim it and how deep, in
+      the person's words (the name is copied from the resume; depth is never
+      filled in for them); skill_index {skill: depth} for a skill the resume
+      does not list; constraints {never_claim_titles,
       never_claim_tools, never_claim_phrases}; voice_samples [{source, text}]
       — prose the person wrote, pasted as written.
     All or nothing."""
@@ -145,19 +149,36 @@ def run_intake(answers: dict[str, Any] | str, replace_existing: bool = False) ->
     """Turn the intake interview into config: writes config/filters.yaml and
     config/commute_table.yaml (each setting commented with the answer that
     produced it), plus config/autoapprove.yaml (no rules) and
-    config/banned_phrases.yaml when missing. `answers`: {tracks: [{name,
-    titles?, comp_floor?, comp_basis: base|ote, said}], include_titles {items,
-    said}, exclude_titles {items, said}, seniority_floor {level:
-    any|no_internships|experienced|senior, said}, locations {work_mode:
-    remote_only|hybrid|onsite_ok, places, accept_remote, relocation_cities,
-    max_office_days_per_week, max_commute_minutes, commute_minutes {place:
-    minutes}, said}, comp {default_floor (required: the floor for titles
-    outside the tracks, and the line the answer bank's salary-expectation
-    figure is measured against), currency, ote_base_share, said},
+    config/banned_phrases.yaml when missing. `answers`:
+    tracks: [{name, titles?, title_words? {all: [word or [alternatives]],
+      any: [words]}, should_match?, should_not_match?, comp_floor?,
+      comp_basis: base|ote, pivot?, min_score?, emphasis?, said}]
+      — titles are phrases (a space also matches a hyphen, a slash or
+      nothing; "senior" matches "Sr."); title_words match words in any
+      order; should_match / should_not_match are the proposed titles the
+      person kept or dropped, checked here and never written; pivot: true for
+      a change of field, with min_score (45-50 is usual, say why); emphasis:
+      one line in their words on what should lead the resume;
+    include_titles {items, said}, exclude_titles {items, said} (schedules or
+      job types they refuse, as title words), seniority_floor {level:
+      any|no_internships|experienced|senior, said};
+    locations {work_mode: remote_only|hybrid|onsite_ok, places, state (US
+      state of the places, "OH" or "Ohio"), nearby {town: minutes} (towns
+      within the commute they kept), accept_remote, relocation_cities,
+      max_office_days_per_week, max_commute_minutes, commute_minutes {place:
+      minutes}, said};
+    comp {default_floor (required: the floor for titles outside the tracks,
+      and the line the answer bank's salary-expectation figure is measured
+      against), unit: annual|hourly, hours_per_week (required for hourly),
+      currency, ote_base_share, said};
+    federal {wanted: true|false, said} (turns on USAJOBS);
     industries {wanted, refused, said}, blocklist_companies {items, said},
     max_age_days?, nightly_at?, writing_style? {estimate_style:
-    hedged|confident, said}}. `said` is the person's own words. Ask against
-    their corpus. A config the interview did not write is replaced only with
+    hedged|confident, said}.
+    `said` is the person's own words. Ask against their corpus. prompt_set
+    is written as general, or sales when every track is a software sales
+    title. A
+    config the interview did not write is replaced only with
     replace_existing=true (backed up first)."""
     parsed = parse_structured(answers, "answers")
     if not isinstance(parsed, dict):
@@ -166,7 +187,10 @@ def run_intake(answers: dict[str, Any] | str, replace_existing: bool = False) ->
 
 
 def seed_targets(
-    companies: list[Any] | str, probe: bool = True, include_not_found: bool = True
+    companies: list[Any] | str | None = None,
+    probe: bool = True,
+    include_not_found: bool = True,
+    feed_only_said: str = "",
 ) -> str:
     """Find and verify the public Greenhouse / Lever / Ashby board of each
     company (a name, or {name, domain?, url?, tier: 1|2|3, said?}), through
@@ -174,11 +198,23 @@ def seed_targets(
     config/targets.yaml. Reports boards found, unverified, and not found
     with what was tried (paste a careers or board URL to retry one). A
     company with no board is recorded without one unless
-    include_not_found=false. Existing entries are kept as they are."""
-    parsed = parse_structured(companies, "companies")
+    include_not_found=false. Existing entries are kept as they are.
+
+    jobkit polls only Greenhouse, Lever and Ashby boards. When the person's
+    employers use something else (hospitals, schools, government and most
+    large employers do), pass feed_only_said with their own words, for
+    example "the hospitals I want all use Workday; I'll rely on the feeds".
+    That is recorded in targets.yaml, no company is needed, and setup_status
+    counts this step as done."""
+    parsed = parse_structured(companies, "companies") if companies not in (None, "") else []
     if not isinstance(parsed, list):
         raise SetupError("companies must be a list")
-    return targets.seed_targets(parsed, probe=probe, include_not_found=include_not_found)
+    return targets.seed_targets(
+        parsed,
+        probe=probe,
+        include_not_found=include_not_found,
+        feed_only_said=feed_only_said,
+    )
 
 
 TOOLS = (

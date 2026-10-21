@@ -1,0 +1,56 @@
+# TEST PERSONA — not a template. A fictional registered nurse looking for
+# hybrid or on-site work around Columbus, Ohio, paid by the hour.
+# tests/test_prompt_set.py loads it.
+
+prompt_set: general
+
+filters:
+  tracks:
+    - id: registered_nurse
+      title_regex: '(?i)\b(registered nurse|staff nurse|clinical nurse|rn)\b'
+      min_score: 55
+    - id: nurse_educator
+      title_regex: '(?i)\bnurse educator\b'
+
+  exclude_titles:
+    - '(?i)\btravel\b'
+
+  locations:
+    allowed: ["Columbus, OH", "Dublin, OH", "Westerville, OH"]
+    accept_remote: false
+
+  comp:
+    # the person said "$42 an hour, about 40 hours a week": 42 x 2080
+    floor: 87360
+    currency: USD
+
+gates:
+  min_score_to_surface: 65
+
+tracking:
+  ghost_after_days: 30
+
+comp_sanity:
+  max_range_width_pct: 0.6
+  flag_missing_range_when_required: true
+  underpriced_below: 109200
+  ote_check: ote_tracks
+
+remote_policy:
+  accept: [hybrid, onsite]
+  reject_onsite: false
+  max_commute_minutes: 40
+
+feeds:
+  adzuna:
+    enabled: true
+    country: us
+    keywords: ["registered nurse", "staff nurse"]
+    locations:
+      - { where: "Columbus, OH", distance_km: 40 }
+  usajobs:
+    enabled: true
+    remote_only: false
+    keywords: ["nurse"]
+    locations:
+      - { name: "Columbus, Ohio", radius_miles: 25 }

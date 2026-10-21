@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import json
+import re
 import sqlite3
 from pathlib import Path
 
 from jobkit import paths
 
 # Absolute, from the project root (paths.HOME), never the working directory:
-# a process started elsewhere used to create a fresh empty DB here and report
-# "no follow-ups due" against it (audit 2026-10-08 §2 item 7, §3 item 2).
+# a process started elsewhere used to create a fresh empty DB here and answer
+# every question with zero (audit 2026-10-08 §2 item 7, §3 item 2).
 DB_PATH = paths.HOME / "data" / "jobkit.db"
 
 SCHEMA = """
@@ -154,14 +156,6 @@ CREATE TABLE IF NOT EXISTS events (
   at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS followups (
-  id INTEGER PRIMARY KEY,
-  application_id INTEGER NOT NULL REFERENCES applications(id),
-  kind TEXT NOT NULL, due_at TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending',      -- pending|done|skipped
-  draft TEXT
-);
-
 CREATE TABLE IF NOT EXISTS discovery_queue (
   id INTEGER PRIMARY KEY,
   company_name TEXT NOT NULL,
@@ -208,9 +202,173 @@ def connect(path: Path | None = None, *, create: bool = False) -> sqlite3.Connec
     return conn
 
 
+# How long init_db waits for another process's write lock (ms). A process
+# migrating the followups table holds that lock while it copies the whole
+# database, which can take longer than sqlite3's default 5 s.
+INIT_DB_BUSY_TIMEOUT_MS = 120_000
+
+
 def init_db(conn: sqlite3.Connection) -> None:
-    conn.executescript(SCHEMA)
+    before = conn.execute("PRAGMA busy_timeout").fetchone()[0]
+    conn.execute(f"PRAGMA busy_timeout = {max(int(before), INIT_DB_BUSY_TIMEOUT_MS)}")
+    try:
+        conn.executescript(SCHEMA)
+        conn.commit()
+        migrate_followups(conn)
+    finally:
+        conn.execute(f"PRAGMA busy_timeout = {int(before)}")
+
+
+# ---- one-time migration: the follow-up notes table goes ----
+# Follow-up note drafting was removed. A database made before that still has
+# a `followups` table (CREATE TABLE IF NOT EXISTS never dropped it). Its rows
+# reference applications(id) with no ON DELETE while foreign keys are on, so
+# left in place they would block folding duplicate application rows. Before
+# the table is dropped, the whole database is copied to
+# <name>.pre-followups.db next to it (never over an existing copy) and every
+# row, drafts included, is kept as a 'followups_archived' event.
+
+FOLLOWUPS_TABLE = "followups"
+FOLLOWUPS_ARCHIVED_EVENT = "followups_archived"
+FOLLOWUPS_BACKUP_TAG = "pre-followups"
+# at most this many backup copies; rows found after that are archived as
+# events with no further copy (an old open session can add rows repeatedly)
+FOLLOWUPS_BACKUP_MAX = 5
+
+TABLE_EXISTS = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :name"
+
+# every follow-up row with the job it belongs to (NULL when its application
+# or job is gone, so an orphan row is archived too)
+ARCHIVE_FOLLOWUP_ROWS = """
+SELECT f.*, j.id AS archived_job_id
+FROM followups f
+LEFT JOIN applications a ON a.id = f.application_id
+LEFT JOIN jobs j ON j.id = a.job_id
+ORDER BY f.id
+"""
+
+
+def _has_table(conn: sqlite3.Connection, name: str) -> bool:
+    return conn.execute(TABLE_EXISTS, {"name": name}).fetchone() is not None
+
+
+def _main_db_file(conn: sqlite3.Connection) -> Path | None:
+    """The file behind the connection's main database; None in memory."""
+    for row in conn.execute("PRAGMA database_list").fetchall():
+        if row[1] == "main":
+            return Path(row[2]) if row[2] else None
+    return None
+
+
+def backup_path_for(db_file: Path, tag: str = FOLLOWUPS_BACKUP_TAG) -> Path:
+    """<stem>.<tag>.db next to the database, or <stem>.<tag>-2.db (-3, ...)
+    when that name is taken: an existing backup is never overwritten."""
+    first = db_file.with_name(f"{db_file.stem}.{tag}.db")
+    if not first.exists():
+        return first
+    n = 2
+    while True:
+        candidate = db_file.with_name(f"{db_file.stem}.{tag}-{n}.db")
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+
+def _backup_count(db_file: Path, tag: str = FOLLOWUPS_BACKUP_TAG) -> int:
+    """How many <stem>.<tag>[-N].db copies sit next to the database."""
+    first = f"{db_file.stem}.{tag}"
+    return sum(
+        1
+        for p in db_file.parent.glob(f"{first}*.db")
+        if p.name == f"{first}.db" or re.fullmatch(rf"{re.escape(first)}-\d+\.db", p.name)
+    )
+
+
+def _backup(db_file: Path, target: Path) -> None:
+    """A full copy of the committed database through SQLite's backup API, read
+    on a connection of its own: the caller holds the write lock (BEGIN
+    IMMEDIATE), and a backup from that same connection would wait on itself.
+    The copy takes the source's WAL journal mode; it is set back to a rollback
+    journal before it is closed, so it is one self-contained file and opening
+    it later leaves no -wal or -shm file next to it."""
+    src = sqlite3.connect(db_file, timeout=30)
+    dest = sqlite3.connect(target)
+    try:
+        src.backup(dest)
+        dest.execute("PRAGMA journal_mode=DELETE").fetchone()
+    except BaseException:
+        dest.close()
+        src.close()
+        target.unlink(missing_ok=True)  # never leave a partial copy behind
+        raise
+    dest.close()
+    src.close()
+
+
+COUNT_FOLLOWUP_ROWS = "SELECT COUNT(*) FROM followups"
+
+
+def migrate_followups(conn: sqlite3.Connection) -> int:
+    """Archive and drop a leftover `followups` table; returns the number of
+    rows archived. Does nothing when the table is absent, so it is safe on
+    every connection and under several processes at once (the second one
+    finds the table gone once it holds the write lock). Order: backup file,
+    archive events, DROP, one commit. A failed backup raises and leaves the
+    table as it was.
+
+    Every run that finds rows first writes a full-file backup under a new
+    name (-2, -3 ...), up to FOLLOWUPS_BACKUP_MAX copies; past that the rows
+    are archived as events with no further copy, and that is logged. An MCP
+    server still running the old code re-creates an empty `followups` table
+    on every tool call (its schema has CREATE TABLE IF NOT EXISTS): an empty
+    table holds nothing to keep, so it is dropped with no backup and no
+    events, or an open old session would write a copy on every call."""
+    if not _has_table(conn, FOLLOWUPS_TABLE):
+        return 0
+    from jobkit.log import log
+
     conn.commit()
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        if not _has_table(conn, FOLLOWUPS_TABLE):
+            conn.rollback()
+            return 0
+        if conn.execute(COUNT_FOLLOWUP_ROWS).fetchone()[0] == 0:
+            conn.execute(f"DROP TABLE {FOLLOWUPS_TABLE}")
+            conn.commit()
+            log("db.followups_dropped_empty")
+            return 0
+        db_file = _main_db_file(conn)
+        backup: Path | None = None
+        if db_file is not None:
+            if _backup_count(db_file) < FOLLOWUPS_BACKUP_MAX:
+                backup = backup_path_for(db_file)
+                _backup(db_file, backup)
+            else:
+                log("db.followups_backup_skipped", copies=FOLLOWUPS_BACKUP_MAX)
+        rows = conn.execute(ARCHIVE_FOLLOWUP_ROWS).fetchall()
+        for r in rows:
+            row = dict(r)
+            job_id = row.pop("archived_job_id")
+            conn.execute(
+                RECORD_EVENT,
+                {
+                    "job_id": job_id,
+                    "kind": FOLLOWUPS_ARCHIVED_EVENT,
+                    "detail": json.dumps(row, default=str, sort_keys=True),
+                },
+            )
+        conn.execute(f"DROP TABLE {FOLLOWUPS_TABLE}")
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
+    log(
+        "db.followups_archived",
+        rows=len(rows),
+        backup=str(backup) if backup is not None else None,
+    )
+    return len(rows)
 
 
 # ---- named queries ----
@@ -887,7 +1045,7 @@ WHERE j.status NOT IN ('applied', 'closed', 'rejected') AND j.closed_at IS NULL
 ORDER BY le.id DESC
 """
 
-# ---- submissions, follow-ups and outcomes (audit 2026-10-08 §2 item 8) ----
+# ---- submissions and outcomes (audit 2026-10-08 §2 item 8) ----
 
 JOB_BRIEF = """
 SELECT id, company_id, company_name, title, status FROM jobs WHERE id = :job_id
@@ -920,15 +1078,6 @@ SELECT id, job_id, stage, resume_path, cover_path, gap_report_path, provenance_p
        submitted_at, updated_at
 FROM applications WHERE job_id = :job_id ORDER BY id
 """
-
-FOLLOWUPS_OF_APPLICATION = """
-SELECT id, kind, due_at, status FROM followups WHERE application_id = :application_id
-ORDER BY id
-"""
-
-MOVE_FOLLOWUP = "UPDATE followups SET application_id = :application_id WHERE id = :id"
-
-DELETE_FOLLOWUP = "DELETE FROM followups WHERE id = :id"
 
 DELETE_APPLICATION = "DELETE FROM applications WHERE id = :id"
 
@@ -966,40 +1115,122 @@ WHERE j.board_id IS NULL AND j.closed_at IS NOT NULL
 ORDER BY a.id
 """
 
-INSERT_FOLLOWUP = """
-INSERT INTO followups (application_id, kind, due_at) VALUES (:application_id, :kind, :due_at)
+# ---- no reply after N days (track/applications.close_ghosted) ----
+# submitted applications with no response on record, submitted :days or more
+# days ago. A response is an outcome event (MCP record_outcome) or an email
+# response other than an automatic acknowledgement (track/responses.py).
+# submitted_at is a bare local date when the person gave the day, or a UTC
+# timestamp when mark_submitted stamped "now"; a timestamp counts from its
+# local day (an evening submission in a US time zone is already the next day
+# in UTC), a bare date as written.
+GHOST_CANDIDATES = """
+SELECT a.id, a.job_id, a.submitted_at, j.company_name, j.title
+FROM applications a JOIN jobs j ON j.id = a.job_id
+WHERE a.stage = 'submitted' AND a.submitted_at IS NOT NULL
+  AND (CASE WHEN length(a.submitted_at) = 10 THEN a.submitted_at
+            ELSE date(a.submitted_at, 'localtime') END)
+      <= date('now', '-' || :days || ' days')
+  AND NOT EXISTS (
+    SELECT 1 FROM events e
+    WHERE e.job_id = a.job_id
+      AND (e.kind = 'outcome'
+           OR (e.kind = 'email_response'
+               AND json_extract(e.detail, '$.outcome') != 'acknowledged')))
+ORDER BY a.submitted_at, a.id
 """
 
-COMPANY_HAS_CONTACT = "SELECT 1 FROM contacts WHERE company_id = :company_id LIMIT 1"
+SET_APPLICATION_GHOSTED = """
+UPDATE applications SET stage = 'ghosted', updated_at = datetime('now')
+WHERE id = :id AND stage = 'submitted'
+"""
 
-PENDING_FOLLOWUPS_WITH_COMPANY = """
-SELECT f.id, f.kind, j.id AS job_id, j.company_id
-FROM followups f JOIN applications a ON a.id = f.application_id
+COUNT_GHOSTED_APPLICATIONS = "SELECT COUNT(*) AS n FROM applications WHERE stage = 'ghosted'"
+
+# feed jobs (no employer board: Adzuna, USAJOBS, the remote boards) that triage
+# rejected because their description was too short to score (layer sanity,
+# jd_missing), recorded at or after :since ('' counts every one). Only jobs
+# whose status is 'rejected': a job the person approved that tailoring later
+# refused for its short description has the same rejection row, but it keeps
+# its approved status and the person has already seen it. Nor any job with a
+# human decision: one approved, refused by tailoring and then rejected through
+# the MCP reject tool is 'rejected' too, but the person scored and saw it
+COUNT_FEED_JOBS_SHORT_JD = """
+SELECT COUNT(DISTINCT r.job_id) AS n FROM rejections r
+JOIN jobs j ON j.id = r.job_id
+WHERE j.board_id IS NULL AND j.status = 'rejected'
+  AND r.layer = 'sanity' AND r.reason = 'jd_missing'
+  AND r.at >= :since
+  AND NOT EXISTS (SELECT 1 FROM decisions d WHERE d.job_id = j.id AND d.auto = 0)
+"""
+
+# the same jobs, newest first, with what the person needs to look one up
+LIST_FEED_JOBS_SHORT_JD = """
+SELECT j.id, j.title, j.company_name, j.location_raw, j.apply_url, MAX(r.at) AS at
+FROM rejections r
+JOIN jobs j ON j.id = r.job_id
+WHERE j.board_id IS NULL AND j.status = 'rejected'
+  AND r.layer = 'sanity' AND r.reason = 'jd_missing'
+  AND r.at >= :since
+  AND NOT EXISTS (SELECT 1 FROM decisions d WHERE d.job_id = j.id AND d.auto = 0)
+GROUP BY j.id
+ORDER BY at DESC, j.id DESC
+LIMIT :limit
+"""
+
+# ---- email response tracking (track/responses.py) ----
+# every submitted application, with what an email from the employer or its
+# ATS could name: the company, its domain, the title, the ATS and apply link
+SUBMITTED_APPLICATIONS = """
+SELECT a.id AS application_id, a.job_id, a.stage, a.submitted_at,
+       j.title, j.company_name, j.apply_url, c.domain AS company_domain, b.ats
+FROM applications a
 JOIN jobs j ON j.id = a.job_id
-WHERE f.status = 'pending'
+JOIN companies c ON c.id = j.company_id
+LEFT JOIN boards b ON b.id = j.board_id
+WHERE a.submitted_at IS NOT NULL
+ORDER BY a.submitted_at, a.id
 """
 
-SET_FOLLOWUP_STATUS = "UPDATE followups SET status = :status WHERE id = :id"
-
-# due today or earlier, still pending, with the application they belong to
-DUE_FOLLOWUPS = """
-SELECT f.id, f.kind, f.due_at, f.draft, a.id AS application_id, a.submitted_at,
-       j.id AS job_id, j.company_name, j.title
-FROM followups f JOIN applications a ON a.id = f.application_id
-JOIN jobs j ON j.id = a.job_id
-WHERE f.status = 'pending' AND f.due_at <= date('now')
-ORDER BY f.due_at, f.id
+APPLICATION_BY_ID = """
+SELECT a.id, a.job_id, a.stage, a.submitted_at, j.company_name, j.title
+FROM applications a JOIN jobs j ON j.id = a.job_id WHERE a.id = :id
 """
 
-FOLLOWUP_BY_ID = """
-SELECT f.id, f.status, f.kind, a.job_id FROM followups f
-JOIN applications a ON a.id = f.application_id WHERE f.id = :id
+EMAIL_RESPONSE_BY_MESSAGE_ID = """
+SELECT id, job_id, detail FROM events
+WHERE kind = 'email_response' AND json_extract(detail, '$.message_id') = :message_id
+ORDER BY id LIMIT 1
 """
 
-# a response ends the nudging: no status check, no ghost-close after a reply
-SKIP_PENDING_FOLLOWUPS_FOR_APPLICATION = """
-UPDATE followups SET status = 'skipped'
-WHERE application_id = :application_id AND status = 'pending'
+# the latest-dated response already recorded for an application: email
+# responses that can move a stage (by the day the email arrived) and outcomes
+# the person recorded (by when they recorded it), as 'YYYY-MM-DD HH:MM:SS'
+LATEST_RESPONSE_FOR_APPLICATION = """
+SELECT MAX(d) AS latest FROM (
+  SELECT json_extract(detail, '$.received_at') AS d FROM events
+  WHERE kind = 'email_response'
+    AND json_extract(detail, '$.application_id') = :application_id
+    AND json_extract(detail, '$.outcome') != 'acknowledged'
+  UNION ALL
+  SELECT at AS d FROM events
+  WHERE kind = 'outcome' AND json_extract(detail, '$.application_id') = :application_id
+)
+"""
+
+LAST_EMAIL_CHECK = """
+SELECT id, detail, at FROM events WHERE kind = 'email_check' ORDER BY id DESC LIMIT 1
+"""
+
+COUNT_EMAIL_RESPONSES_AFTER = """
+SELECT COUNT(*) AS n FROM events WHERE kind = 'email_response' AND id > :after_id
+"""
+
+# email responses recorded at or after :since ('YYYY-MM-DD HH:MM:SS' UTC)
+EMAIL_RESPONSES_SINCE = """
+SELECT e.id, e.job_id, e.detail, e.at, j.company_name, j.title
+FROM events e LEFT JOIN jobs j ON j.id = e.job_id
+WHERE e.kind = 'email_response' AND e.at >= :since
+ORDER BY e.id
 """
 
 # idempotent event: written once per (job, kind, detail)

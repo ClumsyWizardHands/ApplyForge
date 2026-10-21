@@ -3,8 +3,7 @@
 * one project root: absolute data paths, no silent empty DB, .env loaded;
 * a staleness banner on the digest, get_queue and get_stats;
 * run-all stages isolated, recorded, and failing the exit code;
-* follow-ups: drafted through MCP, mark_submitted by job id, no
-  hiring-manager note without a contact, outcomes recorded;
+* mark_submitted by job id, outcomes recorded;
 * background launches recorded with pid, output log and real exit status; one
   batched staging process; open_queue includes needs_human;
 * ATS-over-feed merge, on poll and as a one-off.
@@ -24,7 +23,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 from typer.testing import CliRunner
 
 import jobkit
@@ -35,9 +33,12 @@ from jobkit.pipeline.dedup import merge_feed_dupes, posting_key
 from jobkit.pipeline.digest import freshness_banner, write_digest
 from jobkit.pipeline.poll import seed_targets, upsert_jobs
 from jobkit.pipeline.runner import run_stages
-from jobkit.track.followups import process_followups
 from tests.conftest import REPO_ROOT, SpawnRecorder, load_fixture
+from tests.helpers.applications import applied as _applied
 from tests.test_filter import _insert
+
+# `_applied` stays importable from here: other test modules import it
+__all__ = ["_Running", "_applied"]
 
 TODAY = datetime.date.today()
 
@@ -326,36 +327,19 @@ def test_cli_run_all_runs_every_stage_and_exits_nonzero(
     assert CliRunner().invoke(cli.app, ["run-all"]).exit_code == 0
 
 
-def test_run_all_stage_list_includes_followups_before_digest() -> None:
+def test_run_all_stage_list_has_ghost_close_before_digest() -> None:
     from jobkit import cli
 
     names = [n for n, _ in cli._run_all_stages()]
     assert names[0] == "poll" and names[-1] == "digest"
-    assert names.index("followups") == len(names) - 2
+    assert names.index("ghost-close") == len(names) - 2
+    assert names.index("tailor") < names.index("ghost-close")
+    assert "followups" not in names
 
 
 # ---------------------------------------------------------------------------
-# submissions, follow-ups, outcomes
+# submissions and outcomes
 # ---------------------------------------------------------------------------
-
-
-def _applied(conn: sqlite3.Connection, ext: str = "s1", stage: str = "tailored") -> int:
-    jid = _insert(conn, external_id=ext, title="Account Executive")
-    conn.execute("UPDATE jobs SET status='approved' WHERE id=?", (jid,))
-    conn.execute("INSERT INTO applications (job_id, stage) VALUES (?, ?)", (jid, stage))
-    conn.commit()
-    return jid
-
-
-def _followups(conn: sqlite3.Connection, jid: int) -> dict[str, tuple[str, str]]:
-    return {
-        r["kind"]: (r["due_at"], r["status"])
-        for r in conn.execute(
-            "SELECT f.kind, f.due_at, f.status FROM followups f "
-            "JOIN applications a ON a.id=f.application_id WHERE a.job_id=?",
-            (jid,),
-        )
-    }
 
 
 def test_mark_submitted_by_job_id_without_a_pinned_queue(
@@ -365,33 +349,14 @@ def test_mark_submitted_by_job_id_without_a_pinned_queue(
     jid = _applied(conn)
     day = _days_ago(10)
     out = mcp.mark_submitted(job_ids=str(jid), submitted_on=day)
-    assert f"job {jid} Acme — Account Executive: submitted {day}" in out
-    assert "hiring_manager_note not scheduled (no-contact-known)" in out
+    assert out == f"job {jid} Acme — Account Executive: submitted {day}"
     app = conn.execute("SELECT stage, submitted_at FROM applications WHERE job_id=?", (jid,))
     assert tuple(app.fetchone()) == ("submitted", day)
     assert conn.execute("SELECT status FROM jobs WHERE id=?", (jid,)).fetchone()[0] == "applied"
-    base = datetime.date.fromisoformat(day)
-    assert _followups(conn, jid) == {
-        "status_check": ((base + datetime.timedelta(days=7)).isoformat(), "pending"),
-        "close_as_ghosted": ((base + datetime.timedelta(days=30)).isoformat(), "pending"),
-    }
-    # idempotent: a second call changes nothing and schedules nothing new
+    # idempotent: a second call changes nothing
     assert "already marked submitted" in mcp.mark_submitted(job_ids=str(jid))
-    assert conn.execute("SELECT COUNT(*) FROM followups").fetchone()[0] == 2
     ev = conn.execute("SELECT detail FROM events WHERE kind='marked_submitted'").fetchall()
-    assert len(ev) == 1 and json.loads(ev[0]["detail"])["submitted_on"] == day
-
-
-def test_mark_submitted_schedules_the_note_when_a_contact_is_known(
-    conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    mcp = _mcp(conn, monkeypatch)
-    jid = _applied(conn)
-    conn.execute("INSERT INTO contacts (company_id, name) VALUES (1, 'Pat Hiring')")
-    mcp.mark_submitted(job_ids=str(jid))
-    due = _followups(conn, jid)
-    assert set(due) == {"status_check", "hiring_manager_note", "close_as_ghosted"}
-    assert due["hiring_manager_note"][0] == (TODAY + datetime.timedelta(days=14)).isoformat()
+    assert len(ev) == 1 and json.loads(ev[0]["detail"]) == {"submitted_on": day}
 
 
 def test_mark_submitted_still_takes_pinned_numbers(
@@ -413,128 +378,8 @@ def test_mark_submitted_rejects_bad_input_and_changes_nothing(
     assert "in the future" in mcp.mark_submitted(job_ids=str(jid), submitted_on=future)
     assert "YYYY-MM-DD" in mcp.mark_submitted(job_ids=str(jid), submitted_on="09/04")
     assert "give queue numbers" in mcp.mark_submitted()
-    assert conn.execute("SELECT COUNT(*) FROM followups").fetchone()[0] == 0
     assert conn.execute("SELECT submitted_at FROM applications").fetchone()[0] is None
-
-
-def _write_corpus(home: Path) -> None:
-    corpus = {"bullets": [{"id": "b_001", "text_short": "Grew pipeline ~30%."}]}
-    (home / "data" / "career_corpus.yaml").write_text(yaml.safe_dump(corpus))
-
-
-def _due_followups(conn: sqlite3.Connection, jid: int, kinds: dict[str, int]) -> None:
-    app_id = conn.execute("SELECT id FROM applications WHERE job_id=?", (jid,)).fetchone()[0]
-    conn.execute(
-        "UPDATE applications SET stage='submitted', submitted_at=? WHERE id=?",
-        (_days_ago(20), app_id),
-    )
-    conn.execute("UPDATE jobs SET status='applied' WHERE id=?", (jid,))
-    for kind, offset in kinds.items():
-        conn.execute(
-            "INSERT INTO followups (application_id, kind, due_at) VALUES (?, ?, ?)",
-            (app_id, kind, (TODAY + datetime.timedelta(days=offset)).isoformat()),
-        )
-    conn.commit()
-
-
-def test_process_followups_skips_notes_with_no_contact_and_drafts_the_rest(
-    conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch, jobkit_home: Path
-) -> None:
-    _write_corpus(jobkit_home)
-    jid = _applied(conn)
-    _due_followups(
-        conn, jid, {"status_check": -5, "hiring_manager_note": -1, "close_as_ghosted": 9}
-    )
-    prompts: list[str] = []
-
-    def fake_call_json(c: Any, stage: str, prompt: str, **kw: Any) -> dict[str, Any]:
-        prompts.append(prompt)
-        return {"subject": "Timeline?", "body": "Still keen.\nAny update?"}
-
-    monkeypatch.setattr(llm, "call_json", fake_call_json)
-    stats = process_followups(conn)
-    assert stats == {"drafted": 1, "ghost_closed": 0, "skipped_no_contact": 1, "failed": 0}
-    assert len(prompts) == 1 and "status_check" in prompts[0]
-    rows = {r["kind"]: r for r in conn.execute("SELECT kind, status, draft FROM followups")}
-    assert rows["hiring_manager_note"]["status"] == "skipped"
-    assert rows["hiring_manager_note"]["draft"] is None
-    assert json.loads(rows["status_check"]["draft"])["subject"] == "Timeline?"
-    assert conn.execute("SELECT COUNT(*) FROM events WHERE kind='followup_skipped'").fetchone()[0]
-
-
-def test_followup_prompt_carries_the_estimate_style_and_the_name(
-    conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch, jobkit_home: Path
-) -> None:
-    corpus = {
-        "identity": {"name": "Jordan Rivera"},
-        "bullets": [{"id": "b_001", "text_short": "Grew pipeline ~30%."}],
-    }
-    (jobkit_home / "data" / "career_corpus.yaml").write_text(yaml.safe_dump(corpus))
-    jid = _applied(conn)
-    _due_followups(conn, jid, {"status_check": -1})
-    prompts: list[str] = []
-
-    def fake_call_json(c: Any, stage: str, prompt: str, **kw: Any) -> dict[str, Any]:
-        prompts.append(prompt)
-        return {"subject": "s", "body": "b"}
-
-    monkeypatch.setattr(llm, "call_json", fake_call_json)
-    monkeypatch.setattr("jobkit.validate.style.configured_estimate_style", lambda: "confident")
-    process_followups(conn)
-    assert len(prompts) == 1
-    assert "CANDIDATE NAME: Jordan Rivera" in prompts[0]
-    assert "ESTIMATE STYLE: confident" in prompts[0]
-    assert "{name}" not in prompts[0] and "{estimate_style}" not in prompts[0]
-
-
-def test_process_followups_one_failed_draft_does_not_stop_the_others(
-    conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch, jobkit_home: Path
-) -> None:
-    _write_corpus(jobkit_home)
-    a, b = _applied(conn, "f1"), _applied(conn, "f2")
-    _due_followups(conn, a, {"status_check": -3})
-    _due_followups(conn, b, {"status_check": -2})
-    replies: list[Any] = [RuntimeError("llm down"), {"subject": "S", "body": "B"}]
-
-    def flaky(c: Any, stage: str, prompt: str, **kw: Any) -> dict[str, Any]:
-        r = replies.pop(0)
-        if isinstance(r, Exception):
-            raise r
-        return dict(r)
-
-    monkeypatch.setattr(llm, "call_json", flaky)
-    stats = process_followups(conn)
-    assert (stats["drafted"], stats["failed"]) == (1, 1)
-
-
-def test_get_followups_shows_drafts_and_starts_drafting_the_rest(
-    conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch, spawned: SpawnRecorder
-) -> None:
-    mcp = _mcp(conn, monkeypatch)
-    a, b = _applied(conn, "g1"), _applied(conn, "g2")
-    _due_followups(conn, a, {"status_check": -4})
-    _due_followups(conn, b, {"status_check": -1})
-    conn.execute(
-        "UPDATE followups SET draft=? WHERE id=1",
-        (json.dumps({"subject": "Quick check-in", "body": "Line one.\nLine two."}),),
-    )
-    conn.commit()
-    out = mcp.get_followups()
-    assert "[1] status_check" in out and "Subject: Quick check-in" in out
-    assert "    Line two." in out
-    assert "[2] status_check" in out and "(no draft yet)" in out
-    assert spawned.calls == [background.cli_argv("followups")]
-    assert "follow-ups pipeline: started `jobkit followups`" in out
-
-
-def test_get_followups_with_nothing_due_starts_nothing(
-    conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch, spawned: SpawnRecorder
-) -> None:
-    mcp = _mcp(conn, monkeypatch)
-    jid = _applied(conn)
-    _due_followups(conn, jid, {"status_check": 3})
-    assert mcp.get_followups() == "no follow-ups due"
-    assert spawned.calls == []
+    assert conn.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 0
 
 
 class _Running:
@@ -542,29 +387,6 @@ class _Running:
 
     def poll(self) -> None:
         return None
-
-
-def test_run_followups_launches_once(
-    conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch, spawned: SpawnRecorder
-) -> None:
-    mcp = _mcp(conn, monkeypatch)
-    first = mcp.run_followups()
-    assert "started `jobkit followups`" in first
-    launch_log = json.loads(
-        conn.execute("SELECT detail FROM events WHERE kind='spawn'").fetchone()["detail"]
-    )["log"]
-    monkeypatch.setitem(background._CHILDREN, launch_log, _Running())  # still drafting
-    assert "already running" in mcp.run_followups()
-    assert spawned.calls == [background.cli_argv("followups")]
-
-
-def test_mark_followup_sent(conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch) -> None:
-    mcp = _mcp(conn, monkeypatch)
-    jid = _applied(conn)
-    _due_followups(conn, jid, {"status_check": -1})
-    assert mcp.mark_followup_sent("1, 77") == "marked sent: [1]; not pending (unchanged): [77]"
-    assert conn.execute("SELECT status FROM followups WHERE id=1").fetchone()[0] == "done"
-    assert mcp.get_followups() == "no follow-ups due"
 
 
 def test_record_outcome(conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -577,14 +399,15 @@ def test_record_outcome(conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatc
     assert "no job with id 999" in mcp.record_outcome(999, "reply")
 
     out = mcp.record_outcome(jid, "Interview", "phone screen with the VP, Tue")
-    assert "stage submitted -> interview" in out and "2 pending follow-up(s) skipped" in out
-    assert {s for _, s in _followups(conn, jid).values()} == {"skipped"}
+    assert out.endswith("stage submitted -> interview.")
     ev = json.loads(conn.execute("SELECT detail FROM events WHERE kind='outcome'").fetchone()[0])
     assert ev["outcome"] == "interview" and ev["note"] == "phone screen with the VP, Tue"
+    assert "followups_skipped" not in ev
     # a later reply never undoes a stronger outcome
     assert "stage interview -> interview" in mcp.record_outcome(jid, "reply")
     stats = mcp.get_stats()
     assert "replied: 1" in stats
+    assert "no reply after 30 days: 0" in stats and "follow-up" not in stats
 
 
 # ---------------------------------------------------------------------------
@@ -738,9 +561,10 @@ def test_background_status_tool(
 ) -> None:
     mcp = _mcp(conn, monkeypatch)
     assert mcp.background_status() == "no background launches recorded"
-    mcp.run_followups()
+    monkeypatch.setattr(mcp.browser, "profile_lock_holder", lambda p: None)
+    mcp.run_nightly()
     out = mcp.background_status()
-    assert "`jobkit followups`" in out and "finished ok (exit 0)" in out and "log: " in out
+    assert "`jobkit nightly`" in out and "finished ok (exit 0)" in out and "log: " in out
 
 
 def test_approve_reports_the_real_launch(

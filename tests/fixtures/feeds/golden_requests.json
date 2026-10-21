@@ -1,0 +1,1702 @@
+{
+ "adzuna_no_keywords": {
+  "filters": {
+   "comp_sanity": {
+    "currency": "USD",
+    "flag_missing_range_when_required": true,
+    "flag_role_sprawl_below_headcount": 20,
+    "floor": "from_filters",
+    "max_range_width_pct": 0.6,
+    "on_underpriced": "flag",
+    "reject_when_unpublished": false,
+    "underpriced_threshold_pct": 25,
+    "value_check": true
+   },
+   "dedup": {
+    "canonical_source_priority": [
+     "greenhouse",
+     "lever",
+     "ashby",
+     "smartrecruiters",
+     "workable",
+     "adzuna",
+     "arbeitnow",
+     "remotive",
+     "remoteok",
+     "usajobs"
+    ],
+    "cluster_on": [
+     "normalized_company",
+     "normalized_title",
+     "location_bucket"
+    ],
+    "tiebreak": "jd_hash"
+   },
+   "feeds": {
+    "a16z": {
+     "enabled": false,
+     "keywords": [
+      "revenue operations",
+      "sales operations",
+      "director of sales"
+     ]
+    },
+    "adzuna": {
+     "country": "us",
+     "enabled": true,
+     "keywords": [],
+     "max_days_old": 14
+    },
+    "arbeitnow": {
+     "enabled": true,
+     "remote_only": true
+    },
+    "consider": {
+     "categories": [
+      "sales",
+      "operations"
+     ],
+     "enabled": true
+    },
+    "cosnetwork": {
+     "enabled": false
+    },
+    "getro": {
+     "enabled": false,
+     "keywords": [
+      "revenue operations",
+      "sales operations",
+      "deal desk",
+      "sales manager"
+     ]
+    },
+    "himalayas": {
+     "enabled": true
+    },
+    "linkedin_guest": {
+     "enabled": false,
+     "keywords": [
+      "revenue operations",
+      "sales operations",
+      "sales manager",
+      "director of sales"
+     ],
+     "locations": [
+      {
+       "location": "United States",
+       "workplace": "remote"
+      },
+      {
+       "location": "Greater Philadelphia",
+       "workplace": "hybrid"
+      }
+     ],
+     "max_detail_requests_per_day": 0,
+     "max_search_requests_per_day": 6,
+     "min_delay_seconds": 3,
+     "posted_within_days": 7
+    },
+    "remoteok": {
+     "enabled": true
+    },
+    "remotive": {
+     "categories": [
+      "sales",
+      "business"
+     ],
+     "enabled": true
+    },
+    "usajobs": {
+     "enabled": false,
+     "keywords": [
+      "Business Operations",
+      "Program Analyst"
+     ]
+    }
+   },
+   "filters": {
+    "blocklist_companies": [],
+    "comp": {
+     "currency": "USD",
+     "floor": 165000,
+     "ote_base_share": 0.6,
+     "reject_when_unpublished": false,
+     "track_floors": {
+      "account_executive": {
+       "basis": "ote",
+       "floor": 140000
+      },
+      "sales_exec": {
+       "basis": "base",
+       "floor": 190000
+      },
+      "sdr_bdr": {
+       "basis": "ote",
+       "floor": 75000
+      },
+      "sdr_bdr_manager": {
+       "basis": "base",
+       "floor": 110000
+      }
+     }
+    },
+    "exclude_titles": [
+     "(?i)\\bengineer",
+     "(?i)\\b(intern|internship|apprentice)\\b",
+     "(?i)\\b(contract|contractor|1099|temp)\\b",
+     "(?i)\\b(door.to.door|field canvass(er|ing)?)\\b",
+     "(?i)\\b(retail|store) (associate|manager)\\b",
+     "(?i)\\bcall cent(er|re)\\b"
+    ],
+    "freshness": {
+     "max_age_days": 14,
+     "resurface_reposts": true
+    },
+    "include_titles": [
+     "(?i)\\b(revenue|sales|gtm|go.to.market) (operations|ops)\\b",
+     "(?i)\\bdeal desk\\b",
+     "(?i)\\bsales (manager|lead)\\b",
+     "(?i)\\b(channel|partner|reseller) (sales|manager|lead|programs?)\\b",
+     "(?i)\\b(sales )?(compensation|commissions?) (analyst|manager|lead)\\b",
+     "(?i)\\b(sales|revenue|gtm|go.to.market)\\b.{0,10}\\benablement\\b",
+     "(?i)\\b(founding|first)\\b.{0,15}\\b(ae|account executive|gtm|sales)\\b"
+    ],
+    "locations": {
+     "accept_hybrid_within_miles": 30,
+     "accept_remote": true,
+     "allowed": [
+      "Philadelphia, PA",
+      "King of Prussia, PA",
+      "Bristol, PA",
+      "Langhorne, PA",
+      "Camden, NJ",
+      "Cherry Hill, NJ",
+      "Pennsylvania",
+      "New Jersey",
+      "Chicago, IL",
+      "Raleigh, NC"
+     ],
+     "home_coordinates": "from_corpus"
+    },
+    "tracks": [
+     {
+      "active": true,
+      "id": "sdr_bdr_manager",
+      "title_regex": "(?i)\\b(sdr|bdr|sales development|business development|account development)\\b.{0,25}\\b(manager|lead|leader|director|head)\\b|\\b(manager|director|head|lead)\\b.{0,15}\\b(sdr|bdr|sales development|business development|account development)\\b"
+     },
+     {
+      "active": true,
+      "id": "sales_exec",
+      "title_regex": "(?i)\\b(director|head|vp|vice president|chief)\\b.{0,30}\\b(sales|revenue|gtm|go.to.market|growth)\\b|\\b(sales|revenue)\\b.{0,20}\\b(director|leader|vp|officer)\\b|\\bchief (revenue|sales) officer\\b"
+     },
+     {
+      "active": false,
+      "id": "sdr_bdr",
+      "title_regex": "(?i)\\b(sdr|bdr|adr|sales development|business development|account development|market development)\\b"
+     },
+     {
+      "active": true,
+      "id": "account_executive",
+      "title_regex": "(?i)\\b(account executive|sales executive)\\b|\\bae\\b"
+     }
+    ]
+   },
+   "followups": [
+    {
+     "days_after_submit": 7,
+     "kind": "status_check"
+    },
+    {
+     "days_after_submit": 14,
+     "kind": "hiring_manager_note",
+     "only_if_contact_known": true
+    },
+    {
+     "auto_close": true,
+     "days_after_submit": 30,
+     "kind": "close_as_ghosted"
+    }
+   ],
+   "friction": {
+    "override_score": 90,
+    "skip_above": 85,
+    "warn_above": 60,
+    "weights": {
+     "field_count": 1,
+     "has_assessment": 40,
+     "novel_question_count": 5,
+     "required_count": 2
+    }
+   },
+   "gates": {
+    "max_applications_per_company_per_quarter": 2,
+    "min_score_to_surface": 65,
+    "min_score_to_tailor": 75,
+    "require_human_approval_before_tailor": true,
+    "require_human_confirmation_of_submission": true
+   },
+   "location_strategy": {
+    "default": "Philadelphia, PA",
+    "forms_use_real_address": true,
+    "mode": "per_job",
+    "rules": [
+     {
+      "use": "Bristol, PA",
+      "when": {
+       "job_state": "NJ"
+      }
+     },
+     {
+      "use": "Philadelphia, PA",
+      "when": {
+       "job_city_in": [
+        "Philadelphia",
+        "King of Prussia",
+        "Conshohocken"
+       ]
+      }
+     },
+     {
+      "use": "Philadelphia, PA",
+      "when": {
+       "remote": true
+      }
+     }
+    ]
+   },
+   "questions": {
+    "max_per_day": 3
+   },
+   "remote_policy": {
+    "accept": [
+     "remote",
+     "hybrid"
+    ],
+    "acceptable_geo_restrictions": [
+     "US",
+     "USA",
+     "U.S.",
+     "United States",
+     "US Remote",
+     "North America",
+     "AMER",
+     "Americas",
+     "East Coast",
+     "West Coast",
+     "Eastern Time",
+     "Central Time",
+     "Mountain Time",
+     "Pacific Time",
+     "EST",
+     "ET",
+     "CST",
+     "MST",
+     "PST",
+     "PT"
+    ],
+    "clearance_required": "flag",
+    "home_coordinates": "from_corpus",
+    "max_commute_minutes": 60,
+    "max_office_days_per_week": 2,
+    "on_remote_conflict": "flag",
+    "reject_onsite": true,
+    "relocation_cities": [
+     "Chicago, IL",
+     "Raleigh, NC"
+    ]
+   },
+   "resume": {
+    "recent_role_years": 5
+   },
+   "schedule": {
+    "nightly_at": "02:00",
+    "stale_after_hours": 36
+   },
+   "self_review": {
+    "max_revision_rounds": 1
+   },
+   "volume_mode": "high"
+  },
+  "requests": [
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=account+executive&salary_include_unknown=1&max_days_old=14&sort_by=date&sort_direction=down&results_per_page=50&salary_min=45000"
+   }
+  ],
+  "source": "adzuna"
+ },
+ "adzuna_sales_fixture": {
+  "filters": {
+   "comp_sanity": {
+    "currency": "USD",
+    "flag_missing_range_when_required": true,
+    "flag_role_sprawl_below_headcount": 20,
+    "floor": "from_filters",
+    "max_range_width_pct": 0.6,
+    "on_underpriced": "flag",
+    "reject_when_unpublished": false,
+    "underpriced_threshold_pct": 25,
+    "value_check": true
+   },
+   "dedup": {
+    "canonical_source_priority": [
+     "greenhouse",
+     "lever",
+     "ashby",
+     "smartrecruiters",
+     "workable",
+     "adzuna",
+     "arbeitnow",
+     "remotive",
+     "remoteok",
+     "usajobs"
+    ],
+    "cluster_on": [
+     "normalized_company",
+     "normalized_title",
+     "location_bucket"
+    ],
+    "tiebreak": "jd_hash"
+   },
+   "feeds": {
+    "a16z": {
+     "enabled": false,
+     "keywords": [
+      "revenue operations",
+      "sales operations",
+      "director of sales"
+     ]
+    },
+    "adzuna": {
+     "country": "us",
+     "enabled": true,
+     "keywords": [
+      "revenue operations",
+      "sales operations",
+      "deal desk",
+      "sales manager",
+      "director of sales",
+      "channel sales manager",
+      "sales enablement"
+     ],
+     "max_days_old": 14
+    },
+    "arbeitnow": {
+     "enabled": true,
+     "remote_only": true
+    },
+    "consider": {
+     "categories": [
+      "sales",
+      "operations"
+     ],
+     "enabled": true
+    },
+    "cosnetwork": {
+     "enabled": false
+    },
+    "getro": {
+     "enabled": false,
+     "keywords": [
+      "revenue operations",
+      "sales operations",
+      "deal desk",
+      "sales manager"
+     ]
+    },
+    "himalayas": {
+     "enabled": true
+    },
+    "linkedin_guest": {
+     "enabled": false,
+     "keywords": [
+      "revenue operations",
+      "sales operations",
+      "sales manager",
+      "director of sales"
+     ],
+     "locations": [
+      {
+       "location": "United States",
+       "workplace": "remote"
+      },
+      {
+       "location": "Greater Philadelphia",
+       "workplace": "hybrid"
+      }
+     ],
+     "max_detail_requests_per_day": 0,
+     "max_search_requests_per_day": 6,
+     "min_delay_seconds": 3,
+     "posted_within_days": 7
+    },
+    "remoteok": {
+     "enabled": true
+    },
+    "remotive": {
+     "categories": [
+      "sales",
+      "business"
+     ],
+     "enabled": true
+    },
+    "usajobs": {
+     "enabled": false,
+     "keywords": [
+      "Business Operations",
+      "Program Analyst"
+     ]
+    }
+   },
+   "filters": {
+    "blocklist_companies": [],
+    "comp": {
+     "currency": "USD",
+     "floor": 165000,
+     "ote_base_share": 0.6,
+     "reject_when_unpublished": false,
+     "track_floors": {
+      "account_executive": {
+       "basis": "ote",
+       "floor": 140000
+      },
+      "sales_exec": {
+       "basis": "base",
+       "floor": 190000
+      },
+      "sdr_bdr": {
+       "basis": "ote",
+       "floor": 75000
+      },
+      "sdr_bdr_manager": {
+       "basis": "base",
+       "floor": 110000
+      }
+     }
+    },
+    "exclude_titles": [
+     "(?i)\\bengineer",
+     "(?i)\\b(intern|internship|apprentice)\\b",
+     "(?i)\\b(contract|contractor|1099|temp)\\b",
+     "(?i)\\b(door.to.door|field canvass(er|ing)?)\\b",
+     "(?i)\\b(retail|store) (associate|manager)\\b",
+     "(?i)\\bcall cent(er|re)\\b"
+    ],
+    "freshness": {
+     "max_age_days": 14,
+     "resurface_reposts": true
+    },
+    "include_titles": [
+     "(?i)\\b(revenue|sales|gtm|go.to.market) (operations|ops)\\b",
+     "(?i)\\bdeal desk\\b",
+     "(?i)\\bsales (manager|lead)\\b",
+     "(?i)\\b(channel|partner|reseller) (sales|manager|lead|programs?)\\b",
+     "(?i)\\b(sales )?(compensation|commissions?) (analyst|manager|lead)\\b",
+     "(?i)\\b(sales|revenue|gtm|go.to.market)\\b.{0,10}\\benablement\\b",
+     "(?i)\\b(founding|first)\\b.{0,15}\\b(ae|account executive|gtm|sales)\\b"
+    ],
+    "locations": {
+     "accept_hybrid_within_miles": 30,
+     "accept_remote": true,
+     "allowed": [
+      "Philadelphia, PA",
+      "King of Prussia, PA",
+      "Bristol, PA",
+      "Langhorne, PA",
+      "Camden, NJ",
+      "Cherry Hill, NJ",
+      "Pennsylvania",
+      "New Jersey",
+      "Chicago, IL",
+      "Raleigh, NC"
+     ],
+     "home_coordinates": "from_corpus"
+    },
+    "tracks": [
+     {
+      "active": true,
+      "id": "sdr_bdr_manager",
+      "title_regex": "(?i)\\b(sdr|bdr|sales development|business development|account development)\\b.{0,25}\\b(manager|lead|leader|director|head)\\b|\\b(manager|director|head|lead)\\b.{0,15}\\b(sdr|bdr|sales development|business development|account development)\\b"
+     },
+     {
+      "active": true,
+      "id": "sales_exec",
+      "title_regex": "(?i)\\b(director|head|vp|vice president|chief)\\b.{0,30}\\b(sales|revenue|gtm|go.to.market|growth)\\b|\\b(sales|revenue)\\b.{0,20}\\b(director|leader|vp|officer)\\b|\\bchief (revenue|sales) officer\\b"
+     },
+     {
+      "active": false,
+      "id": "sdr_bdr",
+      "title_regex": "(?i)\\b(sdr|bdr|adr|sales development|business development|account development|market development)\\b"
+     },
+     {
+      "active": true,
+      "id": "account_executive",
+      "title_regex": "(?i)\\b(account executive|sales executive)\\b|\\bae\\b"
+     }
+    ]
+   },
+   "followups": [
+    {
+     "days_after_submit": 7,
+     "kind": "status_check"
+    },
+    {
+     "days_after_submit": 14,
+     "kind": "hiring_manager_note",
+     "only_if_contact_known": true
+    },
+    {
+     "auto_close": true,
+     "days_after_submit": 30,
+     "kind": "close_as_ghosted"
+    }
+   ],
+   "friction": {
+    "override_score": 90,
+    "skip_above": 85,
+    "warn_above": 60,
+    "weights": {
+     "field_count": 1,
+     "has_assessment": 40,
+     "novel_question_count": 5,
+     "required_count": 2
+    }
+   },
+   "gates": {
+    "max_applications_per_company_per_quarter": 2,
+    "min_score_to_surface": 65,
+    "min_score_to_tailor": 75,
+    "require_human_approval_before_tailor": true,
+    "require_human_confirmation_of_submission": true
+   },
+   "location_strategy": {
+    "default": "Philadelphia, PA",
+    "forms_use_real_address": true,
+    "mode": "per_job",
+    "rules": [
+     {
+      "use": "Bristol, PA",
+      "when": {
+       "job_state": "NJ"
+      }
+     },
+     {
+      "use": "Philadelphia, PA",
+      "when": {
+       "job_city_in": [
+        "Philadelphia",
+        "King of Prussia",
+        "Conshohocken"
+       ]
+      }
+     },
+     {
+      "use": "Philadelphia, PA",
+      "when": {
+       "remote": true
+      }
+     }
+    ]
+   },
+   "questions": {
+    "max_per_day": 3
+   },
+   "remote_policy": {
+    "accept": [
+     "remote",
+     "hybrid"
+    ],
+    "acceptable_geo_restrictions": [
+     "US",
+     "USA",
+     "U.S.",
+     "United States",
+     "US Remote",
+     "North America",
+     "AMER",
+     "Americas",
+     "East Coast",
+     "West Coast",
+     "Eastern Time",
+     "Central Time",
+     "Mountain Time",
+     "Pacific Time",
+     "EST",
+     "ET",
+     "CST",
+     "MST",
+     "PST",
+     "PT"
+    ],
+    "clearance_required": "flag",
+    "home_coordinates": "from_corpus",
+    "max_commute_minutes": 60,
+    "max_office_days_per_week": 2,
+    "on_remote_conflict": "flag",
+    "reject_onsite": true,
+    "relocation_cities": [
+     "Chicago, IL",
+     "Raleigh, NC"
+    ]
+   },
+   "resume": {
+    "recent_role_years": 5
+   },
+   "schedule": {
+    "nightly_at": "02:00",
+    "stale_after_hours": 36
+   },
+   "self_review": {
+    "max_revision_rounds": 1
+   },
+   "volume_mode": "high"
+  },
+  "requests": [
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=revenue+operations&salary_include_unknown=1&max_days_old=14&sort_by=date&sort_direction=down&results_per_page=50&salary_min=45000"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=sales+operations&salary_include_unknown=1&max_days_old=14&sort_by=date&sort_direction=down&results_per_page=50&salary_min=45000"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=deal+desk&salary_include_unknown=1&max_days_old=14&sort_by=date&sort_direction=down&results_per_page=50&salary_min=45000"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=sales+manager&salary_include_unknown=1&max_days_old=14&sort_by=date&sort_direction=down&results_per_page=50&salary_min=45000"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=director+of+sales&salary_include_unknown=1&max_days_old=14&sort_by=date&sort_direction=down&results_per_page=50&salary_min=45000"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=channel+sales+manager&salary_include_unknown=1&max_days_old=14&sort_by=date&sort_direction=down&results_per_page=50&salary_min=45000"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=sales+enablement&salary_include_unknown=1&max_days_old=14&sort_by=date&sort_direction=down&results_per_page=50&salary_min=45000"
+   }
+  ],
+  "source": "adzuna"
+ },
+ "adzuna_template": {
+  "filters": {
+   "board_resolution": {
+    "delay_seconds": 1,
+    "enabled": true,
+    "max_requests_per_run": 300,
+    "probe_cache_days": 14
+   },
+   "comp_sanity": {
+    "flag_missing_range_when_required": true,
+    "max_range_width_pct": 0.6
+   },
+   "feeds": {
+    "a16z": {
+     "enabled": false
+    },
+    "adzuna": {
+     "enabled": true,
+     "keywords": [
+      "account executive",
+      "sales director",
+      "head of sales",
+      "sales development manager",
+      "revenue operations"
+     ],
+     "max_days_old": 21
+    },
+    "arbeitnow": {
+     "enabled": true,
+     "remote_only": true
+    },
+    "consider": {
+     "categories": [
+      "sales"
+     ],
+     "enabled": true
+    },
+    "cosnetwork": {
+     "enabled": false
+    },
+    "getro": {
+     "enabled": false
+    },
+    "himalayas": {
+     "enabled": true
+    },
+    "linkedin_guest": {
+     "enabled": false,
+     "keywords": [
+      "account executive",
+      "sales director",
+      "head of sales"
+     ],
+     "locations": [
+      {
+       "location": "United States",
+       "workplace": "remote"
+      }
+     ],
+     "max_detail_requests_per_day": 0,
+     "max_search_requests_per_day": 6,
+     "min_delay_seconds": 3,
+     "posted_within_days": 7
+    },
+    "remoteok": {
+     "enabled": true
+    },
+    "remotive": {
+     "categories": [
+      "sales",
+      "business"
+     ],
+     "enabled": true
+    },
+    "usajobs": {
+     "enabled": false,
+     "keywords": [
+      "Program Manager"
+     ],
+     "remote_only": true
+    }
+   },
+   "filters": {
+    "blocklist_companies": [],
+    "comp": {
+     "currency": "USD",
+     "floor": 100000,
+     "ote_base_share": 0.6,
+     "track_floors": {
+      "account_executive": {
+       "basis": "ote",
+       "floor": 125000
+      },
+      "sales_exec": {
+       "basis": "base",
+       "floor": 160000
+      },
+      "sdr_bdr": {
+       "basis": "ote",
+       "floor": 70000
+      },
+      "sdr_bdr_manager": {
+       "basis": "base",
+       "floor": 110000
+      }
+     }
+    },
+    "exclude_titles": [
+     "(?i)\\b(intern|internship|apprentice)\\b",
+     "(?i)\\b(contract|contractor|1099|temp)\\b",
+     "(?i)\\b(door.to.door|field canvass(er|ing)?)\\b"
+    ],
+    "freshness": {
+     "max_age_days": 30
+    },
+    "include_titles": [
+     "(?i)\\bsales (manager|lead)\\b",
+     "(?i)\\b(founding|first)\\b.{0,15}\\b(ae|account executive|gtm|sales)\\b",
+     "(?i)\\b(revenue|sales) operations\\b.{0,20}\\b(director|lead|manager)\\b",
+     "(?i)\\b(sales|revenue|gtm|go.to.market)\\b.{0,10}\\benablement\\b"
+    ],
+    "locations": {
+     "accept_remote": true,
+     "allowed": []
+    },
+    "tracks": [
+     {
+      "active": true,
+      "id": "sdr_bdr_manager",
+      "title_regex": "(?i)\\b(sdr|bdr|sales development|business development|account development)\\b.{0,25}\\b(manager|lead|leader|director|head)\\b|\\b(manager|director|head|lead)\\b.{0,15}\\b(sdr|bdr|sales development|business development|account development)\\b"
+     },
+     {
+      "active": true,
+      "id": "sales_exec",
+      "title_regex": "(?i)\\b(director|head|vp|vice president|chief)\\b.{0,30}\\b(sales|revenue|gtm|go.to.market|growth)\\b|\\b(sales|revenue)\\b.{0,20}\\b(director|leader|vp|officer)\\b|\\bchief (revenue|sales) officer\\b"
+     },
+     {
+      "active": true,
+      "id": "sdr_bdr",
+      "title_regex": "(?i)\\b(sdr|bdr|adr|sales development|business development|account development|market development)\\b"
+     },
+     {
+      "active": true,
+      "id": "account_executive",
+      "title_regex": "(?i)\\b(account executive|sales executive)\\b|\\bae\\b"
+     }
+    ]
+   },
+   "followups": [
+    {
+     "days_after_submit": 7,
+     "kind": "status_check"
+    },
+    {
+     "days_after_submit": 14,
+     "kind": "hiring_manager_note",
+     "only_if_contact_known": true
+    },
+    {
+     "auto_close": true,
+     "days_after_submit": 30,
+     "kind": "close_as_ghosted"
+    }
+   ],
+   "friction": {
+    "weights": {
+     "field_count": 1,
+     "has_assessment": 40,
+     "novel_question_count": 5,
+     "required_count": 2
+    }
+   },
+   "gates": {
+    "min_score_to_surface": 65
+   },
+   "location_strategy": {
+    "rules": []
+   },
+   "questions": {
+    "max_per_day": 3
+   },
+   "remote_policy": {
+    "acceptable_geo_restrictions": [
+     "US",
+     "USA",
+     "U.S.",
+     "United States",
+     "US Remote",
+     "North America",
+     "AMER",
+     "Americas",
+     "Eastern Time",
+     "Central Time",
+     "Mountain Time",
+     "Pacific Time",
+     "EST",
+     "ET",
+     "CST",
+     "MST",
+     "PST",
+     "PT"
+    ],
+    "max_commute_minutes": 60,
+    "max_office_days_per_week": 2,
+    "reject_onsite": true,
+    "relocation_cities": []
+   },
+   "resume": {
+    "recent_role_years": 5
+   },
+   "schedule": {
+    "nightly_at": "02:00",
+    "stale_after_hours": 36
+   },
+   "self_review": {
+    "max_revision_rounds": 1
+   }
+  },
+  "requests": [
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=account+executive&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50&salary_min=42000"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=sales+director&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50&salary_min=42000"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=head+of+sales&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50&salary_min=42000"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=sales+development+manager&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50&salary_min=42000"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=revenue+operations&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50&salary_min=42000"
+   }
+  ],
+  "source": "adzuna"
+ },
+ "adzuna_twelve_keywords": {
+  "filters": {
+   "feeds": {
+    "adzuna": {
+     "enabled": true,
+     "keywords": [
+      "k0",
+      "k1",
+      "k2",
+      "k3",
+      "k4",
+      "k5",
+      "k6",
+      "k7",
+      "k8",
+      "k9",
+      "k10",
+      "k11"
+     ]
+    }
+   }
+  },
+  "requests": [
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=k0&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=k1&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=k2&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=k3&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=k4&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=k5&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=k6&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=k7&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=k8&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50"
+   },
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=k9&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50"
+   }
+  ],
+  "source": "adzuna"
+ },
+ "adzuna_what_key": {
+  "filters": {
+   "feeds": {
+    "adzuna": {
+     "enabled": true,
+     "what": [
+      "nurse"
+     ]
+    }
+   }
+  },
+  "requests": [
+   {
+    "headers": {
+     "host": "api.adzuna.com"
+    },
+    "url": "https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=test-id&app_key=test-key&what_phrase=nurse&salary_include_unknown=1&max_days_old=21&sort_by=date&sort_direction=down&results_per_page=50"
+   }
+  ],
+  "source": "adzuna"
+ },
+ "usajobs_sales_fixture": {
+  "filters": {
+   "comp_sanity": {
+    "currency": "USD",
+    "flag_missing_range_when_required": true,
+    "flag_role_sprawl_below_headcount": 20,
+    "floor": "from_filters",
+    "max_range_width_pct": 0.6,
+    "on_underpriced": "flag",
+    "reject_when_unpublished": false,
+    "underpriced_threshold_pct": 25,
+    "value_check": true
+   },
+   "dedup": {
+    "canonical_source_priority": [
+     "greenhouse",
+     "lever",
+     "ashby",
+     "smartrecruiters",
+     "workable",
+     "adzuna",
+     "arbeitnow",
+     "remotive",
+     "remoteok",
+     "usajobs"
+    ],
+    "cluster_on": [
+     "normalized_company",
+     "normalized_title",
+     "location_bucket"
+    ],
+    "tiebreak": "jd_hash"
+   },
+   "feeds": {
+    "a16z": {
+     "enabled": false,
+     "keywords": [
+      "revenue operations",
+      "sales operations",
+      "director of sales"
+     ]
+    },
+    "adzuna": {
+     "country": "us",
+     "enabled": true,
+     "keywords": [
+      "revenue operations",
+      "sales operations",
+      "deal desk",
+      "sales manager",
+      "director of sales",
+      "channel sales manager",
+      "sales enablement"
+     ],
+     "max_days_old": 14
+    },
+    "arbeitnow": {
+     "enabled": true,
+     "remote_only": true
+    },
+    "consider": {
+     "categories": [
+      "sales",
+      "operations"
+     ],
+     "enabled": true
+    },
+    "cosnetwork": {
+     "enabled": false
+    },
+    "getro": {
+     "enabled": false,
+     "keywords": [
+      "revenue operations",
+      "sales operations",
+      "deal desk",
+      "sales manager"
+     ]
+    },
+    "himalayas": {
+     "enabled": true
+    },
+    "linkedin_guest": {
+     "enabled": false,
+     "keywords": [
+      "revenue operations",
+      "sales operations",
+      "sales manager",
+      "director of sales"
+     ],
+     "locations": [
+      {
+       "location": "United States",
+       "workplace": "remote"
+      },
+      {
+       "location": "Greater Philadelphia",
+       "workplace": "hybrid"
+      }
+     ],
+     "max_detail_requests_per_day": 0,
+     "max_search_requests_per_day": 6,
+     "min_delay_seconds": 3,
+     "posted_within_days": 7
+    },
+    "remoteok": {
+     "enabled": true
+    },
+    "remotive": {
+     "categories": [
+      "sales",
+      "business"
+     ],
+     "enabled": true
+    },
+    "usajobs": {
+     "enabled": true,
+     "keywords": [
+      "Business Operations",
+      "Program Analyst"
+     ]
+    }
+   },
+   "filters": {
+    "blocklist_companies": [],
+    "comp": {
+     "currency": "USD",
+     "floor": 165000,
+     "ote_base_share": 0.6,
+     "reject_when_unpublished": false,
+     "track_floors": {
+      "account_executive": {
+       "basis": "ote",
+       "floor": 140000
+      },
+      "sales_exec": {
+       "basis": "base",
+       "floor": 190000
+      },
+      "sdr_bdr": {
+       "basis": "ote",
+       "floor": 75000
+      },
+      "sdr_bdr_manager": {
+       "basis": "base",
+       "floor": 110000
+      }
+     }
+    },
+    "exclude_titles": [
+     "(?i)\\bengineer",
+     "(?i)\\b(intern|internship|apprentice)\\b",
+     "(?i)\\b(contract|contractor|1099|temp)\\b",
+     "(?i)\\b(door.to.door|field canvass(er|ing)?)\\b",
+     "(?i)\\b(retail|store) (associate|manager)\\b",
+     "(?i)\\bcall cent(er|re)\\b"
+    ],
+    "freshness": {
+     "max_age_days": 14,
+     "resurface_reposts": true
+    },
+    "include_titles": [
+     "(?i)\\b(revenue|sales|gtm|go.to.market) (operations|ops)\\b",
+     "(?i)\\bdeal desk\\b",
+     "(?i)\\bsales (manager|lead)\\b",
+     "(?i)\\b(channel|partner|reseller) (sales|manager|lead|programs?)\\b",
+     "(?i)\\b(sales )?(compensation|commissions?) (analyst|manager|lead)\\b",
+     "(?i)\\b(sales|revenue|gtm|go.to.market)\\b.{0,10}\\benablement\\b",
+     "(?i)\\b(founding|first)\\b.{0,15}\\b(ae|account executive|gtm|sales)\\b"
+    ],
+    "locations": {
+     "accept_hybrid_within_miles": 30,
+     "accept_remote": true,
+     "allowed": [
+      "Philadelphia, PA",
+      "King of Prussia, PA",
+      "Bristol, PA",
+      "Langhorne, PA",
+      "Camden, NJ",
+      "Cherry Hill, NJ",
+      "Pennsylvania",
+      "New Jersey",
+      "Chicago, IL",
+      "Raleigh, NC"
+     ],
+     "home_coordinates": "from_corpus"
+    },
+    "tracks": [
+     {
+      "active": true,
+      "id": "sdr_bdr_manager",
+      "title_regex": "(?i)\\b(sdr|bdr|sales development|business development|account development)\\b.{0,25}\\b(manager|lead|leader|director|head)\\b|\\b(manager|director|head|lead)\\b.{0,15}\\b(sdr|bdr|sales development|business development|account development)\\b"
+     },
+     {
+      "active": true,
+      "id": "sales_exec",
+      "title_regex": "(?i)\\b(director|head|vp|vice president|chief)\\b.{0,30}\\b(sales|revenue|gtm|go.to.market|growth)\\b|\\b(sales|revenue)\\b.{0,20}\\b(director|leader|vp|officer)\\b|\\bchief (revenue|sales) officer\\b"
+     },
+     {
+      "active": false,
+      "id": "sdr_bdr",
+      "title_regex": "(?i)\\b(sdr|bdr|adr|sales development|business development|account development|market development)\\b"
+     },
+     {
+      "active": true,
+      "id": "account_executive",
+      "title_regex": "(?i)\\b(account executive|sales executive)\\b|\\bae\\b"
+     }
+    ]
+   },
+   "followups": [
+    {
+     "days_after_submit": 7,
+     "kind": "status_check"
+    },
+    {
+     "days_after_submit": 14,
+     "kind": "hiring_manager_note",
+     "only_if_contact_known": true
+    },
+    {
+     "auto_close": true,
+     "days_after_submit": 30,
+     "kind": "close_as_ghosted"
+    }
+   ],
+   "friction": {
+    "override_score": 90,
+    "skip_above": 85,
+    "warn_above": 60,
+    "weights": {
+     "field_count": 1,
+     "has_assessment": 40,
+     "novel_question_count": 5,
+     "required_count": 2
+    }
+   },
+   "gates": {
+    "max_applications_per_company_per_quarter": 2,
+    "min_score_to_surface": 65,
+    "min_score_to_tailor": 75,
+    "require_human_approval_before_tailor": true,
+    "require_human_confirmation_of_submission": true
+   },
+   "location_strategy": {
+    "default": "Philadelphia, PA",
+    "forms_use_real_address": true,
+    "mode": "per_job",
+    "rules": [
+     {
+      "use": "Bristol, PA",
+      "when": {
+       "job_state": "NJ"
+      }
+     },
+     {
+      "use": "Philadelphia, PA",
+      "when": {
+       "job_city_in": [
+        "Philadelphia",
+        "King of Prussia",
+        "Conshohocken"
+       ]
+      }
+     },
+     {
+      "use": "Philadelphia, PA",
+      "when": {
+       "remote": true
+      }
+     }
+    ]
+   },
+   "questions": {
+    "max_per_day": 3
+   },
+   "remote_policy": {
+    "accept": [
+     "remote",
+     "hybrid"
+    ],
+    "acceptable_geo_restrictions": [
+     "US",
+     "USA",
+     "U.S.",
+     "United States",
+     "US Remote",
+     "North America",
+     "AMER",
+     "Americas",
+     "East Coast",
+     "West Coast",
+     "Eastern Time",
+     "Central Time",
+     "Mountain Time",
+     "Pacific Time",
+     "EST",
+     "ET",
+     "CST",
+     "MST",
+     "PST",
+     "PT"
+    ],
+    "clearance_required": "flag",
+    "home_coordinates": "from_corpus",
+    "max_commute_minutes": 60,
+    "max_office_days_per_week": 2,
+    "on_remote_conflict": "flag",
+    "reject_onsite": true,
+    "relocation_cities": [
+     "Chicago, IL",
+     "Raleigh, NC"
+    ]
+   },
+   "resume": {
+    "recent_role_years": 5
+   },
+   "schedule": {
+    "nightly_at": "02:00",
+    "stale_after_hours": 36
+   },
+   "self_review": {
+    "max_revision_rounds": 1
+   },
+   "volume_mode": "high"
+  },
+  "requests": [
+   {
+    "headers": {
+     "authorization-key": "test-key",
+     "host": "data.usajobs.gov",
+     "user-agent": "someone@example.com"
+    },
+    "url": "https://data.usajobs.gov/api/Search?PositionTitle=Business+Operations&ResultsPerPage=500"
+   },
+   {
+    "headers": {
+     "authorization-key": "test-key",
+     "host": "data.usajobs.gov",
+     "user-agent": "someone@example.com"
+    },
+    "url": "https://data.usajobs.gov/api/Search?PositionTitle=Program+Analyst&ResultsPerPage=500"
+   }
+  ],
+  "source": "usajobs"
+ },
+ "usajobs_series": {
+  "filters": {
+   "feeds": {
+    "usajobs": {
+     "enabled": true,
+     "keywords": [
+      "a",
+      "b",
+      "c",
+      "d",
+      "e"
+     ],
+     "pay_grade_low": 12,
+     "remote_only": true,
+     "series": [
+      "1101",
+      "0343"
+     ]
+    }
+   }
+  },
+  "requests": [
+   {
+    "headers": {
+     "authorization-key": "test-key",
+     "host": "data.usajobs.gov",
+     "user-agent": "someone@example.com"
+    },
+    "url": "https://data.usajobs.gov/api/Search?JobCategoryCode=1101%3B0343&SortField=opendate&SortDirection=desc&ResultsPerPage=500&RemoteIndicator=True&PayGradeLow=12"
+   },
+   {
+    "headers": {
+     "authorization-key": "test-key",
+     "host": "data.usajobs.gov",
+     "user-agent": "someone@example.com"
+    },
+    "url": "https://data.usajobs.gov/api/Search?PositionTitle=a&ResultsPerPage=500&RemoteIndicator=True"
+   },
+   {
+    "headers": {
+     "authorization-key": "test-key",
+     "host": "data.usajobs.gov",
+     "user-agent": "someone@example.com"
+    },
+    "url": "https://data.usajobs.gov/api/Search?PositionTitle=b&ResultsPerPage=500&RemoteIndicator=True"
+   },
+   {
+    "headers": {
+     "authorization-key": "test-key",
+     "host": "data.usajobs.gov",
+     "user-agent": "someone@example.com"
+    },
+    "url": "https://data.usajobs.gov/api/Search?PositionTitle=c&ResultsPerPage=500&RemoteIndicator=True"
+   },
+   {
+    "headers": {
+     "authorization-key": "test-key",
+     "host": "data.usajobs.gov",
+     "user-agent": "someone@example.com"
+    },
+    "url": "https://data.usajobs.gov/api/Search?PositionTitle=d&ResultsPerPage=500&RemoteIndicator=True"
+   }
+  ],
+  "source": "usajobs"
+ },
+ "usajobs_template": {
+  "filters": {
+   "board_resolution": {
+    "delay_seconds": 1,
+    "enabled": true,
+    "max_requests_per_run": 300,
+    "probe_cache_days": 14
+   },
+   "comp_sanity": {
+    "flag_missing_range_when_required": true,
+    "max_range_width_pct": 0.6
+   },
+   "feeds": {
+    "a16z": {
+     "enabled": false
+    },
+    "adzuna": {
+     "enabled": true,
+     "keywords": [
+      "account executive",
+      "sales director",
+      "head of sales",
+      "sales development manager",
+      "revenue operations"
+     ],
+     "max_days_old": 21
+    },
+    "arbeitnow": {
+     "enabled": true,
+     "remote_only": true
+    },
+    "consider": {
+     "categories": [
+      "sales"
+     ],
+     "enabled": true
+    },
+    "cosnetwork": {
+     "enabled": false
+    },
+    "getro": {
+     "enabled": false
+    },
+    "himalayas": {
+     "enabled": true
+    },
+    "linkedin_guest": {
+     "enabled": false,
+     "keywords": [
+      "account executive",
+      "sales director",
+      "head of sales"
+     ],
+     "locations": [
+      {
+       "location": "United States",
+       "workplace": "remote"
+      }
+     ],
+     "max_detail_requests_per_day": 0,
+     "max_search_requests_per_day": 6,
+     "min_delay_seconds": 3,
+     "posted_within_days": 7
+    },
+    "remoteok": {
+     "enabled": true
+    },
+    "remotive": {
+     "categories": [
+      "sales",
+      "business"
+     ],
+     "enabled": true
+    },
+    "usajobs": {
+     "enabled": true,
+     "keywords": [
+      "Program Manager"
+     ],
+     "remote_only": true
+    }
+   },
+   "filters": {
+    "blocklist_companies": [],
+    "comp": {
+     "currency": "USD",
+     "floor": 100000,
+     "ote_base_share": 0.6,
+     "track_floors": {
+      "account_executive": {
+       "basis": "ote",
+       "floor": 125000
+      },
+      "sales_exec": {
+       "basis": "base",
+       "floor": 160000
+      },
+      "sdr_bdr": {
+       "basis": "ote",
+       "floor": 70000
+      },
+      "sdr_bdr_manager": {
+       "basis": "base",
+       "floor": 110000
+      }
+     }
+    },
+    "exclude_titles": [
+     "(?i)\\b(intern|internship|apprentice)\\b",
+     "(?i)\\b(contract|contractor|1099|temp)\\b",
+     "(?i)\\b(door.to.door|field canvass(er|ing)?)\\b"
+    ],
+    "freshness": {
+     "max_age_days": 30
+    },
+    "include_titles": [
+     "(?i)\\bsales (manager|lead)\\b",
+     "(?i)\\b(founding|first)\\b.{0,15}\\b(ae|account executive|gtm|sales)\\b",
+     "(?i)\\b(revenue|sales) operations\\b.{0,20}\\b(director|lead|manager)\\b",
+     "(?i)\\b(sales|revenue|gtm|go.to.market)\\b.{0,10}\\benablement\\b"
+    ],
+    "locations": {
+     "accept_remote": true,
+     "allowed": []
+    },
+    "tracks": [
+     {
+      "active": true,
+      "id": "sdr_bdr_manager",
+      "title_regex": "(?i)\\b(sdr|bdr|sales development|business development|account development)\\b.{0,25}\\b(manager|lead|leader|director|head)\\b|\\b(manager|director|head|lead)\\b.{0,15}\\b(sdr|bdr|sales development|business development|account development)\\b"
+     },
+     {
+      "active": true,
+      "id": "sales_exec",
+      "title_regex": "(?i)\\b(director|head|vp|vice president|chief)\\b.{0,30}\\b(sales|revenue|gtm|go.to.market|growth)\\b|\\b(sales|revenue)\\b.{0,20}\\b(director|leader|vp|officer)\\b|\\bchief (revenue|sales) officer\\b"
+     },
+     {
+      "active": true,
+      "id": "sdr_bdr",
+      "title_regex": "(?i)\\b(sdr|bdr|adr|sales development|business development|account development|market development)\\b"
+     },
+     {
+      "active": true,
+      "id": "account_executive",
+      "title_regex": "(?i)\\b(account executive|sales executive)\\b|\\bae\\b"
+     }
+    ]
+   },
+   "followups": [
+    {
+     "days_after_submit": 7,
+     "kind": "status_check"
+    },
+    {
+     "days_after_submit": 14,
+     "kind": "hiring_manager_note",
+     "only_if_contact_known": true
+    },
+    {
+     "auto_close": true,
+     "days_after_submit": 30,
+     "kind": "close_as_ghosted"
+    }
+   ],
+   "friction": {
+    "weights": {
+     "field_count": 1,
+     "has_assessment": 40,
+     "novel_question_count": 5,
+     "required_count": 2
+    }
+   },
+   "gates": {
+    "min_score_to_surface": 65
+   },
+   "location_strategy": {
+    "rules": []
+   },
+   "questions": {
+    "max_per_day": 3
+   },
+   "remote_policy": {
+    "acceptable_geo_restrictions": [
+     "US",
+     "USA",
+     "U.S.",
+     "United States",
+     "US Remote",
+     "North America",
+     "AMER",
+     "Americas",
+     "Eastern Time",
+     "Central Time",
+     "Mountain Time",
+     "Pacific Time",
+     "EST",
+     "ET",
+     "CST",
+     "MST",
+     "PST",
+     "PT"
+    ],
+    "max_commute_minutes": 60,
+    "max_office_days_per_week": 2,
+    "reject_onsite": true,
+    "relocation_cities": []
+   },
+   "resume": {
+    "recent_role_years": 5
+   },
+   "schedule": {
+    "nightly_at": "02:00",
+    "stale_after_hours": 36
+   },
+   "self_review": {
+    "max_revision_rounds": 1
+   }
+  },
+  "requests": [
+   {
+    "headers": {
+     "authorization-key": "test-key",
+     "host": "data.usajobs.gov",
+     "user-agent": "someone@example.com"
+    },
+    "url": "https://data.usajobs.gov/api/Search?PositionTitle=Program+Manager&ResultsPerPage=500&RemoteIndicator=True"
+   }
+  ],
+  "source": "usajobs"
+ }
+}

@@ -31,9 +31,9 @@ from jobkit.pipeline import halts, nightly, questions
 from jobkit.pipeline.dedup import follow_merges
 from jobkit.pipeline.digest import freshness_banner, write_digest
 from jobkit.rules import run_standing_rules
+from jobkit.track import responses
 from jobkit.track.applications import record_submission
 from jobkit.track.applications import repair as repair_application_rows
-from jobkit.track.followups import GHOST_KIND
 
 mcp = MCPServer("jobkit")
 
@@ -426,10 +426,10 @@ def answer_novel(n: int, field_identity: str, answer: str) -> str:
 
 @mcp.tool()
 def mark_submitted(ids: str = "", job_ids: str = "", submitted_on: str = "") -> str:
-    """Log that the human clicked submit and schedule follow-ups from the
-    submission day, per `followups:` in config/filters.yaml (+7d status check,
-    +30d ghost-close; the +14d hiring-manager note only when a contact is
-    stored for the company). `ids` are pinned queue numbers ('1,3'); `job_ids`
+    """Log that the person submitted these applications. Each job then has
+    one application row at stage 'submitted', dated from the submission day.
+    With no reply recorded after tracking.ghost_after_days (default 30) it
+    is marked 'ghosted'. `ids` are pinned queue numbers ('1,3'); `job_ids`
     are raw job ids ('412, 418') and work for any job, including one applied
     to by hand or no longer in the queue. `submitted_on` (YYYY-MM-DD, default
     today) back-dates a submission made earlier. A job already marked
@@ -449,22 +449,17 @@ def mark_submitted(ids: str = "", job_ids: str = "", submitted_on: str = "") -> 
     for label, job_id in targets:
         job = conn.execute(q.JOB_BRIEF, {"job_id": job_id}).fetchone()
         name = f"{label} {job['company_name']} — {job['title']}"
-        # exactly one application row, at 'submitted', with its follow-ups
-        # (track/applications.py), whatever rows the job had before
-        sub = record_submission(conn, job_id, job["company_id"], day, submitted_at)
+        # exactly one application row, at 'submitted' (track/applications.py),
+        # whatever rows the job had before
+        sub = record_submission(conn, job_id, submitted_at)
         folded = (
             f" ({len(sub.folded)} duplicate application row(s) folded into one)"
             if sub.folded
             else ""
         )
         if sub.already:
-            extra = (
-                f"; it had no follow-ups: {sub.scheduled.describe()}"
-                if sub.scheduled.due or sub.scheduled.skipped
-                else ""
-            )
             lines.append(
-                f"{name}: already marked submitted ({sub.submitted_at}), unchanged{extra}{folded}"
+                f"{name}: already marked submitted ({sub.submitted_at}), unchanged{folded}"
             )
             continue
         conn.execute(
@@ -472,18 +467,10 @@ def mark_submitted(ids: str = "", job_ids: str = "", submitted_on: str = "") -> 
             {
                 "job_id": job_id,
                 "kind": "marked_submitted",
-                "detail": json.dumps(
-                    {
-                        "submitted_on": day.isoformat(),
-                        "due": sub.scheduled.due,
-                        "skipped": sub.scheduled.skipped,
-                    }
-                ),
+                "detail": json.dumps({"submitted_on": day.isoformat()}),
             },
         )
-        lines.append(
-            f"{name}: submitted {day.isoformat()}; follow-ups: {sub.scheduled.describe()}{folded}"
-        )
+        lines.append(f"{name}: submitted {day.isoformat()}{folded}")
     conn.commit()
     log("mcp.mark_submitted", job_ids=[j for _, j in targets], submitted_on=day.isoformat())
     return "\n".join(lines)
@@ -503,9 +490,9 @@ def record_outcome(job_id: int, outcome: str, note: str = "") -> str:
     'reply', 'rejection', 'interview' or 'offer'; `note` is free text (who
     wrote, what they said). Stored as an `outcome` event with the note; moves
     the application's stage (replied / rejected / interview / offer) so
-    get_stats and calibration count it; and skips the application's pending
-    follow-ups (no nudge and no ghost-close after a response). The job must be
-    marked submitted first — for a manual application use
+    get_stats and calibration count it. An application with a response is
+    never marked ghosted, and one already ghosted moves on. The job must be
+    marked submitted first; for a manual application use
     mark_submitted(job_ids='N', submitted_on='YYYY-MM-DD')."""
     key = outcome.strip().lower()
     if key not in OUTCOME_STAGE:
@@ -531,9 +518,6 @@ def record_outcome(job_id: int, outcome: str, note: str = "") -> str:
     if key == "reply" and before in ("interview", "offer", "rejected"):
         after = before  # a later reply never undoes a stronger outcome
     conn.execute(q.SET_APPLICATION_STAGE, {"id": app["id"], "stage": after})
-    skipped = conn.execute(
-        q.SKIP_PENDING_FOLLOWUPS_FOR_APPLICATION, {"application_id": app["id"]}
-    ).rowcount
     conn.execute(
         q.RECORD_EVENT,
         {
@@ -546,28 +530,114 @@ def record_outcome(job_id: int, outcome: str, note: str = "") -> str:
                     "application_id": app["id"],
                     "stage_before": before,
                     "stage_after": after,
-                    "followups_skipped": skipped,
                 }
             ),
         },
     )
     conn.commit()
     log("mcp.record_outcome", job_id=job_id, outcome=key, stage=after)
-    return (
-        f"recorded {key} for {name}: stage {before} -> {after}; "
-        f"{skipped} pending follow-up(s) skipped."
-    )
+    return f"recorded {key} for {name}: stage {before} -> {after}."
+
+
+# ---- replies in the person's own mailbox (track/responses.py) ----
+# These tools only record what the person's mailbox already shows. jobkit
+# never connects to the mailbox: Claude reads it through the email connector
+# the person set up, and nothing is ever sent or changed there.
+
+
+@mcp.tool()
+def email_targets(scheduled: bool = False) -> str:
+    """Step 1 of an email check. Lists the submitted applications still
+    waiting on news (id, company, title, ATS, apply host, submission date,
+    stage), when the mailbox was last checked, and a suggested Gmail search
+    (ATS sender domains and company names, after the last check). Read-only:
+    use the search in the person's own mailbox through their email connector.
+    Nothing is sent, and no email is changed or stored. The unattended
+    scheduled run passes scheduled=true: then nothing is listed unless
+    tracking.email_check is true in config/filters.yaml."""
+    if scheduled:
+        from jobkit.config import load_filters
+
+        try:
+            on = load_filters().email_check
+        except (ValueError, FileNotFoundError) as e:
+            # FileNotFoundError covers ConfigMissing: no config/filters.yaml yet
+            return f"Email not checked: {e}"
+        if not on:
+            return (
+                "Email not checked: tracking.email_check is off in config/filters.yaml. "
+                "Skip the email check in this run."
+            )
+    return responses.email_targets(_conn()).render()
+
+
+@mcp.tool()
+def match_email(sender: str, subject: str = "", snippet: str = "", received_at: str = "") -> str:
+    """Step 2: which submitted application one email most likely belongs to.
+    Give the sender ('Acme Recruiting <no-reply@greenhouse-mail.io>'), the
+    subject, a short snippet, and the date it arrived. Returns the candidate
+    applications ranked by a fixed rule (company name, company domain, the ATS
+    the person applied through, title words), with the reasons, and says
+    whether one is a clear match. Read-only: it changes nothing and nothing
+    is sent. Without a clear match, ask the person before recording
+    anything."""
+    try:
+        return responses.match_email(_conn(), sender, subject, snippet, received_at).render()
+    except ValueError as e:
+        return f"no match run: {e}"
+
+
+@mcp.tool()
+def record_email_response(
+    application_id: int,
+    outcome: str,
+    received_at: str,
+    message_id: str,
+    link: str = "",
+    summary: str = "",
+) -> str:
+    """Step 3: record what one email in the person's mailbox says about one
+    submitted application. `outcome` is acknowledged (an automatic receipt),
+    rejected, assessment, interview, offer or recruiter_question.
+    `received_at` is when the email arrived; `message_id` is the mailbox's id
+    for the message (a message is recorded once); `link` opens it in the
+    mailbox; `summary` is ONE line in your words (cut to 160 characters; a
+    summary with a line break is refused). Never pass the email's body: it
+    is not stored. Stage rules: an
+    acknowledgement never moves the stage; a reply moves a ghosted
+    application on; an 'offer' stage is never changed here; the later-dated
+    response decides the stage. Nothing is sent."""
+    try:
+        return responses.record_response(
+            _conn(), application_id, outcome, received_at, message_id, link, summary
+        ).render()
+    except ValueError as e:
+        return f"not recorded: {e}"
+
+
+@mcp.tool()
+def finish_email_check(checked_through: str = "") -> str:
+    """Step 4: record that the person's mailbox was read through
+    `checked_through` (ISO date-time; default now), so the next email_targets
+    search starts there. Records a time only; nothing is sent."""
+    try:
+        return responses.finish_email_check(_conn(), checked_through).render()
+    except ValueError as e:
+        return f"not recorded: {e}"
 
 
 @mcp.tool()
 def add_job_url(url: str) -> str:
     """Ingest a pasted job URL (email alert, DM, any board). Recognizes the
-    employer ATS from the URL shape; supported boards are polled immediately
-    and the specific job is queued."""
+    employer ATS from the URL shape; a Greenhouse, Lever or Ashby board is
+    polled now and the job is queued, then extracted and scored in the
+    background (background_status shows it); it is in get_queue once scored.
+    Other systems are named, and nothing is added."""
+    import re
     import subprocess
 
     home = paths.resolve_home()
-    argv = background.cli_argv("add-url", url)
+    argv = background.cli_argv("add-url", "--no-score", url)
     log("mcp.add_job_url", argv=argv)
     out = subprocess.run(
         argv,
@@ -578,7 +648,15 @@ def add_job_url(url: str) -> str:
         env=background.child_env(home),
     )
     text = (out.stdout + out.stderr).strip() or "no output"
-    return text if out.returncode == 0 else f"add-url exited {out.returncode}:\n{text}"
+    if out.returncode != 0:
+        return f"add-url exited {out.returncode}:\n{text}"
+    pending = re.search(r"^needs scoring: \[(\d+)\]$", out.stdout, re.M)
+    if pending is None:
+        return text
+    job_id = int(pending.group(1))
+    # LLM calls stay out of the MCP request path: scoring runs in the background
+    launch = background.spawn(_conn(), "score-jobs", str(job_id), job_id=job_id)
+    return f"{text}\nscoring: {launch.describe()}. The job shows in get_queue once it is scored."
 
 
 @mcp.tool()
@@ -711,88 +789,13 @@ def resolve_boards(job_id: int = 0, confirm: bool = False, pick: str = "") -> st
     )
 
 
-def _launch_followups(conn: sqlite3.Connection) -> str:
-    busy = background.running(conn, ("followups",))
-    if busy is not None:
-        return (
-            f"follow-up drafting is already running (launch #{busy.event_id}, pid {busy.pid}); "
-            "call get_followups again when background_status shows it finished."
-        )
-    launch = background.spawn(conn, "followups")
-    return f"follow-ups pipeline: {launch.describe()}."
-
-
-@mcp.tool()
-def get_followups() -> str:
-    """Due follow-ups with their drafts. Sending is always manual: send it
-    yourself, then mark_followup_sent(id). Due follow-ups with no draft yet,
-    overdue ghost-closes and hiring-manager notes with no stored contact are
-    handled by the follow-ups pipeline (`jobkit followups`), which this starts
-    in the background — call get_followups again in a few minutes for the
-    drafts (background_status shows the run)."""
-    conn = _conn()
-    rows = conn.execute(q.DUE_FOLLOWUPS).fetchall()
-    if not rows:
-        return "no follow-ups due"
-    pending_work = [r for r in rows if r["kind"] == GHOST_KIND or not r["draft"]]
-    out = []
-    for r in rows:
-        out.append(
-            f"[{r['id']}] {r['kind']} · due {r['due_at']} · {r['company_name']} — {r['title']} "
-            f"(job {r['job_id']}, submitted {r['submitted_at']})"
-        )
-        if r["kind"] == GHOST_KIND:
-            out.append("    no reply in 30 days: the pipeline closes this application as ghosted")
-        elif r["draft"]:
-            d = json.loads(r["draft"])
-            out.append(f"    Subject: {d.get('subject', '')}")
-            out += [f"    {ln}" for ln in str(d.get("body", "")).splitlines()]
-        else:
-            out.append("    (no draft yet)")
-    if pending_work:
-        out += ["", _launch_followups(conn)]
-    return "\n".join(out)
-
-
-@mcp.tool()
-def run_followups() -> str:
-    """Run the follow-ups pipeline now, in the background (`jobkit followups`):
-    drafts every pending status check / hiring-manager note due within 2 days,
-    closes applications ghosted at +30 days, and skips hiring-manager notes for
-    companies with no stored contact. Never sends anything. Check
-    background_status, then get_followups for the drafts."""
-    return _launch_followups(_conn())
-
-
-@mcp.tool()
-def mark_followup_sent(followup_ids: str) -> str:
-    """Record that you sent these follow-ups yourself ('12, 13'): they leave
-    the due list (status done)."""
-    conn = _conn()
-    try:
-        ids = _parse_job_ids(followup_ids)
-    except ValueError:
-        return f"nothing changed: followup_ids must be numbers like '12, 13', got {followup_ids!r}"
-    done, skipped = [], []
-    for fid in ids:
-        f = conn.execute(q.FOLLOWUP_BY_ID, {"id": fid}).fetchone()
-        if f is None or f["status"] != "pending":
-            skipped.append(fid)
-            continue
-        conn.execute(q.SET_FOLLOWUP_STATUS, {"id": fid, "status": "done"})
-        conn.execute(
-            q.RECORD_EVENT,
-            {"job_id": f["job_id"], "kind": "followup_sent", "detail": json.dumps({"id": fid})},
-        )
-        done.append(fid)
-    conn.commit()
-    return f"marked sent: {done}" + (f"; not pending (unchanged): {skipped}" if skipped else "")
-
-
 @mcp.tool()
 def get_stats(period: str = "all") -> str:
     """Data freshness (last successful poll, failed run-all stages), then the
-    funnel with conversion rates and the follow-ups due."""
+    funnel with conversion rates, employer rejections, how many
+    applications had no reply after tracking.ghost_after_days, and the feed
+    jobs not scored because their description was too short (title, company,
+    location and link, newest first)."""
     conn = _conn()
     out = [freshness_banner(conn), ""]
     prev: int | None = None
@@ -817,8 +820,17 @@ def get_stats(period: str = "all") -> str:
         "SELECT COUNT(*) c FROM applications WHERE stage='rejected'"
     ).fetchone()["c"]
     out.append(f"employer rejections recorded: {rejections}")
-    due = len(conn.execute(q.DUE_FOLLOWUPS).fetchall())
-    out.append(f"follow-ups due: {due}" + (" (get_followups)" if due else ""))
+    from jobkit.config import load_filters
+
+    ghosted = conn.execute(q.COUNT_GHOSTED_APPLICATIONS).fetchone()["n"]
+    out.append(f"no reply after {load_filters().ghost_after_days} days: {ghosted}")
+    short = conn.execute(q.COUNT_FEED_JOBS_SHORT_JD, {"since": ""}).fetchone()["n"]
+    if short:
+        out.append(f"feed jobs not scored (description too short): {short}")
+        limit = digest_mod.STATS_SHORT_FEED_JD_LISTED
+        if short > limit:
+            out.append(f"the newest {limit}; open one on its site to read the full posting:")
+        out += digest_mod.short_feed_jd_rows(conn, "", limit)
     return "\n".join(out)
 
 
@@ -980,6 +992,18 @@ def figures(bullet_id: str = "", rendered: str = "") -> str:
 
 
 @mcp.tool()
+def ghost_close(confirm: bool = False) -> str:
+    """Mark submitted applications with no reply after tracking.ghost_after_days
+    (config/filters.yaml, default 30) as ghosted: a status change only, no
+    LLM, nothing sent. The nightly run does this. Without confirm=true this is
+    a dry run that lists them: show the list to the human and call again with
+    confirm=true only if they say so."""
+    from jobkit.track.applications import close_ghosted
+
+    return close_ghosted(_conn(), dry_run=not confirm).render()
+
+
+@mcp.tool()
 def purge_empty_jd_cache(confirm: bool = False) -> str:
     """One-off repair for the empty-JD cache collision: delete LLM cache rows
     keyed on the empty-JD hash (e3b0c442) and reset scores of jobs whose JD is
@@ -1048,7 +1072,7 @@ def _stage_in_background(conn: sqlite3.Connection, job_ids: list[int]) -> str:
 def stage_forms(ids: str = "", job_ids: str = "") -> str:
     """Playwright: open, autofill from the answer bank + drafts, highlight open
     questions, screenshot, and leave each form open on the review screen.
-    NEVER clicks submit. `ids` are pinned queue numbers ('1,3'), `job_ids`
+    Leaves submit to the person. `ids` are pinned queue numbers ('1,3'), `job_ids`
     raw job ids ('412, 418'). All of them run in ONE background process
     (`jobkit stage --job-ids … --keep-open`); the browser profile admits one
     process, so a call while staging is running is refused."""
@@ -1096,7 +1120,7 @@ def restage(n: int) -> str:
 @mcp.tool()
 def background_status(limit: int = 8) -> str:
     """What the background processes started from here (tailor, stage,
-    open-queue, followups, nightly) actually did, newest first: the command, pid,
+    open-queue, nightly) actually did, newest first: the command, pid,
     running or exit code, and the last lines of its output log
     (logs/spawn/)."""
     rows = background.statuses(_conn(), limit=max(1, min(limit, 50)))
@@ -1109,7 +1133,7 @@ def background_status(limit: int = 8) -> str:
 def run_nightly() -> str:
     """Start the nightly run now, in the background (`jobkit nightly`, what
     the launchd schedule runs at 02:00): poll, feeds, filter, triage, form
-    specs, standing rules, tailor approved, follow-ups, then stage every
+    specs, standing rules, tailor approved, ghost-close, then stage every
     approved + tailored job not staged since (one headed browser, closed when
     done), then the digest. It takes a while. Nothing is ever submitted:
     staged forms wait for you (open_queue). schedule_status shows the run
@@ -1131,7 +1155,7 @@ def run_nightly() -> str:
     launch = background.spawn(conn, "nightly")
     out = (
         f"nightly run: {launch.describe()}. It runs every stage (poll through tailor, "
-        "follow-ups, staging, digest); schedule_status shows each stage as it finishes and "
+        "ghost-close, staging, digest); schedule_status shows each stage as it finishes and "
         "the exit (1 if any stage failed). Nothing is submitted."
     )
     holder = browser.profile_lock_holder(browser.PROFILE_DIR)
@@ -1208,11 +1232,11 @@ def repair_applications(confirm: bool = False) -> str:
     """Find application rows a submission left inconsistent and fix them:
     a job marked submitted with no application row saying so, several
     application rows on one job, a submitted row whose stage went back
-    (re-tailoring), a submitted row with no follow-ups, an application left
-    on a merged aggregator row. A job 'applied' with no record of the day is
-    listed for you, never guessed. Without confirm=true this is a dry run
-    that only lists what it would do — show it to the human and call again
-    with confirm=true (`jobkit repair-applications [--dry-run]`)."""
+    (re-tailoring), an application left on a merged aggregator row. A job
+    'applied' with no record of the day is listed for you, never guessed.
+    Without confirm=true this is a dry run that only lists what it would do:
+    show it to the person and call again with confirm=true
+    (`jobkit repair-applications [--dry-run]`)."""
     return repair_application_rows(_conn(), dry_run=not confirm).render()
 
 
@@ -1293,25 +1317,25 @@ def answer_question(
     decline: bool = False,
 ) -> str:
     """Record the human's answer to question `key` (from get_questions), in
-    their own words. An answer that is only a "no" ("no", "never used it",
-    "I have never used Clari", "not that I recall"), or decline=true when the
-    human says they decline, is recorded as a decline: the question is not
-    asked again and the gap stays a gap (undecline_question takes it back).
-    An answer that may be a no or a fact ("Never below 115% of quota", "No,
-    but I used HubSpot") is refused: relay that to the human, never reword it
-    yourself. A tool or method answer is refused unless it is one plain
-    sentence of the human's own use: "[<tool>:] [yes,] I used <tool>" (or
-    I've used, I have used, I use, I ran; "it" for the tool), then only how
-    often, how long, at which of their corpus companies and for what ("I used
-    Clari weekly at Haulmark for two years"). "Yes, daily", "Yes, my AE",
-    "My manager used Clari", "Clari? Only heard of it" and "Only HubSpot"
-    are refused; kind="skill" is refused for anything but a tool or method
-    question. An answer to any other question that names a tool or method
-    ("Yes, sold to 12 lab couriers; the team used Clari") is refused too: a tool
-    enters only through its own question (tool-<x>), never inside another
-    answer; never cut the tool out of the answer yourself. Pass the
-    human's words exactly; never add a "yes", an "I
-    used", a company or a tool name they did not say, and never rephrase a
+    their own words. An answer that is only a "no" ("no", "never used it", "I
+    have never worked in healthcare", "not that I recall"), or decline=true
+    when the human says they decline, is recorded as a decline: the question is
+    not asked again and the gap stays a gap (undecline_question takes it back).
+    An answer that may be a no or a fact ("Never below 95% on
+    patient-satisfaction surveys", "No, but I worked in a clinic") is refused:
+    relay that to the human, never reword it yourself. A tool or method answer
+    is refused unless it is one plain sentence of the human's own use:
+    "[<tool>:] [yes,] I used <tool>" (or I've used, I have used, I use, I ran;
+    "it" for the tool), then only how often, how long, at which of their corpus
+    companies and for what ("I used Clari weekly at Haulmark for two years").
+    "Yes, daily", "Yes, my manager", "My manager used Clari", "Clari? Only
+    heard of it" and "Only HubSpot" are refused; kind="skill" is refused for
+    anything but a tool or method question. An answer to any other question
+    that names a tool or method ("Yes, I trained 40 new hires at a clinic; the
+    team used Clari") is refused too: a tool enters only through its own
+    question (tool-<x>), never inside another answer; never cut the tool out of
+    the answer yourself. Pass the human's words exactly; never add a "yes", an
+    "I used", a company or a tool name they did not say, and never rephrase a
     refused answer into the accepted form yourself: ask the human. Any other
     answer becomes a corpus PROPOSAL
     (data/corpus_proposals.yaml), NOT a corpus edit: a tool or method answer

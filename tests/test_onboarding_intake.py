@@ -12,14 +12,17 @@ from typing import Any
 import pytest
 import yaml
 
+from jobkit import config
 from jobkit.autofill.answer_bank import BankMatcher, comp_expectation_block
-from jobkit.config import load_filters, read_config_yaml
+from jobkit.config import Filters, load_filters, read_config_yaml
 from jobkit.onboarding import mcp_tools
 from jobkit.onboarding.answer_bank_builder import build_answer_bank
 from jobkit.onboarding.files import GENERATED_MARK, SetupError
 from jobkit.onboarding.intake import run_intake
+from jobkit.pipeline.filter import matched_place_bucket
 from jobkit.pipeline.filter import reject_reason_now as _reject_reason
-from jobkit.pipeline.triage import commute_minutes
+from jobkit.pipeline.triage import commute_minutes, geo_restriction_acceptable
+from tests.conftest import FIXTURES
 
 ANSWERS: dict[str, Any] = {
     "tracks": [
@@ -261,3 +264,645 @@ def test_mcp_wrapper(fresh: Path) -> None:
 
     out = mcp_tools.run_intake(json.dumps(ANSWERS))
     assert "config/filters.yaml" in out
+
+
+# ---------------------------------------------------------------------------
+# any field: personas rendered from the neutral template (all fictional)
+# ---------------------------------------------------------------------------
+
+PERSONAS = FIXTURES / "onboarding_personas"
+
+
+def _persona(name: str) -> dict[str, Any]:
+    data = yaml.safe_load((PERSONAS / f"{name}.answers.yaml").read_text())
+    assert isinstance(data, dict)
+    return data
+
+
+def _filters(home: Path) -> Filters:
+    return load_filters(home / "config" / "filters.yaml")
+
+
+def test_the_template_is_the_neutral_one(fresh: Path) -> None:
+    # the sandbox ships the repo's templates: intake renders from the neutral one
+    template = yaml.safe_load((fresh / "config" / "filters.example.yaml").read_text())
+    assert template["prompt_set"] == "general"
+
+
+def test_nurse_persona(fresh: Path) -> None:
+    out = run_intake(_persona("rn"))
+    text = (fresh / "config" / "filters.yaml").read_text()
+    f = _filters(fresh)
+    assert f.prompt_set == "general"
+    assert "followups" not in f.raw and "followups:" not in text
+    assert f.ghost_after.days == 30
+    # titles a nurse search must not drop
+    for title in ("Staff Nurse, ICU", "Clinical Nurse II", "Registered Nurse - Med/Surg"):
+        assert f.track_for(title) == "registered_nurse", title
+        assert _reject_reason(_job(title, "Dublin, OH", False), f) is None, title
+    assert f.track_for("Nurse Practitioner") is None
+    assert _reject_reason(_job("Travel Nurse RN"), f) is not None
+    # hourly pay becomes a yearly floor, with the arithmetic quoted
+    assert f.comp_floor == 40 * 36 * 52
+    assert f.comp_floor_for("Staff Nurse").floor == 42 * 36 * 52 == 78624
+    assert "# hourly: 42 an hour x 36 hours a week x 52 weeks = 78624 a year" in text
+    assert f.comp_sanity.underpriced_below == round(1.25 * 78624)
+    assert f.comp_sanity.ote_check == "ote_tracks"
+    assert text.count("\ncomp_sanity:") == 1
+    assert f.comp_sanity.max_range_width_pct == 0.6  # the range checks kept
+    # the nearby towns kept are places with their own commute. Each place
+    # carries the state, so the filter checks it (match_state) and a job
+    # limited to Ohio residents passes the remote check. Upper Arlington is
+    # filed under dc-metro by its spelling; its state keeps the DC jobs out
+    assert f.allowed_locations == [
+        "Columbus, OH",
+        "Dublin, OH",
+        "Westerville, OH",
+        "Upper Arlington, OH",
+    ]
+    assert f.match_state
+    assert geo_restriction_acceptable("must reside in Ohio", f.acceptable_geo_restrictions)
+    assert "'Upper Arlington' under dc-metro" in out
+    assert "nearby towns written with your state (OH): Dublin, Westerville, Upper Arlington" in out
+    for where, reason in (
+        ("Upper Arlington, OH", None),
+        ("Arlington, VA", "location:dc-metro:other-state"),
+        ("Washington, DC", "location:dc-metro:other-state"),
+        ("Dublin, CA", "location:other-dublin:other-state"),
+    ):
+        assert _reject_reason(_job("Registered Nurse", where, False), f) == reason, where
+    table = read_config_yaml(fresh / "config" / "commute_table.yaml")
+    assert commute_minutes(table, "other-dublin") == 20
+    assert commute_minutes(table, "other-westerville") == 25
+    assert commute_minutes(table, "dc-metro") == 15
+    # feeds: places with the state, remote-only boards off, federal on
+    feeds = f.raw["feeds"]
+    assert f.adzuna_locations == (config.AdzunaPlace("Columbus, OH", 40),)
+    assert feeds["adzuna"]["enabled"] is True
+    assert feeds["adzuna"]["keywords"][:2] == ["Registered Nurse", "Staff Nurse"]
+    assert f.usajobs_locations == (config.UsajobsPlace("Columbus, Ohio", 25),)
+    assert feeds["usajobs"]["enabled"] is True and feeds["usajobs"]["remote_only"] is False
+    assert feeds["usajobs"]["full_description"] is True
+    for board in ("arbeitnow", "remotive", "remoteok", "himalayas"):
+        assert feeds[board]["enabled"] is False, board
+    li = f.linkedin_guest
+    assert li.enabled is False
+    assert li.keywords == ("Registered Nurse", "Staff Nurse", "Clinical Nurse", "RN")
+    assert [(x.location, x.workplace) for x in li.locations] == [("Columbus, Ohio", "any")]
+    assert feeds["remotive"]["categories"] == [] and feeds["consider"]["categories"] == []
+
+
+def test_engineer_persona(fresh: Path) -> None:
+    run_intake(_persona("engineer"))
+    f = _filters(fresh)
+    assert f.prompt_set == "general"
+    for title in (
+        "Backend Engineer (Senior)",
+        "Sr. Software Engineer",
+        "Senior Back-End Engineer",
+        "Software Engineer III - Backend",
+        "Senior Backend Developer",
+        "Staff Platform Engineer",
+    ):
+        assert f.track_for(title) == "backend_engineer", title
+        assert _reject_reason(_job(title), f) is None, title
+    for title in ("Frontend Engineer", "Sales Engineer", "Account Executive"):
+        assert f.track_for(title) is None, title
+    track = f.track("backend_engineer")
+    assert track is not None and track.emphasis == (
+        "APIs and services I designed and ran in production"
+    )
+    assert not track.pivot and track.min_score is None
+    feeds = f.raw["feeds"]
+    assert "locations" not in feeds["adzuna"] and feeds["usajobs"]["remote_only"] is True
+    assert feeds["usajobs"]["enabled"] is False  # federal jobs not asked for
+    assert feeds["remotive"]["enabled"] is True
+    assert [(x.location, x.workplace) for x in f.linkedin_guest.locations] == [
+        ("United States", "remote")
+    ]
+
+
+def test_teacher_moving_into_instructional_design(fresh: Path) -> None:
+    run_intake(_persona("teacher"))
+    f = _filters(fresh)
+    assert f.prompt_set == "general"
+    track = f.track("instructional_designer")
+    assert track is not None and track.pivot and track.min_score == 50
+    assert track.emphasis == "curriculum I designed and the Canvas modules I built"
+    assert 45 <= f.min_score_for("instructional_designer") <= 50
+    assert f.min_score_for(None) == 65
+    for title in ("Learning Designer", "Curriculum Designer", "Senior Learning Designer"):
+        assert f.track_for(title) == "instructional_designer", title
+    # the state given as a name still gives Adzuna its "City, ST"
+    assert f.adzuna_locations == (config.AdzunaPlace("Indianapolis, IN", 40),)
+    assert f.allowed_locations == ["Indianapolis, IN"]
+    assert geo_restriction_acceptable("Indiana residents only", f.acceptable_geo_restrictions)
+    workplaces = [(x.location, x.workplace) for x in f.linkedin_guest.locations]
+    assert workplaces == [("Indianapolis, Indiana", "hybrid"), ("United States", "remote")]
+    # hybrid near Indianapolis, and remote too: Adzuna also searches with no place
+    from jobkit.adapters.feeds.adzuna import _plan
+    from jobkit.pipeline.feeds import _spec_for
+
+    spec = _spec_for("adzuna", f)
+    assert spec is not None
+    plan = _plan(spec)
+    assert {place.name if place else None for _, place in plan} == {"Indianapolis, IN", None}
+
+
+def test_a_change_of_field_without_its_own_gate_is_named(fresh: Path) -> None:
+    answers = _persona("teacher")
+    del answers["tracks"][0]["min_score"]
+    out = run_intake(answers)
+    assert "track instructional_designer is a change of field" in out
+    assert "45-50" in out
+
+
+def test_sales_persona_keeps_the_sales_prompts_and_categories(fresh: Path) -> None:
+    run_intake(_persona("sales"))
+    f = _filters(fresh)
+    assert f.prompt_set == "sales"
+    feeds = f.raw["feeds"]
+    # written explicitly: the neutral template has no categories to copy
+    assert feeds["remotive"]["categories"] == ["sales", "business"]
+    assert feeds["consider"]["categories"] == ["sales"]
+    assert f.track_for("Enterprise Account Executive") == "account_executive"
+
+
+def test_sales_track_names_get_the_sales_prompt_ids(fresh: Path) -> None:
+    """A track named "AE" or "SDR/BDR" gets the id the sales resume prompt and
+    the founding-AE carve-out read; a sales track with no emphasis line is named."""
+    answers = _persona("sales")
+    answers["tracks"][0]["name"] = "AE"
+    answers["tracks"].append({"name": "SDR/BDR", "comp_floor": 80000, "said": "SDR too"})
+    out = run_intake(answers)
+    f = _filters(fresh)
+    assert [t.id for t in f.tracks] == ["account_executive", "sales_manager", "sdr_bdr"]
+    assert "track sales_manager gets no sales emphasis" in out
+    assert "id: sales_exec" in out
+
+
+@pytest.mark.parametrize(
+    "names",
+    [
+        ["Revenue Cycle Specialist"],
+        ["Patient Account Manager"],
+        ["Account Executive", "Registered Nurse"],  # one non-sales track: general
+    ],
+)
+def test_only_an_all_sales_search_is_a_sales_search(fresh: Path, names: list[str]) -> None:
+    answers = copy.deepcopy(ANSWERS)
+    answers["tracks"] = [{"name": n} for n in names]
+    answers["exclude_titles"] = {"items": []}
+    answers["seniority_floor"] = {"level": "any"}
+    run_intake(answers)
+    f = _filters(fresh)
+    assert f.prompt_set == "general"
+    assert f.raw["feeds"]["remotive"]["categories"] == []
+
+
+def test_title_phrases_match_hyphens_slashes_and_sr(fresh: Path) -> None:
+    answers = copy.deepcopy(ANSWERS)
+    answers["tracks"] = [{"name": "Senior Back End Engineer"}]
+    answers["exclude_titles"] = {"items": []}
+    run_intake(answers)
+    f = _filters(fresh)
+    for title in ("Sr. Back-End Engineer", "Senior Backend Engineer", "Sr Back/End Engineer"):
+        assert f.track_for(title) == "senior_back_end_engineer", title
+    assert f.track_for("Senior Frontend Engineer") is None
+
+
+@pytest.mark.parametrize(
+    "track, message",
+    [
+        (
+            {"name": "Software Engineer", "should_match": ["Software Engineer II"]},
+            r"seniority floor \(senior\) rejects it as level I / II titles",
+        ),
+        (
+            {"name": "Software Engineer", "should_match": ["Backend Developer"]},
+            "should match, but",
+        ),
+        (
+            {"name": "Engineer", "should_not_match": ["Sales Engineer"]},
+            "should not match, but it does",
+        ),
+    ],
+)
+def test_example_titles_are_checked_and_never_written(
+    fresh: Path, track: dict[str, Any], message: str
+) -> None:
+    answers = copy.deepcopy(ANSWERS)
+    answers["tracks"] = [track]
+    answers["exclude_titles"] = {"items": []}
+    answers["seniority_floor"] = {"level": "senior"}
+    with pytest.raises(SetupError, match=message):
+        run_intake(answers)
+    assert not (fresh / "config" / "filters.yaml").exists()
+
+
+def test_example_titles_are_comments_not_keys(fresh: Path) -> None:
+    run_intake(_persona("engineer"))
+    raw = yaml.safe_load((fresh / "config" / "filters.yaml").read_text())
+    track = raw["filters"]["tracks"][0]
+    assert "should_match" not in track and "should_not_match" not in track
+    assert "title_words" not in track
+
+
+@pytest.mark.parametrize(
+    "change, message",
+    [
+        ({"comp": {"default_floor": 40, "unit": "hourly"}}, "hours_per_week"),
+        ({"locations": {"work_mode": "remote_only", "nearby": {"Dublin": 10}}}, "nearby"),
+        ({"locations": {"work_mode": "remote_only", "accept_remote": False}}, "accept_remote"),
+        (
+            {
+                "locations": {
+                    "work_mode": "onsite_ok",
+                    "places": ["Columbus"],
+                    "state": "Narnia",
+                    "max_commute_minutes": 30,
+                }
+            },
+            "not a US state",
+        ),
+        ({"tracks": [{"name": "X", "min_score": 120}]}, "min_score"),
+        ({"tracks": [{"name": "X", "emphasis": "x" * 201}]}, "emphasis"),
+    ],
+)
+def test_new_answers_are_validated(fresh: Path, change: dict[str, Any], message: str) -> None:
+    answers = {**copy.deepcopy(ANSWERS), **change}
+    with pytest.raises(SetupError, match=message):
+        run_intake(answers)
+    assert not (fresh / "config" / "filters.yaml").exists()
+
+
+def test_existing_config_is_still_protected_for_a_new_field(jobkit_home: Path) -> None:
+    path = jobkit_home / "config" / "filters.yaml"
+    before = path.read_text()
+    with pytest.raises(SetupError, match="not written by the setup interview"):
+        run_intake(_persona("rn"))
+    assert path.read_text() == before
+
+
+def test_hourly_pay_in_the_answer_bank(fresh: Path) -> None:
+    """A nurse's '$42 an hour' goes in as her wording, with no yearly floor
+    to block her own salary field."""
+    run_intake(_persona("rn"))
+    with pytest.raises(SetupError, match="hourly pay goes in the person's own words"):
+        build_answer_bank(
+            {"comp_expectation": {"policy": "number", "amount": 42, "unit": "hourly"}}
+        )
+    with pytest.raises(SetupError, match="leave it out for hourly pay"):
+        build_answer_bank(
+            {
+                "comp_expectation": {
+                    "policy": "text",
+                    "text": "$42 an hour",
+                    "unit": "hourly",
+                    "floor": 42,
+                }
+            }
+        )
+    build_answer_bank(
+        {"comp_expectation": {"policy": "text", "text": "$42 an hour", "unit": "hourly"}}
+    )
+    bank = _bank(fresh)
+    entry = next(s for s in bank["screening"] if s["id"] == "comp_expectation")
+    assert entry["answer"] == "$42 an hour" and entry["floor"] is None
+    f = _filters(fresh)
+    # the field is filled, whatever (yearly) range the posting shows
+    for comp_max in (None, 70000, 120000):
+        assert comp_expectation_block("Staff Nurse", comp_max, bank, f) is None, comp_max
+
+
+@pytest.mark.parametrize(
+    "persona, title, location, kept",
+    [
+        # a job that works with students or graduates is not the seat itself
+        ("rn", "Registered Nurse, Student Health Services", "Columbus, OH", True),
+        ("rn", "Staff Nurse - Student Health", "Columbus, OH", True),
+        ("rn", "Clinical Nurse Co-op Preceptor", "Columbus, OH", True),
+        ("rn", "Student Nurse Registered Nurse Extern", "Columbus, OH", False),
+        ("rn", "Registered Nurse Internship", "Columbus, OH", False),
+        ("engineer", "Senior Backend Engineer - Graduate Admissions Platform", "Remote", True),
+        ("engineer", "Senior Software Engineer, Student Loans", "Remote", True),
+        # level I / II with senior, staff, lead or principal is a senior role
+        ("engineer", "Senior Software Engineer II", "Remote", True),
+        ("engineer", "Senior Backend Engineer, Level 2", "Remote", True),
+        ("engineer", "Backend Engineer (Senior) II", "Remote", True),
+        ("engineer", "Software Engineer II", "Remote", False),
+        ("engineer", "Graduate Software Engineer", "Remote", False),
+        ("engineer", "New Grad Backend Engineer", "Remote", False),
+    ],
+)
+def test_the_seniority_floor_excludes_only_the_seat(
+    fresh: Path, persona: str, title: str, location: str, kept: bool
+) -> None:
+    run_intake(_persona(persona))
+    f = _filters(fresh)
+    remote = location == "Remote"
+    reason = _reject_reason(_job(title, location, remote), f)
+    if kept:
+        assert reason is None, (title, reason)
+    else:
+        assert reason is not None and reason.startswith("exclude_title"), (title, reason)
+
+
+def test_a_sales_search_with_a_change_of_field_gets_the_general_prompts(fresh: Path) -> None:
+    """pivot and emphasis are read only by the general prompts, so a teacher
+    moving into SDR work is not scored with the sales career anchors."""
+    answers = {
+        "tracks": [
+            {
+                "name": "Sales Development Representative",
+                "titles": ["Sales Development Representative", "SDR", "BDR"],
+                "pivot": True,
+                "min_score": 50,
+                "emphasis": "classroom results and parent outreach",
+                "said": "moving from teaching into SDR",
+            }
+        ],
+        "locations": {"work_mode": "remote_only", "said": "remote"},
+        "comp": {"default_floor": 55000, "said": "55k"},
+    }
+    out = run_intake(answers)
+    f = _filters(fresh)
+    assert f.prompt_set == "general"
+    assert f.tracks[0].pivot and f.tracks[0].emphasis
+    # still a sales search for the feeds
+    assert f.raw["feeds"]["remotive"]["categories"] != []
+    assert "prompt_set is general" in " ".join(out.split())
+
+
+def test_a_plain_sales_search_keeps_the_sales_prompts(fresh: Path) -> None:
+    run_intake(_persona("sales"))
+    assert _filters(fresh).prompt_set == "sales"
+
+
+def test_searches_also_use_the_example_titles(fresh: Path) -> None:
+    """The feeds and LinkedIn search the titles a track should match too, with
+    seniority words and levels dropped, so discovery is as wide as the filter."""
+    run_intake(_persona("engineer"))
+    f = _filters(fresh)
+    assert f.raw["feeds"]["adzuna"]["keywords"] == [
+        "Backend Engineer",
+        "Software Engineer",
+        "Back-End Engineer",
+        "Backend Developer",
+    ]
+    assert f.linkedin_guest.keywords[:2] == ("Backend Engineer", "Software Engineer")
+
+
+def test_a_written_together_title_matches_its_spaced_and_hyphenated_forms(fresh: Path) -> None:
+    run_intake(_persona("teacher"))
+    f = _filters(fresh)
+    for title in ("eLearning Developer", "E-Learning Developer", "E Learning Developer"):
+        assert f.track_for(title) == "instructional_designer", title
+
+
+def test_the_state_keeps_out_other_towns_of_the_same_name(fresh: Path) -> None:
+    run_intake(_persona("rn"))
+    f = _filters(fresh)
+    title = "Registered Nurse"
+    for place in ("Columbus, OH", "Columbus, Ohio, United States", "Dublin, OH", "Dublin"):
+        assert _reject_reason(_job(title, place, False), f) is None, place
+    # the bucket is the same, so only the state tells these apart
+    assert _reject_reason(_job(title, "Columbus, GA", False), f) == (
+        "location:other-columbus:other-state"
+    )
+    assert (
+        _reject_reason(_job(title, "Dublin, CA", False), f) == "location:other-dublin:other-state"
+    )
+    assert _reject_reason(_job(title, "Dublin, Ireland", False), f) == (
+        "location:other-dublin:outside-us"
+    )
+    # ATS spellings the bucket misses are matched to the allowed place
+    for place in ("Columbus OH", "OH-Columbus", "US-OH-Columbus", "Westerville Ohio"):
+        assert _reject_reason(_job(title, place, False), f) is None, place
+        assert matched_place_bucket(place, f) in {"other-columbus", "other-westerville"}
+    assert _reject_reason(_job(title, "Columbus GA", False), f) is not None
+
+
+def test_a_remote_only_state_is_an_acceptable_restriction(fresh: Path) -> None:
+    answers = _persona("engineer")
+    answers["locations"]["state"] = "OR"
+    run_intake(answers)
+    f = _filters(fresh)
+    assert "Oregon" in f.raw["remote_policy"]["acceptable_geo_restrictions"]
+    assert geo_restriction_acceptable(
+        "must live in Oregon or Washington", f.acceptable_geo_restrictions
+    )
+    assert not f.match_state
+
+
+def test_a_place_filed_under_a_metro_by_its_spelling(fresh: Path) -> None:
+    answers = _persona("rn")
+    answers["locations"]["places"] = ["Mansfield"]
+    answers["locations"]["nearby"] = {}
+    answers["locations"]["commute_minutes"] = {"Mansfield": 10}
+    out = run_intake(answers)
+    assert "jobkit files 'Mansfield' under sf-bay by its spelling" in out
+    f = _filters(fresh)
+    assert f.allowed_locations == ["Mansfield, OH"] and f.match_state
+    assert _reject_reason(_job("Registered Nurse", "Mansfield, OH", False), f) is None
+    assert _reject_reason(_job("Registered Nurse", "San Francisco, CA", False), f) == (
+        "location:sf-bay:other-state"
+    )
+    # without a state the person is told every sf-bay job passes
+    del answers["locations"]["state"]
+    out = run_intake(answers)
+    assert "'Mansfield' has no state" in out
+
+
+def test_without_match_state_places_match_by_town_as_before(fresh: Path) -> None:
+    f = Filters(raw={"filters": {"locations": {"allowed": ["Columbus, OH"]}}})
+    assert not f.match_state
+    assert _reject_reason(_job("Registered Nurse", "Columbus, GA", False), f) is None
+    assert _reject_reason(_job("Registered Nurse", "Columbus OH", False), f) == (
+        "location:other-columbusoh"
+    )
+
+
+# ---- places across a state line, and a state given as a place ----
+
+
+def test_a_nearby_town_can_carry_its_own_state(fresh: Path) -> None:
+    """A kept town across a state line ('Covington, KY' near Cincinnati, OH)
+    keeps its own state, so match_state lets its postings in; a bare nearby
+    town gets the home state, and the note names each one."""
+    answers = _persona("rn")
+    answers["locations"].update(
+        places=["Cincinnati"],
+        state="OH",
+        nearby={"Covington, KY": 15, "Mason": 25},
+        commute_minutes={"Cincinnati": 15},
+    )
+    out = run_intake(answers)
+    f = _filters(fresh)
+    assert f.allowed_locations == ["Cincinnati, OH", "Covington, KY", "Mason, OH"]
+    assert "nearby towns written with your state (OH): Mason." in out
+    for where, reason in (
+        ("Covington, KY", None),
+        ("Covington, GA", "location:other-covington:other-state"),
+        ("Mason, OH", None),
+        ("Mason, MI", "location:other-mason:other-state"),
+    ):
+        assert _reject_reason(_job("Registered Nurse", where, False), f) == reason, where
+    table = read_config_yaml(fresh / "config" / "commute_table.yaml")
+    assert commute_minutes(table, "other-covington") == 15
+
+
+def test_a_nearby_town_in_another_metro_with_no_state_is_left_out(fresh: Path) -> None:
+    answers = _persona("rn")
+    answers["locations"]["state"] = None
+    answers["locations"]["places"] = ["Columbus"]
+    out = run_intake(answers)
+    f = _filters(fresh)
+    assert "Upper Arlington" not in " ".join(f.allowed_locations)
+    assert "nearby town 'Upper Arlington' was left out" in out
+    assert "dc-metro" not in f.accepted_location_buckets
+
+
+@pytest.mark.parametrize("place", ["Ohio", "OH", "Ohio, OH"])
+def test_a_state_is_not_a_place(fresh: Path, place: str) -> None:
+    answers = _persona("rn")
+    answers["locations"].update(places=[place], nearby={}, commute_minutes={})
+    with pytest.raises(SetupError, match="is a state, not a city"):
+        run_intake(answers)
+
+
+def test_the_state_after_a_comma_is_written_as_its_code(fresh: Path) -> None:
+    """A state after the comma in any case or spelling is checked and written
+    back as its two-letter code, in places, nearby towns and commute times."""
+    answers = _persona("rn")
+    answers["locations"].update(
+        places=["Cincinnati, ohio"],
+        state=None,
+        nearby={"Covington, ky": 15, "Newport, Kentucky": 20},
+        commute_minutes={"Cincinnati, oh": 15},
+    )
+    run_intake(answers)
+    f = _filters(fresh)
+    assert f.allowed_locations == ["Cincinnati, OH", "Covington, KY", "Newport, KY"]
+    assert _reject_reason(_job("Registered Nurse", "Covington, KY", False), f) is None
+
+
+def test_a_state_code_check_keeps_dc_and_drops_a_trailing_usa() -> None:
+    from jobkit.onboarding.intake import _with_state_code
+
+    assert _with_state_code("Washington, D.C.", "places") == "Washington, DC"
+    assert _with_state_code("Columbus, OH, USA", "places") == "Columbus, OH"
+    assert _with_state_code("Columbus", "places") == "Columbus"
+
+
+@pytest.mark.parametrize(
+    "where, place",
+    [
+        ("places", "Toronto, ON"),
+        ("places", "Columbus, Ohioo"),
+        ("nearby", "Covington, KY 41011"),
+        ("nearby", "Paris, France"),
+    ],
+)
+def test_a_place_with_a_state_that_is_not_a_us_state_is_refused(
+    fresh: Path, where: str, place: str
+) -> None:
+    answers = _persona("rn")
+    if where == "places":
+        answers["locations"].update(places=[place], nearby={}, commute_minutes={})
+    else:
+        answers["locations"].update(places=["Cincinnati"], nearby={place: 15})
+    with pytest.raises(SetupError, match=rf"locations\.{where}: .* is not a US state"):
+        run_intake(answers)
+
+
+@pytest.mark.parametrize("place", ["New York", "Washington, DC"])
+def test_cities_named_like_states_are_places(fresh: Path, place: str) -> None:
+    answers = _persona("rn")
+    answers["locations"].update(places=[place], state=None, nearby={}, commute_minutes={place: 30})
+    run_intake(answers)
+    assert _filters(fresh).allowed_locations[0].startswith(place.split(",")[0])
+
+
+@pytest.mark.parametrize(
+    "title, expected",
+    [
+        ("Retail Sales Associate", "general"),
+        ("Medical Device Sales Representative", "general"),
+        ("Insurance Sales Agent", "general"),
+        ("Insurance Agent", "general"),
+        ("Medical Device Sales Rep", "general"),
+        ("Solar Sales Consultant", "general"),
+        ("Advertising Sales Executive", "general"),
+        ("Staffing Sales Manager", "general"),
+        ("Account Executive", "sales"),
+        ("Enterprise Account Executive", "sales"),
+        ("Associate Account Executive", "sales"),
+        ("Sales Development Representative", "sales"),
+    ],
+)
+def test_only_software_sales_gets_the_sales_prompts(fresh: Path, title: str, expected: str) -> None:
+    """The sales prompt set scores against SaaS account-executive anchors, so
+    retail, device, insurance, solar, advertising and staffing sales get the
+    general set; an associate-level software AE keeps the sales set."""
+    answers = _persona("sales")
+    answers["tracks"] = [{"name": title, "titles": [title], "said": title}]
+    run_intake(answers)
+    assert _filters(fresh).prompt_set == expected
+
+
+def test_an_agency_partnerships_title_keeps_a_sales_track(fresh: Path) -> None:
+    """'Agency' is not 'agent': a partnerships title in a software sales track
+    does not move the search to the general prompt set."""
+    answers = _persona("sales")
+    titles = ["Agency Partnerships Manager", "Account Executive"]
+    answers["tracks"] = [{"name": titles[0], "titles": titles, "said": titles[0]}]
+    run_intake(answers)
+    assert _filters(fresh).prompt_set == "sales"
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Account Executive",
+        "Enterprise Account Executive",
+        "Associate Account Executive",
+        "Sales Development Representative",
+        "Agency Partnerships Manager",
+        "Account Executive, Automotive",
+        "Account Executive, Retail",
+        "Account Executive, Mortgage Technology",
+        "Customer Success Agent",
+        "Route Optimization Sales Engineer",
+    ],
+)
+def test_software_sales_titles_are_not_read_as_other_selling(title: str) -> None:
+    from jobkit.onboarding.intake import _NOT_SOFTWARE_SALES
+
+    assert _NOT_SOFTWARE_SALES.search(title) is None
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Retail Sales Associate",
+        "Insurance Agent",
+        "Medical Device Sales Rep",
+        "Solar Sales Consultant",
+        "Advertising Sales Executive",
+        "Staffing Sales Manager",
+        "Car Sales Consultant",
+        "Auto Sales Associate",
+        "Route Sales Driver",
+        "Wireless Sales Consultant",
+        "Media Sales Account Executive",
+        "Mortgage Loan Officer",
+        "Mortgage Account Executive",
+        "Wholesale Account Executive",
+        "Wholesale Sales Representative",
+    ],
+)
+def test_other_selling_is_read_as_not_software(title: str) -> None:
+    from jobkit.onboarding.intake import _NOT_SOFTWARE_SALES
+
+    assert _NOT_SOFTWARE_SALES.search(title) is not None

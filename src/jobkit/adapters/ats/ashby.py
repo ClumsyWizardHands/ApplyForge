@@ -74,12 +74,28 @@ class AshbyAdapter:
         return [f.identity for f in spec.fields if f.compliance_type]
 
 
+_SHORT_PERIOD = re.compile(r"HOUR|DAY|WEEK|MONTH|QUARTER", re.I)
+
+
+def _is_annual(interval: Any) -> bool:
+    """Ashby's `interval` is '1 YEAR', '1 HOUR', '1 MONTH' and so on. Only a
+    period shorter than a year disqualifies a range; a missing or other value
+    keeps the earlier reading as annual."""
+    return not (isinstance(interval, str) and _SHORT_PERIOD.search(interval))
+
+
 def _compensation(comp: Any) -> tuple[int | None, int | None, str | None]:
-    """Ashby compensation blob → (min, max, currency) for annual salary if present."""
+    """Ashby compensation blob → (min, max, currency) for an annual salary if
+    present. An hourly, monthly or other non-annual range is left unpublished
+    (None), as the Greenhouse and Lever adapters do: the pay floors are yearly,
+    so $38-52 an hour must not be read as $52 a year."""
     if not isinstance(comp, dict):
         return None, None, None
     for summary in comp.get("summaryComponents") or []:
-        if summary.get("compensationType") == "Salary":
-            lo, hi = summary.get("minValue"), summary.get("maxValue")
-            return (int(lo) if lo else None, int(hi) if hi else None, summary.get("currencyCode"))
+        if summary.get("compensationType") != "Salary":
+            continue
+        if not _is_annual(summary.get("interval")):
+            continue
+        lo, hi = summary.get("minValue"), summary.get("maxValue")
+        return (int(lo) if lo else None, int(hi) if hi else None, summary.get("currencyCode"))
     return None, None, None

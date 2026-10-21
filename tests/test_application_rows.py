@@ -3,13 +3,13 @@ employer's ATS row: a LEFT JOIN applications on the feed row's id showed no
 application.
 
 The aggregator row's apply URL was pointed at the employer's posting before
-staging; mark_submitted recorded an application row at 'submitted' with
-follow-ups; the next nightly poll merged the feed row into its ATS row
-(merged_into events), and the application, its follow-ups and the decision
-moved to the ATS row ('applied'). Nothing was lost, but lookups by the feed
-id (and MCP record_outcome) found nothing. Fixed alongside: mark_submitted now
-leaves exactly ONE application row at 'submitted' with its follow-ups
-(several rows are folded into one), re-tailoring never sets a submitted row
+staging; mark_submitted recorded an application row at 'submitted'; the
+next nightly poll merged the feed row into its ATS row (merged_into events),
+and the application and the decision moved to the ATS row ('applied').
+Nothing was lost, but lookups by the feed id (and MCP record_outcome) found
+nothing. Fixed alongside: mark_submitted now leaves exactly ONE application
+row at 'submitted' (several rows are folded into one), re-tailoring never
+sets a submitted row
 back, an auto-approve never adds a second row, record_outcome follows merges,
 and `jobkit repair-applications [--dry-run]` / MCP repair_applications repair
 rows left inconsistent before. Offline; never a live DB."""
@@ -95,20 +95,9 @@ def _apps(conn: sqlite3.Connection, jid: int) -> list[sqlite3.Row]:
     return conn.execute("SELECT * FROM applications WHERE job_id=? ORDER BY id", (jid,)).fetchall()
 
 
-def _followup_kinds(conn: sqlite3.Connection, jid: int) -> list[str]:
-    return sorted(
-        r[0]
-        for r in conn.execute(
-            "SELECT f.kind FROM followups f JOIN applications a ON a.id=f.application_id "
-            "WHERE a.job_id=?",
-            (jid,),
-        )
-    )
-
-
 def _dump(conn: sqlite3.Connection) -> list[tuple[Any, ...]]:
     out: list[tuple[Any, ...]] = []
-    for t in ("applications", "followups", "jobs", "events"):
+    for t in ("applications", "jobs", "events"):
         out += [tuple(r) for r in conn.execute(f"SELECT * FROM {t} ORDER BY id")]  # noqa: S608
     return out
 
@@ -139,10 +128,9 @@ def test_a_submission_merged_into_the_ats_row_stays_one_submitted_row(
         (feed,),
     ).fetchone()
     assert tuple(row) == ("closed", None)
-    # ... because it all moved to the ATS row: one row, submitted, with follow-ups
+    # ... because it all moved to the ATS row: one row, submitted
     (app,) = _apps(conn, ats)
     assert (app["stage"], app["submitted_at"]) == ("submitted", day)
-    assert _followup_kinds(conn, ats) == ["close_as_ghosted", "status_check"]
     assert conn.execute("SELECT status FROM jobs WHERE id=?", (ats,)).fetchone()[0] == "applied"
     # nothing to repair
     rep = applications.repair(conn, dry_run=True)
@@ -154,7 +142,7 @@ def test_a_submission_merged_into_the_ats_row_stays_one_submitted_row(
     assert len(_apps(conn, ats)) == 1
 
 
-# ---- mark_submitted: exactly one row at 'submitted', with its follow-ups ---------
+# ---- mark_submitted: exactly one row at 'submitted' -------------------------------
 
 
 def test_mark_submitted_folds_two_application_rows_into_one(
@@ -173,26 +161,24 @@ def test_mark_submitted_folds_two_application_rows_into_one(
     assert app["id"] == new and app["stage"] == "submitted"
     assert app["resume_path"] == f"/out/{jid}-tailored/resume.pdf"  # the newest tailoring
     assert app["cover_path"] == "/out/c.pdf"  # taken from the folded row where it had none
-    assert _followup_kinds(conn, jid) == ["close_as_ghosted", "status_check"]
     (ev,) = conn.execute("SELECT detail FROM events WHERE kind='applications_consolidated'")
     detail = json.loads(ev[0])
     assert detail["kept"] == new and [r["id"] for r in detail["removed"]] == [old]
+    assert set(detail) == {"kept", "removed"}
 
 
-def test_a_second_submitted_row_never_doubles_the_follow_ups(
+def test_a_second_row_on_a_submitted_job_is_folded_and_the_date_kept(
     conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     mcp = _mcp(conn, monkeypatch)
     jid = _job(conn, "double")
     first = _app(conn, jid, "submitted", _days_ago(9))
-    applications.schedule_followups(conn, first, 1, datetime.date.fromisoformat(_days_ago(9)))
     _app(conn, jid, "tailored")  # a later approve added another row
     conn.commit()
     out = mcp.mark_submitted(job_ids=str(jid))
     assert f"already marked submitted ({_days_ago(9)})" in out
     (app,) = _apps(conn, jid)
     assert app["id"] == first and app["submitted_at"] == _days_ago(9)
-    assert _followup_kinds(conn, jid) == ["close_as_ghosted", "status_check"]
 
 
 def test_mark_submitted_creates_the_row_when_there_is_none(
@@ -203,18 +189,18 @@ def test_mark_submitted_creates_the_row_when_there_is_none(
     mcp.mark_submitted(job_ids=str(jid), submitted_on=_days_ago(2))
     (app,) = _apps(conn, jid)
     assert (app["stage"], app["submitted_at"]) == ("submitted", _days_ago(2))
-    assert _followup_kinds(conn, jid) == ["close_as_ghosted", "status_check"]
 
 
-def test_an_already_submitted_row_without_follow_ups_gets_them(
+def test_an_already_submitted_row_is_left_as_it_was(
     conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     mcp = _mcp(conn, monkeypatch)
-    jid = _job(conn, "no-followups", status="applied")
+    jid = _job(conn, "already", status="applied")
     _app(conn, jid, "submitted", _days_ago(3))
+    before = _dump(conn)
     out = mcp.mark_submitted(job_ids=str(jid))
-    assert "unchanged; it had no follow-ups: status_check" in out
-    assert _followup_kinds(conn, jid) == ["close_as_ghosted", "status_check"]
+    assert out.endswith(f"already marked submitted ({_days_ago(3)}), unchanged")
+    assert _dump(conn) == before
 
 
 def test_an_auto_approve_never_adds_a_second_row(
@@ -273,15 +259,13 @@ def _broken(conn: sqlite3.Connection) -> dict[str, int]:
     # two rows on one job, one submitted
     ids["dupes"] = _job(conn, "dupes", status="applied")
     _app(conn, ids["dupes"], "approved")
-    sub = _app(conn, ids["dupes"], "submitted", _days_ago(6))
-    applications.schedule_followups(conn, sub, 1, datetime.date.fromisoformat(_days_ago(6)))
-    # a submitted row a re-tailor set back, with its follow-ups
+    _app(conn, ids["dupes"], "submitted", _days_ago(6))
+    # a submitted row a re-tailor set back
     ids["went_back"] = _job(conn, "went-back", status="applied")
-    back = _app(conn, ids["went_back"], "tailored", _days_ago(7))
-    applications.schedule_followups(conn, back, 1, datetime.date.fromisoformat(_days_ago(7)))
-    # a submitted row with no follow-ups, on a job still 'approved'
-    ids["no_followups"] = _job(conn, "no-fu", status="approved")
-    _app(conn, ids["no_followups"], "submitted", _days_ago(8))
+    _app(conn, ids["went_back"], "tailored", _days_ago(7))
+    # a submitted row on a job still 'approved'
+    ids["not_applied"] = _job(conn, "not-applied", status="approved")
+    _app(conn, ids["not_applied"], "submitted", _days_ago(8))
     # an application left on an aggregator row merged into an ATS row
     ids["feed"] = _job(conn, "feed-left", status="closed")
     ids["ats"] = _job(conn, "ats-left", board=1, status="applied")
@@ -290,8 +274,7 @@ def _broken(conn: sqlite3.Connection) -> dict[str, int]:
         "INSERT INTO events (job_id, kind, detail) VALUES (?, 'merged_into', ?)",
         (ids["feed"], json.dumps({"ats_job_id": ids["ats"]})),
     )
-    left = _app(conn, ids["feed"], "submitted", _days_ago(2))
-    applications.schedule_followups(conn, left, 1, datetime.date.fromisoformat(_days_ago(2)))
+    _app(conn, ids["feed"], "submitted", _days_ago(2))
     # 'applied' with no submission on record: listed, never guessed
     ids["unknown"] = _job(conn, "unknown", status="applied")
     conn.commit()
@@ -307,24 +290,23 @@ def test_repair_dry_run_lists_everything_and_changes_nothing(conn: sqlite3.Conne
     assert (ids["lost"], "submission-not-recorded", True) in found
     assert (ids["dupes"], "several-applications", True) in found
     assert (ids["went_back"], "stage-went-back", True) in found
-    assert (ids["no_followups"], "no-followups", True) in found
-    assert (ids["no_followups"], "status-not-applied", True) in found
+    assert (ids["not_applied"], "status-not-applied", True) in found
+    assert not [f for f in rep.findings if "follow" in f.kind or "follow" in f.detail]
     assert (ids["ats"], "application-on-merged-row", True) in found
     assert (ids["unknown"], "applied-without-submission", False) in found
     text = rep.render()
     assert text.startswith("DRY RUN — nothing changed.") and "[needs you]" in text
 
 
-def test_repair_leaves_one_submitted_row_with_follow_ups_everywhere(
+def test_repair_leaves_one_submitted_row_everywhere(
     conn: sqlite3.Connection,
 ) -> None:
     ids = _broken(conn)
     applications.repair(conn)
-    for key in ("lost", "dupes", "went_back", "no_followups", "ats"):
+    for key in ("lost", "dupes", "went_back", "not_applied", "ats"):
         jid = ids[key]
         (app,) = _apps(conn, jid)
         assert app["stage"] == "submitted" and app["submitted_at"], key
-        assert _followup_kinds(conn, jid) == ["close_as_ghosted", "status_check"], key
         assert conn.execute("SELECT status FROM jobs WHERE id=?", (jid,)).fetchone()[0] == (
             "applied"
         ), key
@@ -332,7 +314,7 @@ def test_repair_leaves_one_submitted_row_with_follow_ups_everywhere(
     assert _apps(conn, ids["feed"]) == []
     assert _apps(conn, ids["unknown"]) == []  # never invented
     events = conn.execute("SELECT COUNT(*) FROM events WHERE kind='application_repaired'")
-    assert events.fetchone()[0] >= 6
+    assert events.fetchone()[0] >= 5
     # a second run finds only what needs the human
     again = applications.repair(conn)
     assert [(f.job_id, f.kind) for f in again.findings] == [

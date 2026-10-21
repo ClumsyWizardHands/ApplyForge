@@ -20,6 +20,16 @@ Checks, in order:
   a checkout's own old copy from someone else's;
 * every allowed place has a commute-table entry (a warning only: a hybrid
   posting in a place without one is rejected as sanity:commute:unknown);
+* the scoring prompt set: a warning when `prompt_set` is not set and no
+  track is a sales seat (jobs would be scored against sales examples);
+* how many days without a reply mark an application ghosted, and which
+  setting gave that number (information, never a warning);
+* role tracks still holding the template placeholder (a warning);
+* standing rules whose `title_class` names no track (a warning: such a rule
+  never matches);
+* an enabled keyed feed (Adzuna, USAJOBS) without its keys, and LinkedIn
+  discovery left on the built-in sales keywords for a search with no sales
+  track (warnings);
 * the career corpus and answer bank exist (data/, gitignored);
 * the database is initialized (`jobkit init`);
 * the MCP server is registered for this checkout (.mcp.json);
@@ -376,6 +386,184 @@ def check_commute_coverage(env: Env) -> Check | None:
     )
 
 
+# ---- targeting: prompt set, tracks, standing rules, feeds ----
+
+PLACEHOLDER_TRACK_ID = "my_role"
+PLACEHOLDER_REGEX_TEXT = "REPLACE ME"
+FEED_KEYS = {
+    "adzuna": ("ADZUNA_APP_ID", "ADZUNA_APP_KEY"),
+    "usajobs": ("USAJOBS_API_KEY", "USAJOBS_USER_AGENT_EMAIL"),
+}
+
+
+def _filters(env: Env) -> config.Filters | None:
+    """The checkout's filters.yaml, or None when it is missing or does not
+    load (check_config_files reports that)."""
+    path = env.root / "config" / "filters.yaml"
+    if not path.is_file():
+        return None
+    try:
+        return config.load_filters(path)
+    except Exception:  # noqa: BLE001 — check_config_files reports it
+        return None
+
+
+def check_prompt_set(env: Env) -> Check | None:
+    """Which scoring prompts score jobs. No warning for a sales search without
+    prompt_set: that is the original setup and its scores must not move."""
+    filters = _filters(env)
+    if filters is None:
+        return None
+    steers = [t.id for t in filters.tracks if t.pivot or t.emphasis]
+    if filters.prompt_set == "sales" and steers:
+        return Check(
+            "prompt set",
+            False,
+            f"track(s) {', '.join(steers)} set pivot or emphasis, but the sales prompts "
+            "ignore both; only prompt_set: general reads them",
+            "put this line at the top of config/filters.yaml:\nprompt_set: general\n"
+            "then run `uv run jobkit rescore` so queued jobs are scored again",
+            required=False,
+        )
+    if filters.prompt_set_explicit:
+        return Check("prompt set", True, f"prompt_set: {filters.prompt_set}")
+    if filters.has_sales_track:
+        return Check(
+            "prompt set", True, "sales (prompt_set is not set; your tracks are sales roles)"
+        )
+    return Check(
+        "prompt set",
+        False,
+        "prompt_set is not set, so jobs are scored against examples from sales careers",
+        "add this line at the top of config/filters.yaml:\nprompt_set: general\n"
+        "then run `uv run jobkit rescore` so queued jobs are scored again with it",
+        required=False,
+    )
+
+
+def check_ghost_after(env: Env) -> Check | None:
+    """Information only: the days without a reply before a submitted
+    application is marked ghosted, and where the number comes from."""
+    filters = _filters(env)
+    if filters is None:
+        return None
+    ghost = filters.ghost_after
+    where = {
+        "tracking": "tracking.ghost_after_days",
+        "followups": "the close_as_ghosted entry of the followups block in config/filters.yaml",
+        "default": "the default",
+    }[ghost.source]
+    return Check(
+        "no-reply rule",
+        True,
+        f"a submitted application with no reply after {ghost.days} days is marked "
+        f"ghosted ({where})",
+    )
+
+
+def check_tracks(env: Env) -> Check | None:
+    """A track still holding the template placeholder matches no real title."""
+    filters = _filters(env)
+    if filters is None:
+        return None
+    placeholders = [
+        t.id
+        for t in filters.tracks
+        if t.id == PLACEHOLDER_TRACK_ID or PLACEHOLDER_REGEX_TEXT in t.title_regex
+    ]
+    if not placeholders:
+        return Check("role tracks", True, ", ".join(filters.track_ids) or "none defined")
+    return Check(
+        "role tracks",
+        False,
+        f"track(s) {', '.join(placeholders)} still hold the template placeholder",
+        f"{INTERVIEW}\nor edit filters.tracks in config/filters.yaml: give each track an id "
+        "and a title_regex for the titles you want",
+        required=False,
+    )
+
+
+def check_title_classes(env: Env) -> Check | None:
+    """Every standing rule's title_class names a track id."""
+    from jobkit.rules import title_classes_in, unknown_title_classes
+
+    filters = _filters(env)
+    path = env.root / "config" / "autoapprove.yaml"
+    if filters is None or not path.is_file():
+        return None
+    try:
+        rules = config.read_config_yaml(path)
+    except Exception:  # noqa: BLE001 — check_config_files reports it
+        return None
+    if not isinstance(rules, dict):
+        return None
+    unknown = unknown_title_classes(rules, filters)
+    if not unknown:
+        named = title_classes_in(rules)
+        return Check(
+            "standing rules",
+            True,
+            "title_class values name tracks: " + ", ".join(named) if named else "no title_class",
+        )
+    return Check(
+        "standing rules",
+        False,
+        f"title_class {', '.join(unknown)} in config/autoapprove.yaml names no track, so "
+        "those rules never match",
+        f"use a track id from config/filters.yaml ({', '.join(filters.track_ids) or 'none'}) "
+        "or remove the rule",
+        required=False,
+    )
+
+
+def check_feeds(env: Env) -> list[Check]:
+    """Enabled keyed feeds have their keys; LinkedIn discovery is not left on
+    the built-in sales keywords for a search that has no sales track."""
+    filters = _filters(env)
+    if filters is None:
+        return []
+    feeds = filters.raw.get("feeds") or {}
+    if not isinstance(feeds, dict):
+        return []
+    out: list[Check] = []
+    for feed, keys in FEED_KEYS.items():
+        cfg = feeds.get(feed)
+        if not isinstance(cfg, dict) or not cfg.get("enabled"):
+            continue
+        missing = [k for k in keys if not str(env.environ.get(k, "")).strip()]
+        if missing:
+            out.append(
+                Check(
+                    f"{feed} feed",
+                    False,
+                    f"enabled, but {' and '.join(missing)} not set: the feed is skipped",
+                    "put " + " and ".join(f"{k}=..." for k in missing) + " in .env "
+                    f"(see .env.example), or set feeds.{feed}.enabled: false",
+                    required=False,
+                )
+            )
+        else:
+            out.append(Check(f"{feed} feed", True, "enabled, keys set"))
+    li = feeds.get("linkedin_guest")
+    if (
+        isinstance(li, dict)
+        and li.get("enabled") is True
+        and "keywords" not in li
+        and not filters.has_sales_track
+    ):
+        out.append(
+            Check(
+                "linkedin discovery",
+                False,
+                "enabled with no keywords, so it searches the built-in sales keywords",
+                "add feeds.linkedin_guest.keywords to config/filters.yaml: up to "
+                f"{config.LINKEDIN_MAX_KEYWORDS} job titles you want",
+                required=False,
+            )
+        )
+    return out
+
+
 def check_data_files(env: Env) -> list[Check]:
     out: list[Check] = []
     for name, what in DATA_FILES:
@@ -467,6 +655,11 @@ def run_checks(env: Env | None = None) -> Report:
         check_hidden_pth,
         check_config_files,
         check_commute_coverage,
+        check_prompt_set,
+        check_ghost_after,
+        check_tracks,
+        check_title_classes,
+        check_feeds,
         check_data_files,
         check_db,
         check_mcp,

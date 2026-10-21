@@ -1,0 +1,26 @@
+# TEST PERSONA (fictional): interview answers for a middle school teacher
+# moving into instructional design, hybrid around Indianapolis. Read by
+# tests/test_onboarding_intake.py with teacher.txt as the resume.
+tracks:
+  - name: Instructional Designer
+    titles:
+      - Instructional Designer
+      - Learning Designer
+      - eLearning Developer
+      - Curriculum Designer
+      - Instructional Technologist
+    should_match: [Senior Learning Designer, "Instructional Designer, K-12"]
+    pivot: true
+    min_score: 50
+    emphasis: "curriculum I designed and the Canvas modules I built"
+    comp_floor: 65000
+    said: "instructional design, it's a change from teaching"
+locations:
+  work_mode: hybrid
+  places: [Indianapolis]
+  state: Indiana
+  max_office_days_per_week: 2
+  max_commute_minutes: 35
+  commute_minutes: { Indianapolis: 20 }
+  said: "remote, or hybrid in Indianapolis twice a week"
+comp: { default_floor: 60000, said: "60k at least" }

@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
@@ -96,14 +96,205 @@ class Track:
     `active` (filters.yaml `active:`, default true) is whether the track is
     pursued. A paused track still classifies — track_for returns it — so its
     floor, standing-rule class, scoring and tailoring emphasis keep working;
-    only the filter treats its titles differently (Filters.paused_track_for)."""
+    only the filter treats its titles differently (Filters.paused_track_for).
+
+    Optional, all absent by default (absent keeps the behaviour from before
+    they existed):
+    * `pivot` (default false): the person is moving into this kind of role
+      from other work. Under prompt_set general the fit scorer reads it as a
+      career change (prompts/score_fit_general.md).
+    * `min_score` (0-100): this track's queue gate, in place of
+      gates.min_score_to_surface (Filters.min_score_for).
+    * `emphasis`: one line, at most 200 characters, in the person's words:
+      what should lead the resume for this track (tailoring)."""
 
     id: str
     title_regex: str
     active: bool = True
+    pivot: bool = False
+    min_score: int | None = None
+    emphasis: str | None = None
 
     def matches(self, title: str) -> bool:
         return re.search(self.title_regex, title) is not None
+
+
+TRACK_EMPHASIS_MAX = 200
+
+# ---- prompt sets ----
+# `prompt_set` (top level of filters.yaml) picks the scoring prompt family.
+# Absent means "sales": the original prompts, unchanged. "general" uses the
+# field-neutral prompts (prompts/score_fit_general.md, ...).
+PROMPT_SETS = ("sales", "general")
+PromptSet = Literal["sales", "general"]
+
+# A track that reads as a sales seat, by its id or title regex. Used only to
+# decide whether a missing prompt_set deserves a doctor warning.
+_SALES_TRACK = re.compile(
+    r"(?i)sales|account.?executive|\bae\b|\bsdr\b|\bbdr\b|business.?development"
+)
+
+# ---- application tracking ----
+GHOST_AFTER_DAYS_DEFAULT = 30
+_LEGACY_GHOST_KIND = "close_as_ghosted"
+
+
+@dataclass(frozen=True)
+class GhostAfter:
+    """How many days after submission an application with no recorded
+    response is marked ghosted, and where that number came from:
+    "tracking" (tracking.ghost_after_days), "followups" (the legacy
+    `followups:` block's close_as_ghosted entry) or "default"."""
+
+    days: int
+    source: str
+
+
+# ---- comp sanity knobs (filters.yaml `comp_sanity:`, the one owner) ----
+COMP_SANITY_OTE_CHECKS = ("always", "ote_tracks")
+
+
+@dataclass(frozen=True)
+class CompSanity:
+    """`comp_sanity` in filters.yaml. Every default is the value the sanity
+    layer used before these were knobs, so a block without them behaves as
+    before.
+
+    * max_range_width_pct (0.6): a wider published range is "range-dodge".
+    * flag_missing_range_when_required (true): "no-range-where-required".
+    * underpriced_below (160000): with demand 75+, a published ceiling under
+      this is "underpriced".
+    * ote_unclear_from (200000): a published ceiling at or above this whose
+      base-vs-OTE basis is unclear is "ote-basis-unclear".
+    * ote_check ("always"): "ote_tracks" raises the two OTE flags
+      (ote-unrealistic, ote-basis-unclear) only for titles whose comp floor
+      basis is ote; "always" raises them for every title."""
+
+    max_range_width_pct: float = 0.6
+    flag_missing_range_when_required: bool = True
+    underpriced_below: int = 160000
+    ote_unclear_from: int = 200000
+    ote_check: str = "always"
+
+
+def _money(value: Any, key: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"comp_sanity.{key} must be a whole number >= 0, got {value!r}")
+    return value
+
+
+def parse_comp_sanity(cfg: Any) -> CompSanity:
+    """Validate `comp_sanity`. Absent or empty: the defaults. The two older
+    keys are read exactly as the sanity layer always read them (a number, and
+    a truthy value); the new keys are checked strictly."""
+    if cfg is None:
+        cfg = {}
+    if not isinstance(cfg, dict):
+        raise ValueError("comp_sanity must be a mapping")
+    d = CompSanity()
+    ote_check = cfg.get("ote_check", d.ote_check)
+    if ote_check not in COMP_SANITY_OTE_CHECKS:
+        raise ValueError(
+            f"comp_sanity.ote_check must be one of {list(COMP_SANITY_OTE_CHECKS)}, "
+            f"got {ote_check!r}"
+        )
+    return CompSanity(
+        max_range_width_pct=float(cfg.get("max_range_width_pct", d.max_range_width_pct)),
+        flag_missing_range_when_required=bool(
+            cfg.get("flag_missing_range_when_required", d.flag_missing_range_when_required)
+        ),
+        underpriced_below=_money(
+            cfg.get("underpriced_below", d.underpriced_below), "underpriced_below"
+        ),
+        ote_unclear_from=_money(
+            cfg.get("ote_unclear_from", d.ote_unclear_from), "ote_unclear_from"
+        ),
+        ote_check=str(ote_check),
+    )
+
+
+# ---- location keys of the two all-industry feeds (read by pipeline/feeds.py) ----
+
+
+@dataclass(frozen=True)
+class AdzunaPlace:
+    """One `feeds.adzuna.locations` entry: Adzuna's documented `where` (a place
+    name, "Columbus, OH") and `distance` in kilometres."""
+
+    where: str
+    distance_km: int
+
+
+@dataclass(frozen=True)
+class UsajobsPlace:
+    """One `feeds.usajobs.locations` entry: USAJOBS's documented
+    `LocationName` and `Radius` in miles."""
+
+    name: str
+    radius_miles: int
+
+
+def _feed_places(cfg: Any, feed: str) -> list[dict[str, Any]]:
+    if cfg is None:
+        return []
+    if not isinstance(cfg, dict):
+        raise ValueError(f"feeds.{feed} must be a mapping")
+    raw = cfg.get("locations")
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or not all(isinstance(p, dict) for p in raw):
+        raise ValueError(f"feeds.{feed}.locations must be a list of mappings")
+    return raw
+
+
+def _radius(value: Any, key: str, default: int) -> int:
+    value = default if value is None else value
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 500:
+        raise ValueError(f"{key} must be a whole number 0-500, got {value!r}")
+    return value
+
+
+def parse_adzuna_locations(cfg: Any) -> tuple[AdzunaPlace, ...]:
+    """`feeds.adzuna.locations` ([{where, distance_km}]); absent: (), which
+    keeps the location-free request. distance_km defaults to 40."""
+    out: list[AdzunaPlace] = []
+    for i, p in enumerate(_feed_places(cfg, "adzuna")):
+        where = str(p.get("where") or "").strip()
+        if not where:
+            raise ValueError(f"feeds.adzuna.locations[{i}] needs a where")
+        out.append(
+            AdzunaPlace(
+                where, _radius(p.get("distance_km"), f"feeds.adzuna.locations[{i}].distance_km", 40)
+            )
+        )
+    return tuple(out)
+
+
+def parse_adzuna_country(cfg: Any) -> str:
+    """`feeds.adzuna.country`: Adzuna's two-letter country path segment
+    (default "us")."""
+    value = (cfg or {}).get("country", "us") if isinstance(cfg, dict) else "us"
+    text = str(value or "us").strip().lower()
+    if not re.fullmatch(r"[a-z]{2}", text):
+        raise ValueError(f"feeds.adzuna.country must be a two-letter code, got {value!r}")
+    return text
+
+
+def parse_usajobs_locations(cfg: Any) -> tuple[UsajobsPlace, ...]:
+    """`feeds.usajobs.locations` ([{name, radius_miles}]); absent: (), which
+    keeps the location-free request. radius_miles defaults to 25."""
+    out: list[UsajobsPlace] = []
+    for i, p in enumerate(_feed_places(cfg, "usajobs")):
+        name = str(p.get("name") or "").strip()
+        if not name:
+            raise ValueError(f"feeds.usajobs.locations[{i}] needs a name")
+        out.append(
+            UsajobsPlace(
+                name,
+                _radius(p.get("radius_miles"), f"feeds.usajobs.locations[{i}].radius_miles", 25),
+            )
+        )
+    return tuple(out)
 
 
 @dataclass(frozen=True)
@@ -358,6 +549,14 @@ class Filters(BaseModel):
         share = self.ote_base_share
         if not 0 < share <= 1:
             raise ValueError(f"filters.comp.ote_base_share must be in (0, 1], got {share}")
+        # the newer keys fail at load too; each is a no-op when absent
+        _ = (self.prompt_set, self.ghost_after, self.comp_sanity)
+        feeds = self.raw.get("feeds")
+        if isinstance(feeds, dict):
+            # adzuna.country is not checked here: it was written by older
+            # templates and never read, so a stale value must not break a load
+            parse_adzuna_locations(feeds.get("adzuna"))
+            parse_usajobs_locations(feeds.get("usajobs"))
         return self
 
     def _filters(self) -> dict[str, Any]:
@@ -390,8 +589,181 @@ class Filters(BaseModel):
                     f"filters.tracks[{t['id']}].hold_regex is no longer supported: a paused "
                     "track holds every title whose first matching track it is"
                 )
-            out.append(Track(id=str(t["id"]), title_regex=str(t["title_regex"]), active=active))
+            out.append(
+                Track(
+                    id=str(t["id"]),
+                    title_regex=str(t["title_regex"]),
+                    active=active,
+                    **self._track_options(t),
+                )
+            )
         return out
+
+    @staticmethod
+    def _track_options(t: dict[str, Any]) -> dict[str, Any]:
+        """The optional per-track keys (pivot, min_score, emphasis), checked.
+        Only the keys present are returned, so an absent key keeps the
+        dataclass default."""
+        tid = t["id"]
+        out: dict[str, Any] = {}
+        if "pivot" in t:
+            if not isinstance(t["pivot"], bool):
+                raise ValueError(f"filters.tracks[{tid}].pivot must be true or false")
+            out["pivot"] = t["pivot"]
+        if t.get("min_score") is not None:
+            v = t["min_score"]
+            if isinstance(v, bool) or not isinstance(v, int) or not 0 <= v <= 100:
+                raise ValueError(
+                    f"filters.tracks[{tid}].min_score must be a whole number 0-100, got {v!r}"
+                )
+            out["min_score"] = v
+        if t.get("emphasis") is not None:
+            text = str(t["emphasis"]).strip()
+            if "\n" in text or len(text) > TRACK_EMPHASIS_MAX:
+                raise ValueError(
+                    f"filters.tracks[{tid}].emphasis must be one line of at most "
+                    f"{TRACK_EMPHASIS_MAX} characters"
+                )
+            if text:
+                out["emphasis"] = text
+        return out
+
+    def track(self, track_id: str | None) -> Track | None:
+        """The track with this id, or None (also for None)."""
+        for t in self.tracks:
+            if t.id == track_id:
+                return t
+        return None
+
+    def track_of(self, title: str) -> Track | None:
+        """The title's track (first match, as track_for), or None."""
+        return self.track(self.track_for(title))
+
+    @property
+    def track_ids(self) -> list[str]:
+        return [t.id for t in self.tracks]
+
+    @property
+    def has_sales_track(self) -> bool:
+        """Whether any track reads as a sales seat (by its id or title regex).
+        doctor uses it: a sales search without prompt_set is the original
+        setup and needs no warning."""
+        return any(
+            _SALES_TRACK.search(t.id) or _SALES_TRACK.search(t.title_regex) for t in self.tracks
+        )
+
+    # ---- prompt set ----
+
+    @property
+    def prompt_set(self) -> PromptSet:
+        """Top-level `prompt_set`: "sales" (also when absent) or "general".
+        Any other value fails loudly."""
+        value = self.raw.get("prompt_set")
+        if value is None:
+            return "sales"
+        if value not in PROMPT_SETS:
+            raise ValueError(f"prompt_set must be one of {list(PROMPT_SETS)}, got {value!r}")
+        return cast(PromptSet, value)
+
+    @property
+    def prompt_set_explicit(self) -> bool:
+        """Whether filters.yaml names a prompt_set at all."""
+        return self.raw.get("prompt_set") is not None
+
+    # ---- queue gate per track ----
+
+    def min_score_for(self, track_id: str | None) -> int:
+        """The queue gate for a job on this track: the track's min_score when
+        it sets one, else gates.min_score_to_surface. None (no track) gets the
+        global gate."""
+        t = self.track(track_id)
+        if t is not None and t.min_score is not None:
+            return t.min_score
+        return self.min_score_to_surface
+
+    def min_score_for_title(self, title: str) -> int:
+        """min_score_for the title's track."""
+        return self.min_score_for(self.track_for(title))
+
+    @property
+    def has_track_min_scores(self) -> bool:
+        return any(t.min_score is not None for t in self.tracks)
+
+    # ---- application tracking ----
+
+    @property
+    def ghost_after(self) -> GhostAfter:
+        """Days after submission with no recorded response before an
+        application is marked ghosted. tracking.ghost_after_days (1-365) wins;
+        without it, the close_as_ghosted entry of a legacy top-level
+        `followups:` block (its days_after_submit); else 30."""
+        tracking = self.raw.get("tracking")
+        if tracking is not None and not isinstance(tracking, dict):
+            raise ValueError("tracking must be a mapping")
+        if isinstance(tracking, dict) and tracking.get("ghost_after_days") is not None:
+            v = tracking["ghost_after_days"]
+            if isinstance(v, bool) or not isinstance(v, int) or not 1 <= v <= 365:
+                raise ValueError(
+                    f"tracking.ghost_after_days must be a whole number 1-365, got {v!r}"
+                )
+            return GhostAfter(v, "tracking")
+        legacy = self.raw.get("followups")
+        if isinstance(legacy, list):
+            # read leniently: this block is no longer the owner of anything else
+            for entry in legacy:
+                if isinstance(entry, dict) and entry.get("kind") == _LEGACY_GHOST_KIND:
+                    try:
+                        days = int(entry.get("days_after_submit"))  # type: ignore[arg-type]
+                    except (TypeError, ValueError):
+                        continue
+                    if days >= 1:
+                        return GhostAfter(days, "followups")
+        return GhostAfter(GHOST_AFTER_DAYS_DEFAULT, "default")
+
+    @property
+    def ghost_after_days(self) -> int:
+        return self.ghost_after.days
+
+    @property
+    def email_check(self) -> bool:
+        """tracking.email_check: whether the unattended scheduled run reads the
+        person's mailbox (read-only) for employer replies. Off when absent, so
+        a config written before this key existed keeps its scheduled run as it
+        was. Asking Claude to check email works either way."""
+        tracking = self.raw.get("tracking")
+        if tracking is not None and not isinstance(tracking, dict):
+            raise ValueError("tracking must be a mapping")
+        v = (tracking or {}).get("email_check")
+        if v is None:
+            return False
+        if not isinstance(v, bool):
+            raise ValueError(f"tracking.email_check must be true or false, got {v!r}")
+        return v
+
+    # ---- comp sanity ----
+
+    @property
+    def comp_sanity(self) -> CompSanity:
+        """`comp_sanity` (the sanity layer's knobs), with today's defaults."""
+        return parse_comp_sanity(self.raw.get("comp_sanity"))
+
+    # ---- feed locations (pipeline/feeds.py) ----
+
+    def _feed(self, name: str) -> Any:
+        feeds = self.raw.get("feeds") or {}
+        return feeds.get(name) if isinstance(feeds, dict) else None
+
+    @property
+    def adzuna_locations(self) -> tuple[AdzunaPlace, ...]:
+        return parse_adzuna_locations(self._feed("adzuna"))
+
+    @property
+    def adzuna_country(self) -> str:
+        return parse_adzuna_country(self._feed("adzuna"))
+
+    @property
+    def usajobs_locations(self) -> tuple[UsajobsPlace, ...]:
+        return parse_usajobs_locations(self._feed("usajobs"))
 
     def track_for(self, title: str) -> str | None:
         """The id of the first track whose title_regex matches, or None.
@@ -547,6 +919,58 @@ class Filters(BaseModel):
             )
         return value
 
+    @property
+    def match_state(self) -> bool:
+        """`filters.locations.match_state` (default false). When true, a
+        posting in an allowed place's town must also be in that place's state:
+        with "Columbus, OH" allowed, "Columbus, GA" and "Dublin, Ireland" are
+        rejected, and "Columbus OH" or "US-OH-Columbus" are accepted
+        (pipeline/filter.py). It applies only to places written with a state
+        and outside the named metros. Absent, places match by town name, as
+        before."""
+        value = self._locations().get("match_state", False)
+        if not isinstance(value, bool):
+            raise ValueError(f"filters.locations.match_state must be true or false, got {value!r}")
+        return value
+
+    @property
+    def state_places(self) -> tuple[tuple[str, frozenset[str], str], ...]:
+        """(town, states, location bucket) for each allowed place and
+        relocation city written with a US state ("Columbus, OH"), outside the
+        named metros. Read only when match_state is on."""
+        from jobkit.autofill.options import states_in
+
+        out: list[tuple[str, frozenset[str], str]] = []
+        for place in self.allowed_locations + self.relocation_cities:
+            bucket = location_bucket(place, False)
+            states = states_in(place)
+            town = place.split(",")[0].strip()
+            if bucket.startswith("other-") and states and town and not states_in(town):
+                out.append((town, states, bucket))
+        return tuple(out)
+
+    def bucket_states(self, bucket: str) -> frozenset[str] | None:
+        """The states a posting in `bucket` must name, when every allowed place
+        or relocation city in that bucket gives one; None when any of them
+        names no state. A named metro is checked only when every place filed
+        under it is outside the metro's own states (normalize.METRO_STATES:
+        "Mansfield, OH" in sf-bay); "Brooklyn, NY" keeps the whole metro."""
+        from jobkit.autofill.options import states_in
+        from jobkit.normalize import METRO_STATES
+
+        if bucket.startswith("remote"):
+            return None
+        metro = METRO_STATES.get(bucket)
+        states: set[str] = set()
+        for place in self.allowed_locations + self.relocation_cities:
+            if location_bucket(place, False) != bucket:
+                continue
+            named = states_in(place)
+            if not named or (metro is not None and named & metro):
+                return None
+            states |= named
+        return frozenset(states) or None
+
     @staticmethod
     def _place_buckets(places: list[str]) -> frozenset[str]:
         """Each place's location bucket, from normalize.location_bucket — the
@@ -641,7 +1065,9 @@ class Filters(BaseModel):
     def min_score_to_surface(self) -> int:
         """`gates.min_score_to_surface` (default 65): the queue gate. A scored
         job at or above it is queued, one below it is rejected
-        (score_below_surface). Read by triage.run_queue and pipeline/rescore."""
+        (score_below_surface). A track's own `min_score` replaces it for that
+        track's jobs: triage.run_queue and pipeline/rescore read the gate
+        through min_score_for."""
         gates = self.raw.get("gates") or {}
         value = gates.get("min_score_to_surface", 65) if isinstance(gates, dict) else 65
         return int(value)

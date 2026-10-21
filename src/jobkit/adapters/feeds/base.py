@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -9,6 +10,15 @@ import httpx
 
 from jobkit.contact import user_agent
 from jobkit.models import NormalizedJob
+
+
+@dataclass(frozen=True)
+class SearchPlace:
+    """One place to search around. `radius` is in the feed's own unit:
+    kilometres for Adzuna (`distance`), miles for USAJOBS (`Radius`)."""
+
+    name: str
+    radius: int
 
 
 @dataclass(frozen=True)
@@ -22,6 +32,18 @@ class SearchSpec:
     # filter would keep. None = no source-side salary filter.
     salary_min: int | None = None
     extra: dict[str, str] = field(default_factory=dict)
+    # places to search around (feeds.<feed>.locations). Empty: the feed sends
+    # the same location-free request it always has.
+    locations: tuple[SearchPlace, ...] = ()
+    # Adzuna's country path segment (feeds.adzuna.country)
+    country: str = "us"
+
+
+def missing_keys(feed: object) -> list[str]:
+    """The environment variables a key-gated feed needs and does not have.
+    A feed declares them as `key_env`; one without that attribute needs none."""
+    names: tuple[str, ...] = getattr(feed, "key_env", ())
+    return [n for n in names if not os.environ.get(n)]
 
 
 class FeedAdapter(Protocol):

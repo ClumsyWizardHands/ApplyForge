@@ -1,13 +1,13 @@
-"""One application row per job, and a submission that always leaves it at
-stage 'submitted' with its follow-ups.
+"""One application row per job, a submission that always leaves it at
+stage 'submitted', and the no-reply rule that marks it 'ghosted'.
 
 Diagnosis (2026-10-15, read only): an aggregator row (Himalayas, Adzuna)
 whose apply URL was pointed at the employer's posting before staging
 (apply_url_resolved events) was marked submitted (a marked_submitted event:
-an application row at stage 'submitted' with its follow-ups). The next
+an application row at stage 'submitted'). The next
 nightly poll of the employer's board found the feed row naming its posting
 and merged it into the ATS row (pipeline/dedup.merge_feed_row: a merged_into
-event): the application row, its follow-ups and the human decision moved to
+event): the application row and the human decision moved to
 the ATS row, which is 'applied'; the feed row was closed. Nothing was lost,
 but a lookup by the feed row's id (a LEFT JOIN from the feed row, or MCP
 record_outcome on its id) found no application, so the submission looked
@@ -17,8 +17,7 @@ Paths that could really leave a submitted job without one 'submitted'
 application row, fixed here and in their callers:
 * mark_submitted read only the newest application row: a job with two rows
   (an auto-approve that inserted a second one, a merge) got the newest
-  marked and the older left as it was, or a second submission and a second
-  set of follow-ups;
+  marked and the older left as it was, or a second submission;
 * re-tailoring a submitted job (`jobkit tailor --job-id N`, MCP retailor)
   set the newest row's stage back to 'tailored' or 'approved';
 * record_outcome did not follow a merged feed row to its ATS row.
@@ -27,9 +26,16 @@ record_submission is what MCP mark_submitted runs. repair (CLI `jobkit
 repair-applications [--dry-run]`, MCP repair_applications) finds and fixes
 rows left inconsistent before this: a recorded submission with no submitted
 application, several application rows on one job, a submitted row whose
-stage went back, a submitted row with no follow-ups, and an application left
-on a merged feed row. A job marked 'applied' with no record of when it was
-submitted is reported, never invented."""
+stage went back, and an application left on a merged feed row. A job marked
+'applied' with no record of when it was submitted is reported, never
+invented.
+
+close_ghosted is the no-reply rule, run as the 'ghost-close' stage of run-all
+and the nightly run: an application still at stage 'submitted', with no
+response on record, submitted `tracking.ghost_after_days` or more days ago
+(config/filters.yaml, default 30) moves to stage 'ghosted'. It is plain
+bookkeeping, with no LLM. A response recorded later (MCP record_outcome or
+record_email_response) moves it on from 'ghosted'."""
 
 from __future__ import annotations
 
@@ -42,9 +48,10 @@ from typing import Any
 from jobkit import db as q
 from jobkit.log import log
 from jobkit.pipeline.dedup import follow_merges
-from jobkit.track.followups import Scheduled, schedule_followups
 
 SUBMITTED = "submitted"
+GHOSTED = "ghosted"
+GHOSTED_EVENT = "application_ghosted"
 # stages before a submission: a row with submitted_at in one went backwards
 PRE_SUBMIT_STAGES = ("approved", "tailored", "staged")
 # a job status a submitted application corrects to 'applied'
@@ -54,13 +61,6 @@ _PATHS = ("resume_path", "cover_path", "gap_report_path", "provenance_path")
 
 def _rows(conn: sqlite3.Connection, job_id: int) -> list[dict[str, Any]]:
     return [dict(r) for r in conn.execute(q.APPLICATIONS_OF_JOB, {"job_id": job_id})]
-
-
-def _followups(conn: sqlite3.Connection, application_id: int) -> list[dict[str, Any]]:
-    return [
-        dict(r)
-        for r in conn.execute(q.FOLLOWUPS_OF_APPLICATION, {"application_id": application_id})
-    ]
 
 
 def _keeper(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -77,9 +77,8 @@ def consolidate(
 ) -> tuple[dict[str, Any] | None, list[int]]:
     """Fold a job's application rows into one: (the row kept, the ids folded
     into it). The kept row takes the others' artifact paths where it has
-    none and their follow-ups of kinds it lacks; their other follow-ups and
-    the rows themselves are deleted, and an 'applications_consolidated'
-    event keeps every removed row and follow-up as it was."""
+    none; the other rows are deleted, and an 'applications_consolidated'
+    event keeps every removed row as it was."""
     rows = _rows(conn, job_id)
     if len(rows) <= 1:
         return (rows[0] if rows else None), []
@@ -87,19 +86,8 @@ def consolidate(
     others = [r for r in rows if r["id"] != keep["id"]]
     if dry_run:
         return keep, [int(r["id"]) for r in others]
-    kinds = {f["kind"] for f in _followups(conn, int(keep["id"]))}
-    moved: list[dict[str, Any]] = []
-    dropped: list[dict[str, Any]] = []
     for r in sorted(others, key=lambda r: int(r["id"]), reverse=True):  # newest paths first
         conn.execute(q.FILL_APPLICATION_PATHS, {"id": keep["id"], **{k: r[k] for k in _PATHS}})
-        for f in _followups(conn, int(r["id"])):
-            if f["kind"] in kinds:
-                dropped.append(f)
-                conn.execute(q.DELETE_FOLLOWUP, {"id": f["id"]})
-            else:
-                kinds.add(f["kind"])
-                moved.append(f)
-                conn.execute(q.MOVE_FOLLOWUP, {"id": f["id"], "application_id": keep["id"]})
         conn.execute(q.DELETE_APPLICATION, {"id": r["id"]})
     conn.execute(
         q.RECORD_EVENT,
@@ -107,12 +95,7 @@ def consolidate(
             "job_id": job_id,
             "kind": "applications_consolidated",
             "detail": json.dumps(
-                {
-                    "kept": keep["id"],
-                    "removed": others,
-                    "followups_moved": moved,
-                    "followups_dropped": dropped,
-                },
+                {"kept": keep["id"], "removed": others},
                 default=str,
             ),
         },
@@ -129,26 +112,15 @@ class Submission:
     application_id: int
     already: bool  # it was marked submitted before: left as it was
     submitted_at: str
-    scheduled: Scheduled
     folded: list[int] = field(default_factory=list)  # application rows folded into it
 
 
-def _day_of(stamp: str) -> datetime.date:
-    return datetime.date.fromisoformat(str(stamp)[:10])
-
-
-def record_submission(
-    conn: sqlite3.Connection,
-    job_id: int,
-    company_id: int | None,
-    day: datetime.date,
-    submitted_at: str,
-) -> Submission:
+def record_submission(conn: sqlite3.Connection, job_id: int, submitted_at: str) -> Submission:
     """The human submitted this job's application (MCP mark_submitted).
     Afterwards the job (followed through merges) has exactly one application
-    row, at stage 'submitted' with submitted_at, and its follow-ups
-    (track/followups.py). Already submitted: its date and stage stay, and
-    follow-ups are scheduled only if it has none at all. The caller commits."""
+    row, at stage 'submitted' with submitted_at. Already submitted: its date
+    stays, and a stage a re-tailor set back returns to 'submitted'. The
+    caller commits."""
     job_id = follow_merges(conn, job_id)
     keep, folded = consolidate(conn, job_id)
     if keep is None:
@@ -158,21 +130,13 @@ def record_submission(
         )
         keep = {"id": app_id, "stage": SUBMITTED, "submitted_at": None}
     app_id = int(keep["id"])
-    existing = {f["kind"] for f in _followups(conn, app_id)}
     if keep["submitted_at"]:
-        stamp = str(keep["submitted_at"])
-        sched = (
-            Scheduled(due=[], skipped=[])
-            if existing
-            else schedule_followups(conn, app_id, company_id, _day_of(stamp))
-        )
         if keep["stage"] in PRE_SUBMIT_STAGES:  # a re-tailor set it back
             conn.execute(q.SET_APPLICATION_STAGE, {"id": app_id, "stage": SUBMITTED})
-        return Submission(job_id, app_id, True, stamp, sched, folded)
+        return Submission(job_id, app_id, True, str(keep["submitted_at"]), folded)
     conn.execute(q.MARK_APPLICATION_SUBMITTED, {"id": app_id, "submitted_at": submitted_at})
     conn.execute(q.SET_JOB_STATUS, {"job_id": job_id, "status": "applied"})
-    sched = schedule_followups(conn, app_id, company_id, day, skip_kinds=existing)
-    return Submission(job_id, app_id, False, submitted_at, sched, folded)
+    return Submission(job_id, app_id, False, submitted_at, folded)
 
 
 # ---- repair --------------------------------------------------------------------
@@ -204,10 +168,7 @@ class RepairReport:
         lines += [f"- job {f.job_id}: {f.kind}: {f.detail} [{verb}]" for f in fixable]
         lines += [f"- job {f.job_id}: {f.kind}: {f.detail} [needs you]" for f in manual]
         if not self.findings:
-            lines.append(
-                "every submitted job has exactly one application row at a submitted stage "
-                "with its follow-ups"
-            )
+            lines.append("every submitted job has exactly one application row at a submitted stage")
         return "\n".join(lines)
 
 
@@ -290,14 +251,12 @@ def repair(conn: sqlite3.Connection, *, dry_run: bool = False) -> RepairReport:
                     job_id,
                     "submission-not-recorded",
                     f"marked submitted on {day}, but no application row says so: recorded "
-                    "as submitted that day, with its follow-ups",
+                    "as submitted that day",
                     fixed=True,
                 )
             )
             if not dry_run:
-                record_submission(
-                    conn, job_id, job["company_id"], datetime.date.fromisoformat(day), day
-                )
+                record_submission(conn, job_id, day)
             continue
         if not submitted:
             if job["status"] == "applied":
@@ -325,22 +284,7 @@ def repair(conn: sqlite3.Connection, *, dry_run: bool = False) -> RepairReport:
             )
             if not dry_run:
                 conn.execute(q.SET_APPLICATION_STAGE, {"id": app["id"], "stage": SUBMITTED})
-        # 5. a submitted row with no follow-ups (none once the employer answered)
-        if app["stage"] in (SUBMITTED, *PRE_SUBMIT_STAGES) and not _followups(conn, int(app["id"])):
-            rep.findings.append(
-                Finding(
-                    job_id,
-                    "no-followups",
-                    f"application {app['id']} was submitted {app['submitted_at']} with no "
-                    "follow-ups: scheduled from that day",
-                    fixed=True,
-                )
-            )
-            if not dry_run:
-                schedule_followups(
-                    conn, int(app["id"]), job["company_id"], _day_of(str(app["submitted_at"]))
-                )
-        # 6. a submitted job still listed as not applied
+        # 5. a submitted job still listed as not applied
         if job["status"] in PRE_APPLIED_STATUSES:
             rep.findings.append(
                 Finding(
@@ -372,3 +316,69 @@ def repair(conn: sqlite3.Connection, *, dry_run: bool = False) -> RepairReport:
         manual=sum(1 for f in rep.findings if not f.fixed),
     )
     return rep
+
+
+# ---- no reply after N days ------------------------------------------------------
+
+
+@dataclass
+class GhostClose:
+    """What close_ghosted did (or, in a dry run, would do)."""
+
+    days: int
+    dry_run: bool
+    ghosted: list[dict[str, Any]] = field(default_factory=list)
+
+    def render(self) -> str:
+        verb = "would mark" if self.dry_run else "marked"
+        head = "DRY RUN — nothing changed. " if self.dry_run else ""
+        lines = [
+            f"{head}{verb} {len(self.ghosted)} application(s) ghosted: submitted "
+            f"{self.days} or more days ago with no reply on record"
+        ]
+        lines += [
+            f"- job {r['job_id']} {r['company_name']} — {r['title']} (submitted "
+            f"{str(r['submitted_at'])[:10]})"
+            for r in self.ghosted
+        ]
+        return "\n".join(lines)
+
+    def __str__(self) -> str:
+        return self.render()
+
+
+def close_ghosted(
+    conn: sqlite3.Connection, after_days: int | None = None, *, dry_run: bool = False
+) -> GhostClose:
+    """Mark every application at stage 'submitted' with no response on record
+    and submitted `after_days` or more days ago as 'ghosted', with one
+    'application_ghosted' event each. `after_days` defaults to
+    tracking.ghost_after_days (config.Filters.ghost_after_days). dry_run
+    lists them and changes nothing."""
+    if after_days is None:
+        from jobkit.config import load_filters
+
+        after_days = load_filters().ghost_after_days
+    rows = [dict(r) for r in conn.execute(q.GHOST_CANDIDATES, {"days": int(after_days)})]
+    report = GhostClose(days=int(after_days), dry_run=dry_run, ghosted=rows)
+    if dry_run:
+        return report
+    for r in rows:
+        conn.execute(q.SET_APPLICATION_GHOSTED, {"id": r["id"]})
+        conn.execute(
+            q.RECORD_EVENT,
+            {
+                "job_id": r["job_id"],
+                "kind": GHOSTED_EVENT,
+                "detail": json.dumps(
+                    {
+                        "application_id": r["id"],
+                        "submitted_at": r["submitted_at"],
+                        "after_days": int(after_days),
+                    }
+                ),
+            },
+        )
+    conn.commit()
+    log("applications.ghost_close", days=int(after_days), ghosted=len(rows))
+    return report

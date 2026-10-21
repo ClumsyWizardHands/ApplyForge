@@ -304,3 +304,39 @@ def test_rank_correlation() -> None:
     inverse = [(90, 1), (70, 2), (50, 3)]
     assert rank_correlation(inverse) == pytest.approx(-1.0)
     assert rank_correlation([(1, 1)]) == 0.0
+
+
+def test_queue_gate_uses_a_track_min_score(conn: sqlite3.Connection) -> None:
+    """A track's own min_score gates its jobs; other titles keep
+    gates.min_score_to_surface (65 here)."""
+    from jobkit.config import Filters
+
+    filters = Filters(
+        raw={
+            "filters": {
+                "tracks": [
+                    {"id": "nurse", "title_regex": r"(?i)\bnurse\b", "min_score": 55},
+                    {"id": "sales_lead", "title_regex": r"(?i)\bsales\b"},
+                ]
+            },
+            "gates": {"min_score_to_surface": 65},
+        }
+    )
+    ids = {}
+    for i, title in enumerate(("Staff Nurse", "Sales Lead", "Office Manager")):
+        jid = _insert(conn, external_id=f"t{i}", title=title, jd_html=REAL_JD, jd_hash=f"t{i}")
+        conn.execute("UPDATE jobs SET status='filtered' WHERE id=?", (jid,))
+        conn.execute("INSERT INTO scores (job_id, fit_score) VALUES (?, 60)", (jid,))
+        ids[title] = jid
+    conn.commit()
+    assert run_queue(conn, filters) == 1
+    status = dict(conn.execute("SELECT title, status FROM jobs").fetchall())
+    assert status == {
+        "Staff Nurse": "queued",
+        "Sales Lead": "rejected",
+        "Office Manager": "rejected",
+    }
+    reason = conn.execute(
+        "SELECT reason FROM rejections WHERE job_id = ?", (ids["Sales Lead"],)
+    ).fetchone()[0]
+    assert reason == "score_below_surface:60<65"

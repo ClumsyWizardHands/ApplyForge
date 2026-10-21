@@ -155,9 +155,16 @@ def targets_cmd(
     skip_not_found: bool = typer.Option(
         False, "--skip-not-found", help="do not record companies with no board found"
     ),
+    feed_only: str = typer.Option(
+        "",
+        "--feed-only",
+        help="your words for relying on the feeds alone (no employer board jobkit can poll); "
+        "no company needed",
+    ),
 ) -> None:
     """Find and verify public Greenhouse/Lever/Ashby boards; append to
-    config/targets.yaml."""
+    config/targets.yaml. Or record, with --feed-only, that postings come
+    from the feeds."""
     companies: list[Any] = [{"name": n, "tier": tier} for n in names or []]
     if file:
         data = _input(file)
@@ -170,4 +177,5 @@ def targets_cmd(
         companies,
         probe=not no_probe,
         include_not_found=not skip_not_found,
+        feed_only_said=feed_only,
     )

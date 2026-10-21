@@ -31,7 +31,16 @@ Claim judge (package 4, 2026-10-10, validate/claim_judge.py): a letter the
 rule-based fact check passed is read by an LLM judge for claims the rules
 cannot see. Its "fail", or a reply that does not parse, is a fact-check
 failure like any rule's: the same regeneration, the same cover_rejected.md.
-It never runs on, and so never overrides, a rule-based rejection."""
+It never runs on, and so never overrides, a rule-based rejection.
+
+Prompt set (filters.yaml `prompt_set`): absent or "sales" selects bullets
+with prompts/select_bullets.md, whose emphasis lines are written for the sales
+tracks; its caches and attempt keys are as before. "general" uses
+prompts/select_bullets_general.md, which carries the job's track `emphasis:`
+from filters.yaml (the person's own words, inserted in one pass by
+triage.render_once) and keys its caches on the prompt's name and version
+(selection_tag). Both change only which bullets lead; every check after the
+selection is the same."""
 
 from __future__ import annotations
 
@@ -53,7 +62,7 @@ from jobkit.log import log
 from jobkit.normalize import MIN_JD_CHARS, jd_is_missing
 from jobkit.paths import HOME as PROJECT_ROOT
 from jobkit.pipeline import self_review
-from jobkit.pipeline.triage import month_index, record_jd_missing
+from jobkit.pipeline.triage import month_index, record_jd_missing, render_once
 from jobkit.render.pdf import page_count, render_pdf, rendered_pages
 from jobkit.validate import claim_judge
 from jobkit.validate import style as estimate_styles
@@ -519,6 +528,33 @@ class JDMissingError(RuntimeError):
     """The job's description is too short to tailor against (normalize.MIN_JD_CHARS)."""
 
 
+# ---- the bullet-selection prompt, by prompt_set ----
+
+SELECT_PROMPTS = {"sales": "select_bullets", "general": "select_bullets_general"}
+SALES_SELECT_PROMPT = SELECT_PROMPTS["sales"]
+NO_TRACK_EMPHASIS = "no track emphasis; order by relevance to this job"
+
+
+def selection_prompt_name(filters: Filters) -> str:
+    """The bullet-selection prompt for the configured prompt_set."""
+    return SELECT_PROMPTS[filters.prompt_set]
+
+
+def selection_tag(name: str, version: str) -> str:
+    """The selection prompt's part of the tailoring cache keys, the attempt
+    key and provenance.json: the version alone for select_bullets (the keys
+    recorded before prompt_set existed), "<name>:<version>" for any other."""
+    return version if name == SALES_SELECT_PROMPT else f"{name}:{version}"
+
+
+def track_emphasis(track_id: str | None, filters: Filters) -> str:
+    """The track's `emphasis:` from filters.yaml, or NO_TRACK_EMPHASIS."""
+    track = filters.track(track_id)
+    if track is None or not track.emphasis:
+        return NO_TRACK_EMPHASIS
+    return track.emphasis
+
+
 def _attempt_key(
     jd_hash: object,
     chash: str,
@@ -745,9 +781,12 @@ def tailor_job(conn: sqlite3.Connection, job_id: int) -> dict[str, str]:
     track = filters.track_for(str(job["title"] or "")) or "other"
     required = required_role_ids(corpus, _today(), _recent_role_years(filters))
     reqs = {k: json.loads(job[k] or "[]") for k in ("must_have", "nice_to_have", "implied")}
-    sel_prompt = llm.PromptFile("select_bullets")
+    sel_name = selection_prompt_name(filters)
+    sel_prompt = llm.PromptFile(sel_name)
+    sel_tag = selection_tag(sel_name, sel_prompt.version)
+    emphasis = track_emphasis(track, filters)
     # caller key = namespace; llm.call hashes it with the model and full prompt
-    tailor_key = f"tailor:{job['jd_hash']}:{chash}:{sel_prompt.version}"
+    tailor_key = f"tailor:{job['jd_hash']}:{chash}:{sel_tag}"
     # the skills line may only repeat skill_index keys; with no index there is
     # nothing to check it against, so it is left off the resume (fail closed)
     skills_indexed = bool(skill_index_keys(corpus))
@@ -770,6 +809,19 @@ def tailor_job(conn: sqlite3.Connection, job_id: int) -> dict[str, str]:
     resume_log = self_review.ArtifactLog("resume", "Resume bullet selection")
 
     def render_selection(extra: str) -> str:
+        if sel_name != SALES_SELECT_PROMPT:
+            # one pass: the emphasis and the corpus are the person's text and
+            # are sent as written, whatever braces they contain
+            return render_once(
+                sel_prompt,
+                title=str(job["title"] or ""),
+                company=str(job["company_name"] or ""),
+                track=track,
+                track_emphasis=emphasis,
+                requirements=json.dumps(reqs, indent=1) + extra,
+                corpus=_corpus_for_prompt(corpus, required),
+                estimate_style=style,
+            )
         return sel_prompt.render(
             title=job["title"],
             company=job["company_name"],
@@ -824,14 +876,14 @@ def tailor_job(conn: sqlite3.Connection, job_id: int) -> dict[str, str]:
             scope=RESUME_SCOPE,
             draft=_selection_text(raw, corpus),
             violations=failure,
-            writer_version=sel_prompt.version,
+            writer_version=sel_tag,
         )
     if selection is None:
         _record_reviews(conn, job_id, [resume_log])
         raise RuntimeError(f"resume failed twice for job {job_id}: {failure}")
 
     # ---- self-review of the passing selection: revise, keep only if it passes ----
-    revision_key = f"tailor-revision:{job['jd_hash']}:{chash}:{sel_prompt.version}"
+    revision_key = f"tailor-revision:{job['jd_hash']}:{chash}:{sel_tag}"
     revision_text = {"text": ""}
     last: dict[str, _SelectionCheck] = {}
 
@@ -895,7 +947,7 @@ def tailor_job(conn: sqlite3.Connection, job_id: int) -> dict[str, str]:
         selection,
         kind=RESUME_KIND,
         scope=RESUME_SCOPE,
-        writer_version=sel_prompt.version,
+        writer_version=sel_tag,
         render=lambda s: _selection_text(s, corpus),
         render_for_writer=_selection_json,
         ids_of=_bullet_ids,
@@ -957,7 +1009,7 @@ def tailor_job(conn: sqlite3.Connection, job_id: int) -> dict[str, str]:
     run_key = _attempt_key(
         job["jd_hash"],
         chash,
-        sel_prompt.version,
+        sel_tag,
         cover_prompt.version,
         style,
         _review_tag(max_rounds),
@@ -1196,7 +1248,7 @@ def tailor_job(conn: sqlite3.Connection, job_id: int) -> dict[str, str]:
             {
                 "job_id": job_id,
                 "corpus_hash": chash,
-                "tailor_prompt": sel_prompt.version,
+                "tailor_prompt": sel_tag,
                 "cover_prompt": cover_prompt.version,
                 "claim_judge_prompt": claim_judge.version(),
                 "positioning_id": selection.get("positioning_id"),
@@ -1310,10 +1362,12 @@ def _unchanged_since_cover_failure(
         try:
             current["chash"] = corpus_hash(CORPUS_PATH.read_text())
             current["style"] = estimate_styles.configured_estimate_style()
-            current["review"] = _review_tag(load_filters().self_review_max_rounds)
+            filters = load_filters()
+            current["review"] = _review_tag(filters.self_review_max_rounds)
+            sel_name = selection_prompt_name(filters)
         except (OSError, ValueError):
             return False  # no corpus or a bad config: let tailor_job fail loudly as before
-        current["tailor"] = llm.PromptFile("select_bullets").version
+        current["tailor"] = selection_tag(sel_name, llm.PromptFile(sel_name).version)
         current["cover"] = llm.PromptFile("cover_letter").version
         current["judge"] = claim_judge.version()
     inputs = (

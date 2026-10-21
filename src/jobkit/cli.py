@@ -38,7 +38,8 @@ from jobkit.pipeline.triage import (
     run_remote_check,
     run_score,
 )
-from jobkit.track.followups import process_followups
+from jobkit.track import responses
+from jobkit.track.applications import close_ghosted
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -311,9 +312,10 @@ def answer_cmd(
     decline: bool = typer.Option(False, "--decline", help="decline the question explicitly"),
 ) -> None:
     """Answer question KEY. An answer that is only a "no" ("no", "never used
-    it", "I have never used Clari"), or --decline, is recorded as a decline:
+    it", "I have never worked in healthcare"), or --decline, is recorded as a decline:
     not asked again, the gap stays a gap (`jobkit undecline KEY` takes it
-    back). An answer that may be a no or a fact ("Never below 115% of quota")
+    back). An answer that may be a no or a fact ("Never below 95% on
+    patient-satisfaction surveys")
     is refused, and so is a tool or method answer that is not one plain
     sentence of your own use: "[yes,] I used <tool>" (or I've used, I have
     used, I use, I ran; "it" for the tool), then only how often, how long,
@@ -321,7 +323,7 @@ def answer_cmd(
     Haulmark for two years"). "Yes, daily", "My manager used Clari" and
     "Clari? Only heard of it" are refused. Only a tool or method question
     can add a skill_index item, and an answer to any other question that
-    names a tool or method ("Yes, sold to 12 lab couriers; the team used Clari")
+    names a tool or method ("Yes, I trained 40 new hires; the team used Clari")
     is refused: answer the tool's own question instead.
     Any other answer becomes a corpus PROPOSAL in
     data/corpus_proposals.yaml, in your words. Nothing reaches
@@ -433,7 +435,7 @@ def stage(
     job_ids: str = typer.Option("", help="comma-separated batch (one browser, one profile)"),
     keep_open: bool = typer.Option(False, help="leave browser open for review"),
 ) -> None:
-    """Playwright staging: fill forms to the last click. NEVER submits."""
+    """Fill approved application forms in a visible browser and stop before submit."""
     conn = _db()
     if job_ids:
         ids = [int(x) for x in job_ids.replace(",", " ").split()]
@@ -504,7 +506,8 @@ def _run_all_stages() -> list[Stage]:
         ("rules", run_standing_rules),
         ("form-specs-approved", lambda c: capture_form_specs(c, 50)),  # auto-approved stragglers
         ("tailor", tailor_approved),
-        ("followups", process_followups),
+        # no reply after tracking.ghost_after_days: stage 'ghosted' (no LLM)
+        ("ghost-close", lambda c: close_ghosted(c)),
         ("digest", write_digest),
     ]
 
@@ -513,7 +516,7 @@ def _run_all_stages() -> list[Stage]:
 def run_all() -> None:
     """The full background pipeline: poll -> feeds -> LinkedIn guest discovery
     (when enabled) -> discovery -> resolve-boards -> filter -> triage ->
-    form-specs -> standing rules -> tailor approved -> follow-ups -> digest.
+    form-specs -> standing rules -> tailor approved -> ghost-close -> digest.
     Cron entrypoint. Each stage runs isolated (a failing stage does not stop
     the rest) and is recorded as a run_all.stage event; exits 1 if any stage
     failed or saw every one of its LLM calls fail."""
@@ -530,7 +533,7 @@ def nightly() -> None:
     """The one unattended run a night (launchd entrypoint: `jobkit schedule
     install`). run-all's stages (poll -> feeds -> LinkedIn guest discovery
     (when enabled) -> discovery -> resolve-boards -> filter ->
-    triage -> form-specs -> standing rules -> tailor -> follow-ups), then
+    triage -> form-specs -> standing rules -> tailor -> ghost-close), then
     stage every approved, tailored job not staged since it was tailored (one
     browser process, closed when done, so the profile lock is released), then
     the digest. Never submits: staged forms wait for you (open-queue). Each
@@ -601,14 +604,27 @@ def schedule_status() -> None:
 
 
 @app.command(name="add-url")
-def add_url(url: str) -> None:
+def add_url(
+    url: str,
+    score: bool = typer.Option(
+        True,
+        "--score/--no-score",
+        help="extract and score the queued job now (--no-score prints `needs scoring: [id]` "
+        "instead; MCP add_job_url then scores it in the background)",
+    ),
+) -> None:
     """Ingest a pasted job URL (from anywhere — an email alert, a friend, a
-    board). Resolves the employer's ATS from the URL shape; supported ATSs get
-    their board polled immediately so the job enters the normal pipeline."""
+    board). Resolves the employer's ATS from the URL shape; a Greenhouse,
+    Lever or Ashby board is polled now, the job is queued and then extracted
+    and scored, so it shows in the queue like any other."""
     conn = _db()
     if resolve_url(url) is None:
-        typer.echo("could not recognize an ATS in that URL — no action taken")
-        raise typer.Exit(1)
+        # many hospitals, schools and agencies link from their own careers
+        # domain: say what to do, and exit 0 (nothing failed)
+        typer.echo(
+            "jobkit can't read this site, so nothing was added. Apply on the employer's site."
+        )
+        raise typer.Exit()
     res = asyncio.run(ingest_url(conn, url))
     hit = res.resolved
     assert hit is not None
@@ -617,7 +633,8 @@ def add_url(url: str) -> None:
         + (f" ({hit.note})" if hit.note else "")
     )
     if res.poll is None:
-        typer.echo("manual-path ATS: track it by pasting details, or apply via browser")
+        if hit.supported:  # the system is readable but the link names no board
+            typer.echo("no board name in that link, so nothing was added")
         raise typer.Exit()
     typer.echo(f"polled board: {res.poll.describe()}")
     if res.status == "poll_failed":
@@ -629,24 +646,125 @@ def add_url(url: str) -> None:
             conn.execute(q.QUEUE_PASTED_JOB, {"job_id": row["id"]})
             conn.commit()
             typer.echo(f"queued: [{row['id']}] {row['company_name']} — {row['title']}")
+            _score_pasted(conn, int(row["id"]), now=score)
         else:
             typer.echo(
                 "board polled but that job id wasn't in the public feed (may be closed or unlisted)"
             )
 
 
-@app.command()
-def followups() -> None:
-    """Generate due follow-up drafts; close ghosted at +30d; skip hiring-manager
-    notes for companies with no stored contact. Sending is manual."""
+# printed by `add-url --no-score` for a queued job with no score yet; MCP
+# add_job_url reads it and starts `jobkit score-jobs <id>` in the background
+NEEDS_SCORING = "needs scoring: [{job_id}]"
+
+
+def _score_pasted(conn: sqlite3.Connection, job_id: int, *, now: bool) -> None:
+    """A pasted job skips the filter and triage stages (they read only status
+    'filtered'), and the queue lists only scored jobs: extract and score it
+    here, or say it still needs it."""
+    if conn.execute("SELECT 1 FROM scores WHERE job_id = ?", (job_id,)).fetchone():
+        return
+    if not now:
+        typer.echo(NEEDS_SCORING.format(job_id=job_id))
+        return
+    _echo_scores(conn, [job_id])
+
+
+def _echo_scores(conn: sqlite3.Connection, job_ids: list[int]) -> None:
+    from jobkit.pipeline.triage import extract_and_score
+
+    scored = extract_and_score(conn, job_ids)
+    for jid in job_ids:
+        if jid in scored:
+            typer.echo(f"scored: [{jid}] fit {scored[jid]}")
+        else:
+            typer.echo(
+                f"not scored: [{jid}] (already scored, or its description is missing or too "
+                "short; see logs/jobkit.jsonl)"
+            )
+
+
+@app.command(name="score-jobs")
+def score_jobs(job_ids: list[int]) -> None:
+    """Extract and score these jobs now, whatever their status. Used for a
+    pasted job (MCP add_job_url starts it in the background). Jobs already
+    scored are left as they are."""
+    _echo_scores(_db(), job_ids)
+
+
+@app.command(name="ghost-close")
+def ghost_close(
+    dry_run: bool = typer.Option(False, "--dry-run", help="list only; change nothing"),
+) -> None:
+    """Mark submitted applications with no reply after tracking.ghost_after_days
+    (config/filters.yaml, default 30) as ghosted. The nightly run does this;
+    --dry-run lists them first."""
     conn = _db()
-    s = process_followups(conn)
-    typer.echo(
-        f"drafted={s['drafted']} ghost_closed={s['ghost_closed']} "
-        f"skipped_no_contact={s['skipped_no_contact']} failed={s['failed']}"
-    )
-    if s["failed"] and not s["drafted"]:
-        raise typer.Exit(1)
+    typer.echo(close_ghosted(conn, dry_run=dry_run).render())
+
+
+email_app = typer.Typer(
+    no_args_is_help=True,
+    help="Replies in your own mailbox, recorded by hand (debugging; the MCP tools "
+    "email_targets, match_email, record_email_response and finish_email_check are the "
+    "normal path). Nothing is ever sent.",
+)
+app.add_typer(email_app, name="email")
+
+
+@email_app.command("targets")
+def email_targets_cmd() -> None:
+    """Submitted applications to look for, the last check and a Gmail search."""
+    typer.echo(responses.email_targets(_db()).render())
+
+
+@email_app.command("match")
+def email_match_cmd(
+    sender: str = typer.Option(..., help="the From line"),
+    subject: str = typer.Option("", help="the subject"),
+    snippet: str = typer.Option("", help="a short snippet"),
+    received_at: str = typer.Option("", "--received-at", help="when it arrived"),
+) -> None:
+    """Rank the applications one email could belong to."""
+    try:
+        typer.echo(responses.match_email(_db(), sender, subject, snippet, received_at).render())
+    except ValueError as e:
+        typer.echo(f"no match run: {e}", err=True)
+        raise typer.Exit(1) from None
+
+
+@email_app.command("record")
+def email_record_cmd(
+    application_id: int = typer.Option(..., "--application-id"),
+    outcome: str = typer.Option(..., help=", ".join(responses.OUTCOMES)),
+    received_at: str = typer.Option(..., "--received-at", help="when it arrived"),
+    message_id: str = typer.Option(..., "--message-id", help="the mailbox's id for it"),
+    link: str = typer.Option("", help="a link to the message"),
+    summary: str = typer.Option("", help="one line in your words (160 characters)"),
+) -> None:
+    """Record one email's outcome for one application. The body is never stored."""
+    try:
+        rec = responses.record_response(
+            _db(), application_id, outcome, received_at, message_id, link, summary
+        )
+    except ValueError as e:
+        typer.echo(f"not recorded: {e}", err=True)
+        raise typer.Exit(1) from None
+    typer.echo(rec.render())
+
+
+@email_app.command("done")
+def email_done_cmd(
+    checked_through: str = typer.Option(
+        "", "--checked-through", help="ISO date-time the mailbox was read through; default now"
+    ),
+) -> None:
+    """Record that the mailbox was checked through a time."""
+    try:
+        typer.echo(responses.finish_email_check(_db(), checked_through).render())
+    except ValueError as e:
+        typer.echo(f"not recorded: {e}", err=True)
+        raise typer.Exit(1) from None
 
 
 @app.command()
@@ -689,10 +807,9 @@ def repair_applications_cmd(
     dry_run: bool = typer.Option(False, "--dry-run", help="list only; change nothing"),
 ) -> None:
     """Make every submitted job hold exactly one application row at a
-    submitted stage with its follow-ups (track/applications.py): a job marked
-    submitted with no application row saying so, several rows on one job, a
-    submitted row whose stage went back, a submitted row with no follow-ups,
-    an application left on a merged aggregator row. A job 'applied' with no
+    submitted stage (track/applications.py): a job marked submitted with no
+    application row saying so, several rows on one job, a submitted row whose
+    stage went back, an application left on a merged aggregator row. A job 'applied' with no
     record of the day is listed, never guessed. MCP: repair_applications."""
     from jobkit.track.applications import repair
 

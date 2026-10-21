@@ -55,17 +55,48 @@ def test_every_personal_config_file_has_a_template(name: str) -> None:
 
 
 def test_filters_template_loads_with_neutral_defaults() -> None:
+    text = (TEMPLATES / "filters.example.yaml").read_text()
     f = load_filters(TEMPLATES / "filters.example.yaml")
-    ids = [t.id for t in f.tracks]
-    assert {"account_executive", "sales_exec", "sdr_bdr_manager"} <= set(ids)
+    # one placeholder track for any field, which doctor warns about until edited
+    assert f.track_ids == [doctor.PLACEHOLDER_TRACK_ID]
+    assert doctor.PLACEHOLDER_REGEX_TEXT in f.tracks[0].title_regex
+    assert f.prompt_set == "general" and f.prompt_set_explicit
+    assert not f.has_sales_track
     # every per-track floor names a defined track (the loader checks it too)
-    assert set(f.raw["filters"]["comp"]["track_floors"]) <= set(ids)
+    assert set(f.raw["filters"]["comp"]["track_floors"]) <= set(f.track_ids)
     # no place chosen for you: remote only until you list places
     assert f.allowed_locations == [] and f.relocation_cities == []
     assert f.accepted_location_buckets == config.REMOTE_BUCKETS
     assert f.nightly_at == (2, 0) and f.questions_per_day == 3
     assert f.self_review_max_rounds == 1 and f.min_score_to_surface == 65
-    # a feed that breaks hard rule 11 ships disabled
+    # no-reply bookkeeping is a plain status rule; nothing drafts follow-ups
+    assert "followups" not in f.raw
+    assert (f.ghost_after.days, f.ghost_after.source) == (30, "tracking")
+    # one comp_sanity block: the range checks and the field-neutral knobs together
+    assert text.count("\ncomp_sanity:") == 1
+    assert f.comp_sanity.ote_check == "ote_tracks"
+    assert f.comp_sanity.max_range_width_pct == 0.6
+    # no sales search ships as the default
+    feeds = f.raw["feeds"]
+    assert feeds["remotive"]["categories"] == [] and feeds["consider"]["categories"] == []
+    assert not re.search(r"(?i)account executive|head of sales|sales director", text)
+    # a feed that breaks hard rule 11 ships disabled, and so does the
+    # unaudited Chief of Staff feed and LinkedIn discovery
+    assert feeds["getro"]["enabled"] is False
+    assert feeds["cosnetwork"]["enabled"] is False
+    assert f.linkedin_guest.enabled is False
+
+
+def test_sales_example_keeps_the_sales_profile() -> None:
+    f = load_filters(TEMPLATES / "filters.sales.example.yaml")
+    assert {"account_executive", "sales_exec", "sdr_bdr_manager", "sdr_bdr"} == set(f.track_ids)
+    assert f.prompt_set == "sales" and f.has_sales_track
+    assert "followups" not in f.raw and f.ghost_after.source == "tracking"
+    # the sales defaults of the comp-sanity knobs, in its one block
+    text = (TEMPLATES / "filters.sales.example.yaml").read_text()
+    assert text.count("\ncomp_sanity:") == 1
+    assert f.comp_sanity == config.CompSanity()
+    assert f.raw["feeds"]["remotive"]["categories"] == ["sales", "business"]
     assert f.raw["feeds"]["getro"]["enabled"] is False
 
 
@@ -93,12 +124,19 @@ def _rule_job(**kw: Any) -> dict[str, Any]:
 
 def test_autoapprove_template_uses_known_keys_and_approves_nothing() -> None:
     cfg = yaml.safe_load((TEMPLATES / "autoapprove.example.yaml").read_text())
-    # nothing is approved without asking until you add a rule yourself
-    assert cfg["auto_approve"] == []
-    for rule in cfg["auto_reject"]:
-        rules._cond_matches(rule["when"], _rule_job())  # an unknown key raises
-        assert rule.get("reason")
-    assert rules._cond_matches(cfg["auto_reject"][0]["when"], _rule_job(tier=3, fit_score=60))
+    # nothing is approved or rejected without asking until you add a rule
+    # yourself (feed companies are tier 3: an active tier-3 rule would reject
+    # feed jobs under a track's lower min_score)
+    assert cfg["auto_approve"] == [] and cfg["auto_reject"] == []
+    text = (TEMPLATES / "autoapprove.example.yaml").read_text()
+    examples = [
+        yaml.safe_load(line.strip().lstrip("#").strip().removeprefix("- when:").strip())
+        for line in text.splitlines()
+        if line.strip().startswith("# - when:")
+    ]
+    assert examples
+    for when in examples:
+        rules._cond_matches(when, _rule_job())  # an unknown key raises
 
 
 def test_banned_phrases_template_has_every_pass() -> None:
@@ -121,7 +159,22 @@ def test_commute_template_counts_remote_as_zero() -> None:
 # any non-alphanumeric character, (?<![a-z0-9])name(?![a-z0-9]), so an
 # identifier joined by "_" (`role_name`, `at_name`) is caught too, which `\b`
 # would let through. Without the file only that scan skips.
-OWNER_MARKERS_FILE = REPO_ROOT / "docs" / "local" / "owner-markers.txt"
+# The gate runs these scans with JOBKIT_REQUIRE_OWNER_SCAN=1, which turns a
+# missing file into a failure instead of a skip, and may point
+# JOBKIT_OWNER_LOCAL_DIR at the owner checkout's docs/local/ to scan a tree
+# (a worktree, a clean export) that has none of its own.
+OWNER_LOCAL_DIR = Path(os.environ.get("JOBKIT_OWNER_LOCAL_DIR") or REPO_ROOT / "docs" / "local")
+REQUIRE_OWNER_SCAN = os.environ.get("JOBKIT_REQUIRE_OWNER_SCAN") == "1"
+OWNER_MARKERS_FILE = OWNER_LOCAL_DIR / "owner-markers.txt"
+
+
+def _no_owner_file(what: str, path: Path) -> None:
+    """Skip the calling scan without its local file, or fail under
+    JOBKIT_REQUIRE_OWNER_SCAN=1, so a gate never reads a skip as a pass."""
+    msg = f"no owner {what}: {path} is absent"
+    if REQUIRE_OWNER_SCAN:
+        pytest.fail(f"{msg} (JOBKIT_REQUIRE_OWNER_SCAN=1)")
+    pytest.skip(msg)
 
 
 def owner_markers(path: Path = OWNER_MARKERS_FILE) -> re.Pattern[str] | None:
@@ -144,7 +197,8 @@ OWNER_MARKERS = owner_markers()
 def require_owner_markers() -> re.Pattern[str]:
     """The checkout's owner markers, or skip the calling test without them."""
     if OWNER_MARKERS is None:
-        pytest.skip(f"no owner markers: {OWNER_MARKERS_FILE.relative_to(REPO_ROOT)} is absent")
+        _no_owner_file("markers", OWNER_MARKERS_FILE)
+    assert OWNER_MARKERS is not None
     return OWNER_MARKERS
 
 
@@ -160,7 +214,7 @@ def require_owner_markers() -> re.Pattern[str]:
 # ships, so the shared tree cannot be read back into the names it guards.
 # Without the file only that scan skips. To add a marker, append the output
 # of `marker_key("the words", key)`.
-OWNER_DIGESTS_FILE = REPO_ROOT / "docs" / "local" / "owner-marker-digests.txt"
+OWNER_DIGESTS_FILE = OWNER_LOCAL_DIR / "owner-marker-digests.txt"
 
 OwnerDigests = tuple[bytes, frozenset[tuple[str, ...]], tuple[tuple[int, tuple[str, ...]], ...]]
 
@@ -382,7 +436,7 @@ def _file_text(path: Path) -> str:
 
 def test_committable_files_hold_no_local_owner_digests() -> None:
     if OWNER_DIGESTS is None:
-        pytest.skip(f"no owner digests: {OWNER_DIGESTS_FILE.relative_to(REPO_ROOT)} is absent")
+        _no_owner_file("digests", OWNER_DIGESTS_FILE)
     files = _committable_files()
     assert any(p.name == "test_setup_config.py" for p in files)
     hits = {

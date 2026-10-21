@@ -514,13 +514,13 @@ def test_remote_check_hybrid_office_outside_commute_rejected(
         ("SDR Manager", "sdr_bdr_manager"),
         ("Enterprise Account Executive", "account_executive"),
         ("Founding Account Executive", None),
-        ("Director of Sales", None),
+        ("Director of Sales", "sales_exec"),  # every track keeps its id
         # the filters.yaml account_executive track is the one AE definition
         ("Senior Sales Executive", "account_executive"),
         ("Enterprise Sales Executive", "account_executive"),
         ("Sales Executive - Hybrid Philadelphia", "account_executive"),
         ("Founding Sales Executive", None),  # the good-deal carve-out
-        ("Regional Sales Director, AE team", None),  # sales_exec track, not an AE
+        ("Regional Sales Director, AE team", "sales_exec"),  # not an AE
     ],
 )
 def test_title_class_sdr_never_ae(title: str, cls: str | None) -> None:

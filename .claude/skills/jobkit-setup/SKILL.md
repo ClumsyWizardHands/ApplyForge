@@ -1,21 +1,25 @@
 ---
 name: jobkit-setup
-description: The guided jobkit setup interview for a new user, start to finish. Checks the machine, reads the person's resume, confirms every corpus entry with them (they set each metric's confidence and evidence), asks their job preferences, target companies and application answers one question at a time, runs the first pass, and schedules the daily run as a Claude app scheduled task (macOS LaunchAgent as fallback). Use when the person says "set up jobkit", "onboard me", "get me started", "continue jobkit setup", or on a first run (no data/career_corpus.yaml, or `jobkit setup-status` / `jobkit doctor` reports missing setup).
+description: The guided ApplyForge (jobkit) setup interview for a new user, start to finish, for any kind of job. Checks the machine, reads the person's resume, confirms every corpus entry and resume skill with them (they set each metric's confidence and evidence), asks their job preferences (titles, career change, pay, places), sets up where postings come from (employer boards or the job feeds), asks their application answers one question at a time, runs the first pass, schedules the daily run as a Claude app scheduled task (macOS LaunchAgent as fallback), and optionally connects the email they apply from. Use when the person says "set up jobkit", "set up ApplyForge", "onboard me", "get me started", "continue jobkit setup", or on a first run (no data/career_corpus.yaml, or `jobkit setup-status` / `jobkit doctor` reports missing setup).
 ---
 
 <!-- Maintainers: name jobkit MCP tools as calls, e.g. setup_status(), and CLI
 commands in code spans, e.g. `uv run jobkit doctor`. tests/test_claude_skills.py
 checks that each one exists. -->
 
-# jobkit setup interview
+# ApplyForge setup interview
 
-jobkit finds job postings, checks them, tailors a resume and cover letter
+ApplyForge finds job postings, checks them, tailors a resume and cover letter
 from facts the person confirmed, and fills application forms up to the last
-click. The person reviews and clicks submit. This interview builds their
-files. It takes about an hour and can stop and resume at any point: every
-answer is saved as it is given.
+click. The person reviews each form and presses submit. The command, the
+package and the MCP server are all called `jobkit`. This interview builds the
+person's files. It takes about an hour and can stop and resume at any point:
+every answer is saved as it is given.
 
-## How to talk (this matters more than speed)
+It works for any job titles the person chooses: nursing, teaching,
+engineering, sales, operations and so on.
+
+## How to talk
 
 The interview is long, so keep the load on the person low. Make every turn
 easy to answer:
@@ -26,39 +30,40 @@ easy to answer:
 - **Accept short replies** ("keep · verified · Q3 board deck") and
   "skip", "back", "pause". On "pause": say what is saved and that "continue
   jobkit setup" picks up here.
-- **No walls of text.** Never paste a whole file. Summarize, then ask.
+- **No walls of text.** Do not paste a whole file. Summarize, then ask.
 - After each step: one line on what was saved, then the next step's first
   question.
 
-## Rules that never bend
+## Rules
 
 These protect the person. A tool refusal is the rule working: relay the
-reason in plain words and ask again. Never work around one.
+reason in plain words and ask again. Do not work around one.
 
 1. **The corpus draft holds only the resume's own text.** Never rewrite,
    improve, shorten or add to it. Improvements go in the critique
    (`data/resume_critique.md`), never into the draft. When the person wants
    different wording, ask them to type the sentence as they want it, and use
-   exactly that. Never offer a rewrite of your own.
+   exactly that. Do not offer a rewrite of your own.
 2. **`metric_confidence` and `evidence` come from the person, for every
    bullet.** Ask; never default, guess or suggest a value. If the person
-   says one answer covers a whole batch, you may apply it to that batch. Never
-   propose that yourself.
+   says one answer covers a whole batch, you may apply it to that batch. Do
+   not propose that yourself. The same goes for a skill's depth: their words.
 3. **Screening answers are asked, never assumed.** Nothing comes from the
    example files or the resume without the person saying it. Work
    authorization and sponsorship are legal statements: ask them exactly.
 4. **EEO questions are optional.** Each takes the person's explicit choice,
    "I don't wish to answer", or nothing (the field then stays blank and is
-   flagged on every form). Never pick one for them.
+   flagged on every form). Do not pick one for them.
 5. **Salary history is never answered.** jobkit leaves it blank and flags it.
 6. **Approve before tailoring.** jobkit tailors only jobs the person approves
    (or standing rules they accepted one at a time; there are none at first).
-7. **The person submits.** jobkit fills forms up to the last click and stops.
-   It never clicks submit, and never solves a CAPTCHA or bot check. It has
-   no submission step to turn on: there is no `src/jobkit/autofill/submit.py`
-   and no `auto_submit` setting. If they ask for one, say so. Do not build,
-   enable or configure automatic submission: that is a change to Hard Rule 1
-   in `CLAUDE.md`, which only the owner of the jobkit GitHub repository makes.
+7. **The person submits.** jobkit fills forms up to the last click and stops;
+   it never clicks submit. At a CAPTCHA or bot check it stops and hands the
+   form to the person; it never solves one.
+   If they ask jobkit to submit for them, answer in one or two sentences: jobkit leaves submit to the person, because a bot check on an application form is the employer asking for a person to send it, and no ATS offers applicants a submit API. Do not build, enable or configure automatic submission.
+   If they want the longer reason: some bot checks are invisible, so
+   software cannot reliably tell when it is being asked to stop, and every
+   ATS submit API takes the employer's key, not the applicant's.
 8. **Facts only from the corpus.** A resume, letter or form answer may only
    state what the person confirmed. A question the corpus cannot answer is
    flagged for them, never invented.
@@ -66,8 +71,9 @@ reason in plain words and ask again. Never work around one.
    `.mcp.json` are gitignored. Never commit them, and never copy a config
    file out of git history (that is someone else's config).
 10. **Persistent changes need a yes.** Installing a schedule, creating a
-    scheduled task or changing settings happens only on the person's explicit
-    yes to that exact change.
+    scheduled task, connecting an account or changing settings happens only
+    on the person's explicit yes to that exact change. API keys and
+    passwords: the person types them in; you do not.
 
 ## Tools: MCP first, CLI when it is not connected
 
@@ -92,14 +98,16 @@ Run `uv run jobkit doctor` (MCP: doctor()). On a fresh clone it fails on the
 config and data files: that is expected, this interview writes them. Fix
 only the machine items now, one at a time, asking before each:
 
-- **uv missing**: show the person the install command doctor prints and let
-  them run it (it downloads and runs an installer). Then a new terminal.
+- **uv missing** (`uv: command not found`; doctor can't run without it): give
+  them the install command from https://docs.astral.sh/uv/getting-started/installation/
+  (or `brew install uv`) to run themselves (it downloads and runs an
+  installer), then a new terminal, then run doctor.
 - **Python not 3.12**: `uv python install 3.12`, then `uv sync`.
 - **Chromium missing**: `uv run playwright install chromium` (a download of
   about 150 MB; say so first). jobkit fills forms in a visible browser.
 - **LLM backend**: either the `claude` CLI on PATH (Claude Code, logged in;
-  runs on their Claude subscription) or `ANTHROPIC_API_KEY` in `.env`. Never
-  type a key yourself: the person pastes it into `.env`.
+  runs on their Claude subscription) or `ANTHROPIC_API_KEY` in `.env`. The
+  person pastes the key into `.env` themselves.
 - **Checkout location**: not under iCloud Drive, ~/Desktop, ~/Documents or
   ~/Downloads (macOS hides files there and launchd cannot read them).
   Doctor prints the move command; ask before running it.
@@ -111,6 +119,12 @@ only the machine items now, one at a time, asking before each:
   folder (approve the "jobkit" server when asked). Carry on with the CLI now.
 - **Contact email** (a warning): offer to put `JOBKIT_CONTACT_EMAIL=` in `.env`
   for the polite job-board User-Agent. Optional.
+- **Job feed keys** (optional and free; this can wait until step 5): Adzuna
+  lists jobs in every industry. Its key comes from developer.adzuna.com and
+  goes in `.env` as `ADZUNA_APP_ID=` and `ADZUNA_APP_KEY=`. USAJOBS lists US
+  federal jobs. Its key comes from developer.usajobs.gov and goes in `.env`
+  as `USAJOBS_API_KEY=` and `USAJOBS_USER_AGENT_EMAIL=` (the email they
+  registered with). The person pastes the keys in themselves.
 
 Re-run doctor until only config/data items (and warnings) remain.
 
@@ -124,7 +138,12 @@ works, or paste the text here."
   `data/setup/tmp/pasted_resume.txt`, then
   `uv run jobkit setup ingest --text-file data/setup/tmp/pasted_resume.txt`).
 - Refused because the file did not extract cleanly: ask them to paste the
-  text. Never guess at a garbled parse.
+  text. Do not guess at a garbled parse.
+- Refused because no jobs were found: the message lists the headings it saw
+  ("headings found: ..."). Show them and ask which one holds the jobs. Then
+  ask the person to paste the resume text with that one heading changed to
+  "Experience" (their edit; nothing else changes), and ingest the pasted
+  text.
 - A draft already holding confirmations is kept; only start over
   (ingest_resume(replace_draft=true), CLI `--replace-draft`) on their yes.
 
@@ -138,7 +157,7 @@ Every later resume, letter and form answer draws only on what is confirmed
 here. Run corpus_draft_status(batch_size=5) (CLI:
 `uv run jobkit setup draft --batch 5`) to see what is left.
 
-**3a. Identity, roles, education, summary lines**, via
+**3a. Identity, roles, education, summary lines, skills**, via
 update_corpus_draft(changes) (CLI: `uv run jobkit setup update-draft <file>`).
 One question at a time:
 
@@ -148,26 +167,42 @@ One question at a time:
 - **Home city**: where they actually live. Always ask.
 - Each role: company and title exactly as they should print, start and end
   month. If the end is missing or only a year, ask "Is this your current
-  job?" Never assume current.
+  job?" Do not assume current.
 - Each school and degree: keep, fix or drop.
 - Each summary line from the resume: keep or drop.
+- **Each skill the resume lists**, one at a time (corpus_draft_status lists
+  the ones not yet decided): "Your resume lists Epic. Should applications
+  claim it? If yes, how well do you know it, in a few words?" Send
+  `resume_skills: [{name, depth}]` with their words as the depth, or
+  `{name, drop: true}`. This matters most for tools and systems: the fact
+  check refuses a letter that names a tool the person has not confirmed,
+  and this is the main place to confirm one.
+- **Each licence, certification or project line** (corpus_draft_status lists
+  them under the resume's own heading), one at a time, in the resume's words:
+  "Your resume lists 'Registered Nurse, Ohio Board of Nursing, active'.
+  Should applications claim it? Anything to add, in a few words?" Send
+  `resume_skills: [{name: <the line as written>, depth: <their words>}]`, or
+  `{name, drop: true}`. A kept line is what scoring sees: a licence left out
+  here counts as missing on every job that asks for it.
 
 **3b. Bullets, five at a time**, via confirm_bullets(decisions) (CLI:
-`uv run jobkit setup confirm <file>`). One bullet per message:
+`uv run jobkit setup confirm <file>`). One bullet per message, showing the
+person's own bullet:
 
 ```
-Step 3 of 8 · bullet 7 of 24 · Sales Manager, Acme
-"Grew pipeline 40% in two quarters."
+Step 3 of 8 · bullet 7 of 24 · <title>, <company>
+"<the bullet exactly as the resume has it>"
 Keep, edit or drop?  Then: how solid is the number?
   verified = you can point at a source · estimate = you'd say "roughly" · none = no figure
-And the evidence, one line: where could you show it? (a dashboard, a doc, a person)
+And the evidence, one line: where could you show it? (a report, a review, a person)
 ```
 
 - `edit`: their own sentence, exactly as typed, as `text_long`.
 - A bullet that states a number cannot be `none` and needs evidence.
 - A bullet with no outcome: ask once, "Was there a number? Roughly how much,
-  over what period?" If they give one, the bullet changes only by an edit
-  in their words. "skip" is fine.
+  over what period?" (patients per shift, students per class, tickets a
+  week, deals a quarter). If they give one, the bullet changes only by an
+  edit in their words. "skip" is fine.
 - After five, send the batch. It is all or nothing: on a refusal, relay the
   reason, fix just that bullet with the person, send again.
 
@@ -176,9 +211,9 @@ an email, a doc intro. It keeps cover letters sounding like you." Store them
 as written via update_corpus_draft(changes) (`voice_samples`).
 
 **3d. Promote**: promote_corpus() (CLI: `uv run jobkit setup promote`). It
-reports bullet count and verified share. Under 30 bullets or 40% verified is
-a thin corpus: say so plainly, and that the daily questions grow it over
-time.
+reports the bullet count and how many of the bullets that state a figure are
+verified. Under 30 bullets, or under 40% of those figures verified, is a thin
+corpus: say so plainly, and that the daily questions grow it over time.
 
 ## Step 4 of 8 — What they want (preferences)
 
@@ -186,44 +221,102 @@ Ask against their corpus ("Your last two roles managed teams. Keep managing,
 or go back to individual work?"), one question at a time. Keep their exact
 words for each `said` field.
 
-1. Direction: keep the current path, or pivot? Toward which titles? Each
-   group of titles is a track.
-2. Titles they would take, and titles they would refuse.
-3. Seniority floor: any / no internships / experienced / senior.
-4. Remote only, hybrid, or onsite is fine? Which cities? Max office days a
-   week and max commute; minutes from home to each city.
-5. Would they relocate? Where?
-6. **Comp floor**: the number below which they would say no. Always ask the
-   default floor (titles outside every track); per-track floors are
-   optional. For sales roles: is it base or OTE?
-7. Industries they want, and industries they refuse.
-8. Companies they would never work for.
-9. Writing style for estimated numbers: `hedged` (estimates keep "about") or
-   `confident` (stated plainly, exactly as written).
+1. **Direction**: which kinds of role? Each kind is a track. For each track,
+   ask "Is this a change of field?" If yes, set `pivot: true` and propose
+   `min_score` 45 or 50, with the reason in one line: the score measures how
+   well the corpus meets a job's must-haves, and a career changer's corpus
+   rarely meets them on paper, so the usual cut-off of 65 would hide most of
+   the jobs worth a look. They pick the number.
+2. **Title words**: "What word does every title you want contain?"
+   (Nurse, Engineer, Teacher) and "Which words narrow it?" (ICU, Backend,
+   Instructional). These become `title_words`.
+3. **Typical titles**: propose 10 to 15 real titles for the track (for
+   example "Staff Nurse, ICU", "Clinical Nurse II", "Sr. Software Engineer").
+   They keep or drop each one. Kept titles go in `should_match`, dropped ones
+   in `should_not_match`; run_intake checks the track against both and says
+   which one fails.
+4. **Emphasis**: "For this kind of role, what should lead your resume?" One
+   line in their words, saved as `emphasis` (for example "patient outcomes
+   and charge nurse shifts first").
+5. **Titles and schedules they would refuse**, in their words: night shift,
+   PRN, contract, travel, commission-only. These go in `exclude_titles`.
+6. Seniority floor: any / no internships / experienced / senior.
+7. **Places**: remote only, hybrid, or on-site is fine? Which city, and which
+   state? A state alone is not a place: if they say "anywhere in Ohio", ask
+   which cities. Max office days a week and max commute; minutes from home to
+   each place. Then propose nearby towns within their commute, one at a time:
+   keep (with minutes) or drop. Kept towns go in `nearby`. A kept town in
+   another state goes in with its state (`"Covington, KY": 15`); a bare town
+   gets their home state.
+8. Would they relocate? Where?
+9. **Pay floor**: "Do you think of pay as a salary or an hourly rate?" For
+   hourly, ask the rate and the hours a week (`unit: hourly`,
+   `hours_per_week`); jobkit converts it to a yearly floor and shows the
+   arithmetic in the config. Always ask the default floor (titles outside
+   every track); per-track floors are optional. Only for sales titles: is
+   the floor base pay, or base plus commission (OTE)?
+10. Industries they want, and industries they refuse.
+11. Companies they would never work for.
+12. **Federal jobs**: "Would you consider US federal government jobs?" A yes
+    turns on USAJOBS (`federal: {wanted: true, said}`); it needs the free
+    key from step 1.
+13. Writing style for estimated numbers: `hedged` (estimates keep "about") or
+    `confident` (stated plainly, exactly as written).
 
 Then run_intake(answers) (CLI: `uv run jobkit setup intake <file>`). The tool
-description lists every field. On a refusal (for example a title their
-floor would reject), ask the conflicting question again. Never edit a config
-file the interview did not write without their yes
+description lists every field. On a refusal (for example a kept title their
+seniority floor would reject), ask the conflicting question again. Do not
+edit a config file the interview did not write without their yes
 (replace_existing=true, CLI `--replace-existing`; the old copy is backed up).
 
-If none of their tracks is a sales role, tell them in one line: jobkit's fit
-score is calibrated for sales roles, so for their kind of work they should
-decide on each job's gaps and rationale, not on the score alone (README,
-"Tuned for sales roles").
+Tell them in one line how scoring is set: intake writes `prompt_set: sales`
+when every track is a software sales title (account executive, SDR/BDR,
+sales manager; not retail, insurance or device sales) and no track is marked
+as a change of field or given an emphasis, and `prompt_set: general` (scoring examples from many
+fields) otherwise.
 
-## Step 5 of 8 — Companies to watch
+## Step 5 of 8 — Where postings come from
 
-Ask: "Name companies you'd love to work at." (tier 1), then "Others worth
-watching?" (tier 2). You may suggest 20 to 40 more from their sector, stage,
-size and places; they approve the list.
+First say this in two or three lines, plainly:
+
+- jobkit reads employer job boards directly only on Greenhouse, Lever and
+  Ashby. Those are mostly tech companies and startups.
+- Hospitals, school districts, government and most large employers use
+  Workday, iCIMS, Taleo or SuccessFactors, which jobkit cannot read. For
+  those it relies on the job feeds (Adzuna for any industry, USAJOBS for
+  federal jobs). A pasted link on those systems is named, and the person
+  applies on the employer's site; that application is not tracked. LinkedIn
+  discovery only helps when the employer also posts on Greenhouse, Lever or
+  Ashby.
+
+Then ask: "Name companies you'd love to work at." (tier 1), then "Others worth
+watching?" (tier 2). You may suggest 20 to 40 more from their field, places
+and size; they approve the list.
 
 Run seed_targets(companies) (CLI:
 `uv run jobkit setup targets "Name 1" "Name 2" --tier 1`, or
 `uv run jobkit setup targets --file <file>` for a list with tiers). It only
 uses the public job-board endpoints. Report: boards found, unverified, not
-found. For each not found, ask for a careers page or job-board link and retry
-with `{name, url}`.
+found. Ask once whether they have a careers or job-board link for the ones
+not found, and retry those with `{name, url}`. Do not chase each one.
+
+**If their employers are not on those boards** (or they name none): ask them
+to say in their own words that they will rely on the feeds, and record it
+with seed_targets(feed_only_said="<their words>") (CLI:
+`uv run jobkit setup targets --feed-only "<their words>"`). No company is
+needed, and the step counts as done. Then:
+
+- Check that the Adzuna key (and the USAJOBS key, if they want federal jobs)
+  is in `.env`. Without a key that feed is skipped, and doctor warns.
+- A posting link found anywhere can be added with add_job_url(url). For a
+  Greenhouse, Lever or Ashby link it queues the job and scores it in the
+  background, and the job is in the queue once scored; for another system it
+  names the system, and they apply on the employer's site.
+- LinkedIn discovery is off by default. When on, it runs a few logged-out
+  LinkedIn searches a day for their titles. It adds a job only when the
+  employer also posts it on Greenhouse, Lever or Ashby; otherwise it notes
+  the company name. Turning it on is `enabled: true` under
+  `feeds.linkedin_guest` in `config/filters.yaml`, on their yes.
 
 ## Step 6 of 8 — Application answers (the answer bank)
 
@@ -236,7 +329,9 @@ can come over several calls.
   applications?" The city here is the real one, not the display location.
 - Work authorization and sponsorship: ask exactly as written.
 - Comp expectation: give a number, their own wording, or leave it blank
-  every time. A number below their default floor is refused.
+  every time. A number below their default floor is refused. For hourly pay,
+  use their own wording (`policy: text`, `unit: hourly`) or leave it blank;
+  the tool refuses a number or a floor for hourly pay.
 - EEO block: say first that every one is optional. Offer three choices:
   their answer, "I don't wish to answer", or skip (blank and flagged).
 - Legal acknowledgements: off unless they opt in; then only labels they
@@ -261,7 +356,8 @@ happen only for jobs they approve.
 ## Step 8 of 8 — Daily runs
 
 The daily run is `jobkit nightly`: new postings, scoring, tailoring approved
-jobs, filling approved forms (never submitting), follow-up drafts, digest.
+jobs, filling approved forms (the person submits), marking applications with
+no reply after 30 days as ghosted, and the digest.
 
 Ask: "What time each day should jobkit run? Pick a time your computer is on
 and the Claude app is open, for example 7:00." Mention that a browser window
@@ -308,6 +404,19 @@ run already finished and only sends the summary.
 
 **C. Linux**: no LaunchAgent. Use A, or give them a cron line that runs
 `uv run --directory REPO jobkit nightly` for them to add themselves.
+
+**D. The email they apply from (optional).** Ask: "Want jobkit to notice
+replies from employers? It can read the inbox you apply from through
+Claude's email connector." On a yes, they connect it themselves in the
+Claude app's connector settings (Gmail, or another email connector), for the
+account they put on applications. Tell them what it does: the daily "check
+my email" and the scheduled run search that mailbox for replies to the
+applications they marked submitted, and record each one as an outcome
+(acknowledged, rejected, assessment, interview, offer, or a recruiter's
+question) with a one-line summary and a link to the message. It only reads.
+It does not send, reply, forward, delete, archive, label or mark anything
+read, and it keeps no email text beyond that one line. Without it, they tell
+jobkit about replies themselves.
 
 ## Done
 

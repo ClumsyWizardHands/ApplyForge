@@ -33,7 +33,17 @@ Then the board-resolution section (discovery/board_resolver.py), when a run
 happened that day or a flag stands: aggregator jobs merged into the
 employer's own posting, LinkedIn cards found on the employer's board, and
 every job flagged board-match-ambiguous with its candidate postings and how
-to pick one."""
+to pick one.
+
+Then "Replies recorded since the last digest" (track/responses.py): employer
+emails the person's mailbox showed and Claude recorded through MCP
+record_email_response since the previous digest was written, each
+with its outcome and the stage it left. Nothing when there are none.
+
+The funnel ends, when there are any, with how many submitted applications
+had no reply after tracking.ghost_after_days (the 'ghost-close' stage marks
+them ghosted). After it, when any were set aside since the last digest, a
+line counting feed jobs whose description was too short to score."""
 
 from __future__ import annotations
 
@@ -48,6 +58,7 @@ from jobkit.config import load_filters
 from jobkit.discovery import board_resolver, linkedin_guest
 from jobkit.pipeline import halts, letter_gate, questions
 from jobkit.pipeline.runner import NIGHTLY, ago, last_successful_nightly, latest_nightly
+from jobkit.track import responses
 
 DIGEST_DIR = paths.HOME / "out" / "digest"
 
@@ -148,6 +159,63 @@ def _funnel(conn: sqlite3.Connection) -> list[tuple[str, int]]:
     ]
 
 
+def previous_digest_time(date: str) -> str:
+    """When the newest digest before `date` was written ('YYYY-MM-DD
+    HH:MM:SS' UTC, from its file), or the start of the day a week before
+    `date` when there is none."""
+    earlier = sorted(p for p in DIGEST_DIR.glob("????-??-??.md") if p.stem < date and p.is_file())
+    if earlier:
+        written = datetime.datetime.fromtimestamp(earlier[-1].stat().st_mtime, datetime.UTC)
+        return written.strftime("%Y-%m-%d %H:%M:%S")
+    week = datetime.date.fromisoformat(date) - datetime.timedelta(days=7)
+    return f"{week.isoformat()} 00:00:00"
+
+
+SHORT_FEED_JD_LISTED = 10
+
+
+def short_feed_jd_rows(
+    conn: sqlite3.Connection, since: str = "", limit: int = SHORT_FEED_JD_LISTED
+) -> list[str]:
+    """One line per feed job rejected since `since` for a description too
+    short to score (status still rejected), newest first: title, company,
+    location and link."""
+    rows = conn.execute(q.LIST_FEED_JOBS_SHORT_JD, {"since": since, "limit": limit}).fetchall()
+    out = []
+    for r in rows:
+        where = f", {r['location_raw']}" if r["location_raw"] else ""
+        out.append(f"- {r['title']}, {r['company_name']}{where}: {r['apply_url']}")
+    return out
+
+
+def short_feed_jd_lines(conn: sqlite3.Connection, since: str) -> list[str]:
+    """The feed jobs rejected since `since` because their description was
+    too short to score (jd_missing), listed with their links. Feeds such as
+    Adzuna send only a snippet, so without this section those jobs vanish
+    unseen. An approved job that tailoring refused for the same reason is not
+    counted: it was never kept out of the queue."""
+    n = conn.execute(q.COUNT_FEED_JOBS_SHORT_JD, {"since": since}).fetchone()["n"]
+    if not n:
+        return []
+    lines = [
+        "## Feed jobs not scored",
+        f"{n} job{'s' if n != 1 else ''} from the job feeds came with too short a "
+        "description to score, so they were not queued. If one looks right, open it "
+        "on the feed's site and apply on the employer's site.",
+        *short_feed_jd_rows(conn, since),
+    ]
+    if n > SHORT_FEED_JD_LISTED:
+        lines.append(
+            f"- and {n - SHORT_FEED_JD_LISTED} more (get_stats lists the newest "
+            f"{STATS_SHORT_FEED_JD_LISTED})"
+        )
+    lines.append("")
+    return lines
+
+
+STATS_SHORT_FEED_JD_LISTED = 25
+
+
 def write_digest(conn: sqlite3.Connection, date: str | None = None) -> Path:
     date = date or datetime.date.today().isoformat()
     lines = [f"# jobkit digest — {date}", "", freshness_banner(conn), ""]
@@ -191,8 +259,8 @@ def write_digest(conn: sqlite3.Connection, date: str | None = None) -> Path:
             f"{comp} · {remote} · gaps: {gaps}{flag_str}"
         )
     lines.append("")
-    # follow-ups due today or earlier: the human sends them (followup_lines)
-    lines.extend(followup_lines(conn))
+    # employer replies recorded from the person's mailbox since the last digest
+    lines.extend(responses.digest_lines(conn, previous_digest_time(date)))
 
     flagged = conn.execute(
         """SELECT j.company_name, j.title, s.flags FROM sanity s
@@ -220,7 +288,11 @@ def write_digest(conn: sqlite3.Connection, date: str | None = None) -> Path:
         rate = f" ({n / prev:.0%} of prior)" if prev else ""
         lines.append(f"- {name}: {n}{rate}")
         prev = n or prev
+    ghosted = conn.execute(q.COUNT_GHOSTED_APPLICATIONS).fetchone()["n"]
+    if ghosted:
+        lines.append(f"- no reply after {load_filters().ghost_after_days} days: {ghosted}")
     lines.append("")
+    lines.extend(short_feed_jd_lines(conn, previous_digest_time(date)))
 
     top_rejects = conn.execute(
         """SELECT reason, COUNT(*) n FROM rejections
@@ -233,34 +305,3 @@ def write_digest(conn: sqlite3.Connection, date: str | None = None) -> Path:
     path = DIGEST_DIR / f"{date}.md"
     path.write_text("\n".join(lines) + "\n")
     return path
-
-
-def followup_lines(conn: sqlite3.Connection) -> list[str]:
-    """The digest's "Follow-ups due" section: every pending follow-up due
-    today or earlier (the same rows as MCP get_followups), whether its draft
-    is ready, and that sending is the human's: jobkit drafts, never sends.
-    Empty when none is due. The unattended scheduled run reports this
-    section, so the human hears about due follow-ups without asking."""
-    from jobkit.track.followups import GHOST_KIND
-
-    rows = conn.execute(q.DUE_FOLLOWUPS).fetchall()
-    if not rows:
-        return []
-    lines = [f"## Follow-ups due ({len(rows)})"]
-    for r in rows:
-        if r["kind"] == GHOST_KIND:
-            state = "no reply: the follow-ups stage closes it as ghosted"
-        elif r["draft"]:
-            state = "draft ready"
-        else:
-            state = "no draft yet (the follow-ups stage drafts it)"
-        lines.append(
-            f"- [{r['id']}] {r['kind']} · due {r['due_at']} · {r['company_name']} — "
-            f"{r['title']} (job {r['job_id']}): {state}"
-        )
-    lines.append(
-        "Send each one yourself (jobkit never sends): MCP get_followups shows the drafts, "
-        "then mark_followup_sent with the ids you sent."
-    )
-    lines.append("")
-    return lines

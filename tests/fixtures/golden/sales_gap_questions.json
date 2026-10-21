@@ -1,0 +1,357 @@
+[
+ {
+  "gap_examples": [],
+  "jobs": [
+   1,
+   2
+  ],
+  "key": "tool-hubspot",
+  "kind": "tool",
+  "label": "HubSpot",
+  "question": "Have you used HubSpot hands-on? If yes: at which job, for how long, and what you did with it."
+ },
+ {
+  "gap_examples": [
+   "Board-level reporting not shown"
+  ],
+  "jobs": [
+   1
+  ],
+  "key": "exp-board-level-exposure",
+  "kind": "experience",
+  "label": "board-level exposure",
+  "question": "Have you presented or reported to a board of directors? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "Cold calling not documented"
+  ],
+  "jobs": [
+   1
+  ],
+  "key": "exp-cold-calling",
+  "kind": "experience",
+  "label": "cold calling",
+  "question": "Have you done cold calling or outbound prospecting yourself? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "Developer tools experience missing"
+  ],
+  "jobs": [
+   1
+  ],
+  "key": "exp-developer-tools",
+  "kind": "experience",
+  "label": "developer tools",
+  "question": "Have you sold developer tools or infrastructure software? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "No fintech or banking background"
+  ],
+  "jobs": [
+   1
+  ],
+  "key": "exp-financial-services",
+  "kind": "experience",
+  "label": "financial services",
+  "question": "Have you sold to banks, fintechs or other financial services firms? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "Marketing automation not documented"
+  ],
+  "jobs": [
+   1
+  ],
+  "key": "exp-marketing-automation",
+  "kind": "experience",
+  "label": "marketing automation",
+  "question": "Have you worked hands-on with marketing automation? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "Channel partners experience not shown"
+  ],
+  "jobs": [
+   1
+  ],
+  "key": "exp-partnerships",
+  "kind": "experience",
+  "label": "partnerships",
+  "question": "Have you run partnerships, alliances or channel sales? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "Public sector buyers not documented"
+  ],
+  "jobs": [
+   1
+  ],
+  "key": "exp-public-sector",
+  "kind": "experience",
+  "label": "public sector",
+  "question": "Have you sold to government or the public sector? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "No SDR team management experience"
+  ],
+  "jobs": [
+   1
+  ],
+  "key": "exp-sdr-bdr-team-management",
+  "kind": "experience",
+  "label": "SDR/BDR team management",
+  "question": "Have you managed SDRs or BDRs (a sales development team)? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "Usage-based pricing not documented"
+  ],
+  "jobs": [
+   1
+  ],
+  "key": "exp-usage-based-pricing",
+  "kind": "experience",
+  "label": "usage-based pricing",
+  "question": "Have you sold usage-based or consumption-priced products? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [],
+  "jobs": [
+   1
+  ],
+  "key": "expansion_ledgerline_revenue_split",
+  "kind": "fact",
+  "label": "expansion_ledgerline_revenue_split",
+  "question": "How much came from repeat borrowers?"
+ },
+ {
+  "gap_examples": [
+   "MEDDPICC rather than MEDDIC expertise"
+  ],
+  "jobs": [
+   1
+  ],
+  "key": "method-meddpicc",
+  "kind": "method",
+  "label": "MEDDPICC",
+  "question": "Have you run deals or coached a team on MEDDPICC? If yes: at which job, and how you used it."
+ },
+ {
+  "gap_examples": [],
+  "jobs": [
+   1
+  ],
+  "key": "method-sandler",
+  "kind": "method",
+  "label": "Sandler",
+  "question": "Have you run deals or coached a team on Sandler? If yes: at which job, and how you used it."
+ },
+ {
+  "gap_examples": [
+   "Clari proficiency (required tool not documented)"
+  ],
+  "jobs": [
+   1
+  ],
+  "key": "tool-clari",
+  "kind": "tool",
+  "label": "Clari",
+  "question": "Have you used Clari hands-on? If yes: at which job, for how long, and what you did with it."
+ },
+ {
+  "gap_examples": [
+   "Clay enrichment workflows"
+  ],
+  "jobs": [
+   1
+  ],
+  "key": "tool-clay",
+  "kind": "tool",
+  "label": "Clay",
+  "question": "Have you used Clay hands-on? If yes: at which job, for how long, and what you did with it."
+ },
+ {
+  "gap_examples": [
+   "Gong call reviews"
+  ],
+  "jobs": [
+   1
+  ],
+  "key": "tool-gong",
+  "kind": "tool",
+  "label": "Gong",
+  "question": "Have you used Gong hands-on? If yes: at which job, for how long, and what you did with it."
+ },
+ {
+  "gap_examples": [
+   "No documented experience with cybersecurity products"
+  ],
+  "jobs": [
+   2
+  ],
+  "key": "exp-cybersecurity",
+  "kind": "experience",
+  "label": "cybersecurity",
+  "question": "Have you sold cybersecurity products? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "Healthcare sector sales experience not documented"
+  ],
+  "jobs": [
+   2
+  ],
+  "key": "exp-healthcare",
+  "kind": "experience",
+  "label": "healthcare",
+  "question": "Have you sold in healthcare (providers, payers, health tech)? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "Hiring reps not documented"
+  ],
+  "jobs": [
+   2
+  ],
+  "key": "exp-hiring-sales-reps",
+  "kind": "experience",
+  "label": "hiring sales reps",
+  "question": "Have you hired sales reps? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "EMEA expansion not documented"
+  ],
+  "jobs": [
+   2
+  ],
+  "key": "exp-international-sales",
+  "kind": "experience",
+  "label": "international sales",
+  "question": "Have you sold internationally (EMEA, APAC, LATAM)? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "No law firm experience"
+  ],
+  "jobs": [
+   2
+  ],
+  "key": "exp-legal-industry",
+  "kind": "experience",
+  "label": "legal industry",
+  "question": "Have you sold to law firms or the legal industry? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "Product-led motion not documented"
+  ],
+  "jobs": [
+   2
+  ],
+  "key": "exp-product-led-growth",
+  "kind": "experience",
+  "label": "product-led growth",
+  "question": "Have you sold in a product-led growth (PLG) motion? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "Technical buyers (CTOs) not documented"
+  ],
+  "jobs": [
+   2
+  ],
+  "key": "exp-technical-buyers",
+  "kind": "experience",
+  "label": "technical buyers",
+  "question": "Have you sold to technical buyers (engineers, CTOs, IT leaders)? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "Territory planning not documented"
+  ],
+  "jobs": [
+   2
+  ],
+  "key": "exp-territory-planning",
+  "kind": "experience",
+  "label": "territory planning",
+  "question": "Have you planned or carved sales territories? Your corpus does not record it. If yes: at which job, what you did, and one concrete result (with a number if you have one)."
+ },
+ {
+  "gap_examples": [
+   "Challenger Sale training"
+  ],
+  "jobs": [
+   2
+  ],
+  "key": "method-challenger",
+  "kind": "method",
+  "label": "Challenger",
+  "question": "Have you run deals or coached a team on Challenger? If yes: at which job, and how you used it."
+ },
+ {
+  "gap_examples": [
+   "Missing ZoomInfo/Cognism and 6sense platform experience"
+  ],
+  "jobs": [
+   2
+  ],
+  "key": "tool-6sense",
+  "kind": "tool",
+  "label": "6sense",
+  "question": "Have you used 6sense hands-on? If yes: at which job, for how long, and what you did with it."
+ },
+ {
+  "gap_examples": [
+   "Missing ZoomInfo/Cognism and 6sense platform experience"
+  ],
+  "jobs": [
+   2
+  ],
+  "key": "tool-cognism",
+  "kind": "tool",
+  "label": "Cognism",
+  "question": "Have you used Cognism hands-on? If yes: at which job, for how long, and what you did with it."
+ },
+ {
+  "gap_examples": [
+   "Outreach sequences not documented"
+  ],
+  "jobs": [
+   2
+  ],
+  "key": "tool-outreach",
+  "kind": "tool",
+  "label": "Outreach",
+  "question": "Have you used Outreach hands-on? If yes: at which job, for how long, and what you did with it."
+ },
+ {
+  "gap_examples": [
+   "Tableau dashboards for the board"
+  ],
+  "jobs": [
+   2
+  ],
+  "key": "tool-tableau",
+  "kind": "tool",
+  "label": "Tableau",
+  "question": "Have you used Tableau hands-on? If yes: at which job, for how long, and what you did with it."
+ },
+ {
+  "gap_examples": [
+   "Missing ZoomInfo/Cognism and 6sense platform experience"
+  ],
+  "jobs": [
+   2
+  ],
+  "key": "tool-zoominfo",
+  "kind": "tool",
+  "label": "ZoomInfo",
+  "question": "Have you used ZoomInfo hands-on? If yes: at which job, for how long, and what you did with it."
+ }
+]

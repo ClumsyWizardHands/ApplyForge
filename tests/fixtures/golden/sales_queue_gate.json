@@ -1,0 +1,22 @@
+{
+ "Account Executive": {
+  "reasons": null,
+  "status": "queued"
+ },
+ "Director of Sales": {
+  "reasons": null,
+  "status": "queued"
+ },
+ "Enterprise Account Executive": {
+  "reasons": "filter:score_below_surface:64<65",
+  "status": "rejected"
+ },
+ "Manager, Sales Development": {
+  "reasons": null,
+  "status": "queued"
+ },
+ "Revenue Operations Manager": {
+  "reasons": "filter:score_below_surface:40<65",
+  "status": "rejected"
+ }
+}
