@@ -8,7 +8,7 @@
 
 Every downstream stage reads from four files: `career_corpus.yaml`, `targets.yaml`, `filters.yaml`, and `answer_bank.yaml`. Hand-writing them is possible but slow, and the corpus in particular is where quality lives — a thin corpus produces thin resumes no matter how good the tailoring is.
 
-Onboarding is a conversation that produces all four. Budget about an hour. It runs **once at setup** and **again as calibration** every 50 reviewed jobs.
+Onboarding is a conversation that produces all four, one question at a time, saved as it goes. It takes about an hour. It runs **once at setup** and **again as calibration** every 50 reviewed jobs.
 
 **How it runs.** The person says "set up jobkit" in a Claude session whose folder is their checkout, and Claude follows the `jobkit-setup` project skill (`.claude/skills/jobkit-setup/SKILL.md`, which ships with the repo; "continue jobkit setup" resumes it). The work is done by the onboarding modules in `src/jobkit/onboarding/`. The skill reaches them through the jobkit MCP tools listed at the end of this file (`onboarding/mcp_tools.py`), or, until the MCP server is registered for the checkout, through their CLI twins (`jobkit setup ...`, `onboarding/cli.py`). Both run the same code and the same checks. `jobkit setup-status` (MCP `setup_status`) shows which steps are done and the next one.
 
@@ -134,7 +134,7 @@ Walk the ~30 recurring screening questions conversationally and write `data/answ
 
 ### 2.8 Seed standing rules (planned)
 
-Not built yet: today `autoapprove.yaml` starts with no rules. The design: propose 3–6 `auto_approve` / `auto_reject` rules derived from the interview answers — e.g., *"tier 1, score ≥ 85, no sanity flags → auto-approve?"* The human accepts or rejects each rule individually. Accepted rules go live immediately: auto-approved jobs are tailored and staged without asking and appear in the digest as done-FYI. Calibration (Phase 3) then refines the set from observed behavior. Never seed a rule that duplicates a sanity-layer control — remote conflict, commute, and underpriced belong to `remote_policy` and `comp_sanity`.
+On the roadmap: today `autoapprove.yaml` starts with no rules. The design: propose 3–6 `auto_approve` / `auto_reject` rules derived from the interview answers — e.g., *"tier 1, score ≥ 85, no sanity flags → auto-approve?"* The human accepts or rejects each rule individually. Accepted rules go live immediately: auto-approved jobs are tailored and staged without asking and appear in the digest as done-FYI. Calibration (Phase 3) then refines the set from observed behavior. Never seed a rule that duplicates a sanity-layer control — remote conflict, commute, and underpriced belong to `remote_policy` and `comp_sanity`.
 
 ### 2.9 First run and the daily run
 
@@ -177,7 +177,7 @@ Present as numbered proposals. Human accepts or rejects each. Accepted changes a
 | `corpus_health()` | Bullet count, metric coverage, tag distribution, gaps vs recent postings |
 | `answer_bank_questions()` | The screening questions in interview order, with what is set |
 | `build_answer_bank(answers)` | Writes `answer_bank.yaml` from the human's answers (ONBOARDING.md 2.7) |
-| `seed_rules()` | Proposes initial standing rules for per-rule acceptance (ONBOARDING.md 2.8). Not built yet: `autoapprove.yaml` starts with no rules |
+| `seed_rules()` | Proposes initial standing rules for per-rule acceptance (ONBOARDING.md 2.8). On the roadmap: `autoapprove.yaml` starts with no rules |
 
 ---
 

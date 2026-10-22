@@ -12,13 +12,17 @@ and how to do each part by hand.
 
 ## What you need
 
-- **macOS or Linux.** Windows is untested. Put the checkout somewhere ordinary
-  such as `~/code/jobkit`, not under Desktop, Documents, Downloads or iCloud
-  Drive. macOS stops scheduled jobs from reading those folders, and iCloud
-  sets the hidden flag on files, which makes Python skip the virtualenv's
-  `.pth` file so `import jobkit` fails.
-- **Access to the repository.** If it is private, your GitHub account needs an
-  invitation, and git or the GitHub CLI (`gh auth login`) must be signed in.
+- **A computer you can run Claude Code on.** I built and tested ApplyForge on
+  my Mac, and CI runs the tests on macOS and Linux. Windows reports are welcome: [open an
+  issue](https://github.com/ClumsyWizardHands/ApplyForge/issues) with whatever
+  trips you up.
+- **A plain folder for the checkout.** Tip from experience: use something like
+  `~/code/jobkit`. On macOS, Desktop, Documents, Downloads and iCloud Drive are
+  off-limits to scheduled jobs, and iCloud sets the hidden flag on files, which
+  makes Python skip the virtualenv's `.pth` file so `import jobkit` fails.
+  `jobkit doctor` catches this and prints the command to move the checkout.
+- **Access to the repository.** While it's private, ask for an invite, then
+  sign in with git or `gh auth login`.
 - **uv**, the Python tool ApplyForge runs with: `brew install uv`, or
   `curl -LsSf https://astral.sh/uv/install.sh | sh`. It installs Python 3.12.
 - **The Claude app** (desktop, with its Code tab and scheduled tasks) or
@@ -61,8 +65,9 @@ The scheduled task's prompt is one line that points at
 `.claude/skills/jobkit-scheduled-run/SKILL.md` in your checkout, so the routine
 updates with the code. The task runs while the Claude app is open; a run missed
 while it is closed happens at the next launch. The unattended run doesn't
-approve jobs, answer questions or submit anything. Cloud routines can't reach
-your checkout, so they can't run jobkit. `tests/test_claude_skills.py` checks
+approve jobs, answer questions or submit anything. Use a scheduled task in
+the app, not a cloud routine: cloud routines run on another machine and can't
+see your checkout. `tests/test_claude_skills.py` checks
 that every `jobkit` command and Claude tool the skills name exists, with the
 options they use, and that the scheduled run only starts the nightly run,
 reads its results and records clear email replies.
@@ -296,9 +301,10 @@ bank) is replaced only if you ask (`replace_existing=true`,
 What you said is kept in `data/setup/*.answers.yaml`. All of `data/` and
 `config/*.yaml` is gitignored.
 
-Planned, not built: proposing the first standing rules from your answers
-(`seed_rules`); `config/autoapprove.yaml` starts with none. STAR stories are
-added to the corpus by hand.
+`config/autoapprove.yaml` starts with no standing rules; you add them as
+patterns show up, and `calibrate` proposes some. STAR stories go into the
+corpus by hand for now. Having setup propose your first rules is on the
+[roadmap](roadmap.md#setup-and-daily-use).
 
 ## Keys and contact address (`.env`)
 
@@ -383,9 +389,11 @@ created only on your yes.
   open, at the time you chose.
 - **A macOS LaunchAgent**, `com.jobkit.nightly` in `~/Library/LaunchAgents`,
   managed by `jobkit schedule install|uninstall|status` (tools
-  `schedule_install`, `schedule_uninstall`, `schedule_status`). On other
-  systems these commands say scheduling isn't supported; run `jobkit nightly`
-  from cron or a systemd timer yourself.
+  `schedule_install`, `schedule_uninstall`, `schedule_status`).
+- **Linux, Windows and other systems:** the Claude app's scheduled task works
+  the same way. Or run `jobkit nightly` once a day, from the project root,
+  with cron or a systemd user timer (Linux) or Task Scheduler (Windows). The
+  `schedule` commands set up the macOS agent only.
 
 About the LaunchAgent:
 
@@ -400,9 +408,9 @@ About the LaunchAgent:
 - `install` refuses a checkout under `~/Desktop`, `~/Documents`, `~/Downloads`
   or iCloud Drive, including data, config or logs linked there. It replaces an
   installed agent and removes the old `com.jobkit.morning` and
-  `com.jobkit.followups` agents, then prints the agent and a warning. The Mac
-  must be awake at that time; launchd doesn't wake it. A run missed while it
-  sleeps happens at the next wake; one missed while it is shut down is skipped.
+  `com.jobkit.followups` agents, then prints the agent. Tip:
+  launchd doesn't wake the Mac. A run missed while it sleeps happens when it
+  wakes; one missed while it's shut down is skipped.
   `--dry-run` prints the plist and installs nothing.
 - `status` is read-only. It shows whether the agent is installed and loaded
   (launchd state, runs, last exit code), the latest nightly run stage by stage
@@ -415,89 +423,16 @@ About the LaunchAgent:
 
 ## Updating
 
-Close every open Claude session in the jobkit folder before you run `git pull`,
-then:
+ApplyForge changes often. Close any open Claude sessions in the jobkit folder,
+then run:
 
 ```bash
 cd ~/code/jobkit && git pull && uv sync && uv run jobkit doctor
 ```
 
-Then start a new Claude session so the jobkit tools reload. A session left open
-during the update keeps running the old tools against the new code and the
-new database, and any of its tools can misbehave, not only the follow-up ones.
-For example, its `rescore` fails with an error, and its `mark_submitted` still
-reports follow-up reminders that are never drafted, or fails with "no such
-table: followups" and records nothing; restart Claude and mark it again. Each
-of its calls also re-creates an empty `followups` table that the next new
-command drops again.
+Then start a new Claude session so the jobkit tools load the new code. A
+session left open keeps the old tools, which can fail against the updated
+database and record nothing.
 
-If your database has the `followups` table from an older version, the first
-jobkit command that opens the database does this once. That is any command
-other than `jobkit doctor`, or the first Claude tool call:
-
-1. saves a copy of the whole database as `data/jobkit.pre-followups.db` (if that
-   name is taken, `-2`, `-3` and so on; an existing copy is never overwritten);
-2. stores every row of the table, unsent drafts included, as a
-   `followups_archived` event;
-3. drops the table.
-
-If the copy can't be written, nothing changes. Rows found later (an old open
-session can add them) get a copy of their own under the next free name, up to
-five copies; after that they are kept as events with no copy. An empty
-`followups` table found later is dropped with no copy, since it holds
-nothing. While one jobkit process makes the copy, others wait for it (up to
-two minutes) instead of failing. A `followups:` block left in your
-`config/filters.yaml` is now read only for its `close_as_ghosted` days, when
-`tracking.ghost_after_days` is not set.
-
-The no-reply rule now covers every application still at `submitted` with no
-reply on record after that many days, including ones the old follow-up
-schedule had no reminder for (submissions from before follow-ups existed, or a
-reminder you skipped). So the first nightly run after the update may mark
-several applications as ghosted at once. To see which ones first, run `uv run
-jobkit ghost-close --dry-run`, or ask Claude to run it (Claude's
-`ghost_close` tool with `confirm` false does the same).
-
-Other changes you may notice on an existing search, including a sales one
-whose config has none of the new settings:
-
-- A job you paste with `jobkit add-url` (or `add_job_url`) is now extracted
-  and scored, which is two Claude calls per link. Before, it was queued with
-  no score.
-- `jobkit add-url` on a Taleo, Jobvite, USAJOBS or other recognised but
-  unsupported link now names the system and exits 0, where it used to exit 1
-  with "could not recognize". The note for unsupported systems is worded
-  differently, and LinkedIn discovery records such a card by the system's name
-  (for example `offsite:taleo`) instead of `offsite:unrecognized`.
-- The digest has no follow-ups section. Its funnel ends with "no reply after
-  30 days" when any application has been marked ghosted. A "Replies recorded
-  since the last digest" section appears when email replies were recorded,
-  and a "Feed jobs not scored" line when feed jobs came with too short a
-  description to score.
-- A keyed feed (Adzuna, USAJOBS) that returns no rows is recorded as `empty`
-  (log `feeds.empty`), where it used to be recorded as `skipped_no_key`, so
-  the run summary on a quiet day reads differently.
-- Standing rules can name any track id as `title_class`. A rule naming
-  `account_executive`, `sdr_bdr` or `sdr_bdr_manager` decides as before.
-- An Ashby posting that gives an hourly, weekly or monthly range is no longer
-  read as a yearly one: its pay is treated as unpublished. Before, a $45-60
-  an hour posting was read as $60 a year and rejected by your pay floor; now
-  it passes the filter like any posting without a published yearly range, and
-  is scored. The next poll rewrites the pay of such postings already stored.
-- `jobkit add-url` on a link whose site it can't recognize (many hospitals and
-  schools use their own careers domain) now says so and exits 0, where it
-  used to exit 1.
-- The no-reply rule covers every application at `submitted` with no reply on
-  record, and skips one whose stage you set back. The old rule marked any
-  application with a pending close reminder. It counts days by your local
-  date; ghost rows the old code made counted by the UTC date.
-- `uv run jobkit run-all` and the nightly run name the stage `ghost-close`
-  where they said `followups`.
-- To have the scheduled daily run check your email for replies, add
-  `email_check: true` under `tracking:` in `config/filters.yaml`. Without it
-  the scheduled run skips email; asking Claude to check your email works
-  either way.
-- USAJOBS stores the posting's summary alone unless
-  `feeds.usajobs.full_description: true` is set (the setup interview writes
-  it). With it, duties, qualifications and education are stored too, so
-  federal jobs are long enough to score; each one is scored again once.
+[What's new](changelog.md) lists each change you might notice, and what an
+update does to your files when it needs to.

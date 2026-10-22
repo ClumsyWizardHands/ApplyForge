@@ -13,8 +13,8 @@ ApplyForge finds job postings, checks them, tailors a resume and cover letter
 from facts the person confirmed, and fills application forms up to the last
 click. The person reviews each form and presses submit. The command, the
 package and the MCP server are all called `jobkit`. This interview builds the
-person's files. It takes about an hour and can stop and resume at any point:
-every answer is saved as it is given.
+person's files. It takes about an hour, goes one question at a time, and can
+stop and resume at any point: every answer is saved as it is given.
 
 It works for any job titles the person chooses: nursing, teaching,
 engineering, sales, operations and so on.
@@ -108,8 +108,9 @@ only the machine items now, one at a time, asking before each:
 - **LLM backend**: either the `claude` CLI on PATH (Claude Code, logged in;
   runs on their Claude subscription) or `ANTHROPIC_API_KEY` in `.env`. The
   person pastes the key into `.env` themselves.
-- **Checkout location**: not under iCloud Drive, ~/Desktop, ~/Documents or
-  ~/Downloads (macOS hides files there and launchd cannot read them).
+- **Checkout location**: a plain folder such as ~/code/jobkit, not iCloud
+  Drive, ~/Desktop, ~/Documents or ~/Downloads (on macOS, files there are
+  hidden from scheduled jobs).
   Doctor prints the move command; ask before running it.
 - **Database**: `uv run jobkit init`.
 - **MCP registration**: write `.mcp.json` from `.mcp.example.json` with
@@ -282,12 +283,13 @@ First say this in two or three lines, plainly:
 - jobkit reads employer job boards directly only on Greenhouse, Lever and
   Ashby. Those are mostly tech companies and startups.
 - Hospitals, school districts, government and most large employers use
-  Workday, iCIMS, Taleo or SuccessFactors, which jobkit cannot read. For
-  those it relies on the job feeds (Adzuna for any industry, USAJOBS for
-  federal jobs). A pasted link on those systems is named, and the person
-  applies on the employer's site; that application is not tracked. LinkedIn
-  discovery only helps when the employer also posts on Greenhouse, Lever or
-  Ashby.
+  Workday, iCIMS, Taleo or SuccessFactors. jobkit finds those jobs through
+  the feeds (Adzuna for any industry, USAJOBS for federal jobs). A pasted link
+  on those systems gets the system's name, and the person applies on the
+  employer's site; jobkit doesn't track that application yet. LinkedIn
+  discovery helps when the employer also posts on Greenhouse, Lever or Ashby.
+  Fuller support for the other systems is on the roadmap
+  (docs/roadmap.md).
 
 Then ask: "Name companies you'd love to work at." (tier 1), then "Others worth
 watching?" (tier 2). You may suggest 20 to 40 more from their field, places
@@ -402,8 +404,9 @@ schedule_install(confirm=true)). `uv run jobkit schedule status` shows it
 afterwards. If both A and B are set up, the Claude task sees that the night's
 run already finished and only sends the summary.
 
-**C. Linux**: no LaunchAgent. Use A, or give them a cron line that runs
-`uv run --directory REPO jobkit nightly` for them to add themselves.
+**C. Not on a Mac**: use A, or give them a cron line (or their system's
+scheduler entry) that runs `uv run --directory REPO jobkit nightly`, for them
+to add themselves.
 
 **D. The email they apply from (optional).** Ask: "Want jobkit to notice
 replies from employers? It can read the inbox you apply from through

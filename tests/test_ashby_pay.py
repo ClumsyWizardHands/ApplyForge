@@ -58,8 +58,8 @@ def test_recorded_ramp_board_keeps_its_annual_pay() -> None:
 
 
 def test_owner_path_decision_hourly_ae_posting_is_unpublished_pay() -> None:
-    """A deliberate change on the sales path (listed under Updating in
-    docs/setup.md): before this round a $45-60 an hour AE posting was read as
+    """A deliberate change on the sales path (listed in docs/changelog.md):
+    before this round a $45-60 an hour AE posting was read as
     a $45-60 a year range and rejected by the comp floor. It is now stored as
     unpublished pay, so the filter passes it to the next stage, as it does
     any posting without a yearly range. Monthly and weekly ranges are the

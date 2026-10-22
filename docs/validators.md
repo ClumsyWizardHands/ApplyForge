@@ -592,12 +592,13 @@ bullet selection, the cover letter and each drafted form answer.
   the questions raised, the report path, and with `full` the report itself.
   Neither makes a model call.
 
-## Known limits
+## What the checks miss
 
-The fact check can't see a claim that has no number, no proper noun and none of
-the words it looks for: "I also led the sales development team", or "I ran the
-merchant team for ~18 months" when every word comes from its cited bullets but
-no bullet says it. Holding every first-person sentence to its cited bullets'
+The rule-based fact check is strict, and it still misses some claims and
+rejects some true sentences. It can't see a claim that has no number, no proper
+noun and none of the words it looks for: "I also led the sales development
+team", or "I ran the merchant team for ~18 months" when every word comes from
+its cited bullets but no bullet says it. Holding every first-person sentence to its cited bullets'
 words would also reject honest sentences. The claim judge, the critic (for a
 letter) and your own read of the filled form are the checks for those.
 

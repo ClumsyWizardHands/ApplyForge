@@ -82,7 +82,7 @@ class ScheduleError(RuntimeError):
 
 
 class ScheduleUnsupported(ScheduleError):
-    """Not macOS."""
+    """Not macOS: the LaunchAgent doesn't apply."""
 
 
 def _platform() -> str:
@@ -92,10 +92,13 @@ def _platform() -> str:
 def require_macos() -> None:
     plat = _platform()
     if plat != "darwin":
+        if plat == "win32":
+            how = "a scheduled task in the Claude desktop app or Windows Task Scheduler"
+        else:
+            how = "cron or a systemd user timer"
         raise ScheduleUnsupported(
-            f"jobkit schedule is not supported yet on {plat}: only macOS (launchd) is. "
-            "Run `jobkit nightly` once a night from cron or a systemd user timer yourself, "
-            "from the project root."
+            f"jobkit schedule sets up a macOS LaunchAgent, so it doesn't apply on {plat}. "
+            f"Run `jobkit nightly` once a day, from the project root, with {how}."
         )
 
 

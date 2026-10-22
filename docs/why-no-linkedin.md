@@ -3,7 +3,8 @@
 ApplyForge (the `jobkit` command) reads jobs from employers' own job boards. If
 you turn it on, it also runs a few logged-out LinkedIn searches a day to find
 company names, then looks for those jobs on each company's own board. This
-page covers what LinkedIn allows, what ApplyForge does, and the risk you take on.
+page covers what LinkedIn allows, what ApplyForge does, and what could come
+next.
 
 ## What LinkedIn allows
 
@@ -31,12 +32,12 @@ page covers what LinkedIn allows, what ApplyForge does, and the risk you take on
 
 ## What ApplyForge doesn't do
 
-ApplyForge doesn't log in to LinkedIn or drive a browser there. Logged-in
-automation is what LinkedIn suspends accounts for, and losing your profile,
-network and recruiter messages in the middle of a search is a serious loss. It
-also doesn't try to get past bot detection or solve CAPTCHAs. Browser
-automation is also slow and costly next to a job board, which answers one
-request with every open role at a company, in structured data.
+ApplyForge never logs in to LinkedIn and never drives a browser there.
+Logged-in automation is what LinkedIn suspends accounts for, and your profile,
+network and recruiter messages matter too much to put at stake in the middle of
+a search. It never gets around bot detection or solves a CAPTCHA. A job board
+is faster anyway: one request returns every open role at a company, in
+structured data.
 
 ## Discovery mode (off by default)
 
@@ -129,13 +130,13 @@ keep each card's outcome. The digest's "LinkedIn guest discovery" line sums the
 day: searches made, new jobs found on employer boards, companies queued, and
 whether LinkedIn blocked the run.
 
-### The risk
+### Your call
 
-This mode is against LinkedIn's User Agreement, which forbids automated access
-whether or not you are logged in. Turning it on is your decision, for
-low-volume, logged-out discovery. Because no request is logged in, your
-LinkedIn account isn't involved, but LinkedIn can still block the address the
-requests come from.
+LinkedIn's User Agreement forbids automated access, logged in or not, so this
+mode stays off until you turn it on. No request is logged in, so your LinkedIn
+account is never involved. If LinkedIn blocks your address, that block applies
+to your own logged-out browsing from that network too; ApplyForge stops for the
+day and tries again tomorrow.
 
 Indeed and Glassdoor are out of scope: ApplyForge doesn't scrape them, logged in or
 out, and doesn't use API keys that weren't issued to you. Indeed's Publisher
@@ -153,17 +154,23 @@ API was retired in 2023.
   it, so your title there should match your resume. A referral usually gets more
   attention than a cold application.
 
-## Possible later steps
+## What could come next
 
-These stay within the limits above: no automated logged-in browsing, and
-nothing that hides from bot detection.
+I'd like a better LinkedIn process, as long as it keeps to the same
+principles: nothing logged in, and nothing that hides from bot detection.
+Ideas so far, also on the
+[roadmap](roadmap.md#linkedin-within-the-principles):
 
-- **Job-alert emails.** Read your LinkedIn job-alert emails and pull out the
-  company apply links (approved, not built).
+- **Job-alert emails.** Read the LinkedIn job-alert emails you already get
+  (read-only) and look each job up on the employer's own board.
 - **Your own LinkedIn data.** LinkedIn lets members download their data,
-  including connections. Importing that file would let ApplyForge point out people
-  you already know at companies in your queue.
-- **Assisted browsing.** While you browse LinkedIn yourself, Claude reads the
-  posting you have open and adds the job to your pipeline.
+  including connections. Importing that file would let ApplyForge point out
+  people you already know at companies in your queue. The file stays on your
+  computer; only the names at a company you're looking at are shown, when you
+  ask.
+- **Paste a job you found yourself.** Paste the job's text or the company name
+  from a LinkedIn posting you're reading, and ApplyForge looks for the job on
+  the employer's own board. It reads only what you paste and never opens the
+  linkedin.com link.
 - **Official access.** If LinkedIn opens a job-seeker API or partner program,
   use it.

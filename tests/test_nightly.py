@@ -613,7 +613,7 @@ def test_status_names_a_failed_and_a_stopped_run(mac: Mac, conn: sqlite3.Connect
     assert "did not finish: its process is gone" in schedule.status(conn)[0]
 
 
-def test_other_platforms_are_not_supported_yet(
+def test_other_platforms_get_the_cron_pointer(
     jobkit_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from jobkit import cli
@@ -622,13 +622,14 @@ def test_other_platforms_are_not_supported_yet(
     calls: list[tuple[str, ...]] = []
     monkeypatch.setattr(schedule, "_launchctl", lambda *a: calls.append(a))
     for fn in (schedule.install, schedule.uninstall, schedule.plan):
-        with pytest.raises(schedule.ScheduleUnsupported, match="not supported yet on linux"):
+        with pytest.raises(schedule.ScheduleUnsupported, match="doesn't apply on linux"):
             fn()
     _sandbox_db().close()
     runner = CliRunner()
     for args in (["install"], ["uninstall"], ["status"]):
         res = runner.invoke(cli.app, ["schedule", *args])
-        assert res.exit_code == 1 and "not supported yet on linux" in res.output, args
+        assert res.exit_code == 1 and "doesn't apply on linux" in res.output, args
+        assert "systemd user timer" in res.output and "Claude" not in res.output, args
     assert (
         "last nightly run: none on record" in runner.invoke(cli.app, ["schedule", "status"]).output
     )
@@ -717,8 +718,10 @@ def test_mcp_schedule_tools(
     assert mcp.schedule_uninstall(confirm=True).startswith("removed com.jobkit.nightly")
     assert not schedule.plist_path().exists()
     monkeypatch.setattr(schedule, "_platform", lambda: "win32")
-    assert "not supported yet on win32" in mcp.schedule_install(confirm=True)
-    assert "not supported yet on win32" in mcp.schedule_status()
+    win = mcp.schedule_install(confirm=True)
+    assert "doesn't apply on win32" in win
+    assert "Task Scheduler" in win and "systemd" not in win
+    assert "doesn't apply on win32" in mcp.schedule_status()
 
 
 # ---------------------------------------------------------------------------

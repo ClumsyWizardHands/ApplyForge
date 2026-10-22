@@ -906,7 +906,7 @@ class _Plan:
                 lines.append("  # getro: robots.txt disallows the search endpoint (hard rule 11)")
                 cfg["enabled"] = False
             if name == "a16z":
-                lines.append("  # a16z: experimental parser, currently broken")
+                lines.append("  # a16z: off until its parser matches the board's new page format")
                 cfg["enabled"] = False
             if name == "linkedin_guest":
                 lines.append(

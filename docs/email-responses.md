@@ -8,7 +8,7 @@ what they say against the right application. This is optional. Without a
 connector, tell Claude what you heard back ("Beta rejected me", "Acme wants an
 interview") and it records that with the `record_outcome` tool.
 
-## What it can and can't do
+## What it does
 
 - **Claude reads; ApplyForge records.** ApplyForge (the `jobkit` command) never
   connects to your mailbox and holds no email password or token. Claude reads

@@ -622,7 +622,7 @@ def add_url(
         # many hospitals, schools and agencies link from their own careers
         # domain: say what to do, and exit 0 (nothing failed)
         typer.echo(
-            "jobkit can't read this site, so nothing was added. Apply on the employer's site."
+            "jobkit doesn't read this site yet, so nothing was added. Apply on the employer's site."
         )
         raise typer.Exit()
     res = asyncio.run(ingest_url(conn, url))

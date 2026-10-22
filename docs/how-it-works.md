@@ -705,8 +705,8 @@ filled. An aggregator row is never canonical. Code:
   `discovery_queue`. `--dry-run` reads the board APIs and writes nothing;
   `resolve_boards()` without `confirm=true` reads only the database.
   `enabled: false` turns it off everywhere except `--pick`.
-- **Not built:** the careers-page crawl of SPEC §2.4. A known company domain
-  only contributes its label as a slug.
+- A known company domain contributes its label as a board slug. Crawling
+  careers pages directly is on the [roadmap](roadmap.md#more-places-to-find-jobs).
 
 `jobkit add-url` uses the same `discovery/ingest.py` path. It polls only the
 board the link names, and doesn't reset an existing company's tier when the
@@ -787,8 +787,3 @@ last so it reports the filling.
   and warns when a browser holds the profile.
 
 Scheduling the run is covered in [Setup](setup.md#the-daily-run).
-
-## Sheets
-
-A Google Sheets mirror is optional in the spec and not wired. SQLite is the
-only source of truth either way.

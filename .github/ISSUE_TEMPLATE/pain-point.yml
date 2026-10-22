@@ -1,0 +1,48 @@
+name: Pain point or bug
+description: Something broke, confused you, or took longer than it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for writing this up. Every pain point helps me fix the next one.
+        Please leave out your resume, form answers, email and anything else personal.
+  - type: textarea
+    id: what
+    attributes:
+      label: What were you doing?
+      description: For example "the setup interview, step 3" or "opening my applications".
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected instead. Error text is welcome; trim your home-folder name from paths and remove any email address first.
+    validations:
+      required: true
+  - type: dropdown
+    id: computer
+    attributes:
+      label: Your computer
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: claude
+    attributes:
+      label: How you use it
+      options:
+        - Claude app (desktop)
+        - Claude Code in a terminal
+        - Something else
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `uv run jobkit doctor` (if it's about setup)
+      description: It shows your email address, folder paths and the places in your search. Remove the email line, trim the paths, and generalize any town names before pasting.
+      render: text

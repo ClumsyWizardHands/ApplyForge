@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-labelledby="title desc">
+  <title id="title">ApplyForge</title>
+  <desc id="desc">ApplyForge: your job search, run from Claude. You press submit. A filled application form with every field checked and a pointer on the Submit button.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#161b22"/>
+      <stop offset="1" stop-color="#1d1813"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ff7a1a" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#ff7a1a" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <clipPath id="frame"><rect x="1" y="1" width="1278" height="318" rx="18"/></clipPath>
+  </defs>
+  <g clip-path="url(#frame)">
+    <rect width="1280" height="320" fill="url(#bg)"/>
+    <circle cx="1046" cy="166" r="250" fill="url(#glow)"/>
+  </g>
+  <rect x="1" y="1" width="1278" height="318" rx="18" fill="none" stroke="#30363d" stroke-width="2"/>
+
+  <rect x="88" y="94" width="44" height="6" rx="3" fill="#ff8a3d"/>
+  <text x="84" y="186" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="88" font-weight="800" letter-spacing="-2.5" fill="#e6edf3">Apply<tspan fill="#ff8a3d">Forge</tspan></text>
+  <text x="88" y="236" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="27" font-weight="500" fill="#c9d1d9">Your job search, run from Claude. You press submit.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="884" y="44" width="316" height="232" rx="16" fill="#0d1117" stroke="#3a3f47" stroke-width="1.5"/>
+  </g>
+  <rect x="908" y="68" width="128" height="10" rx="5" fill="#e6edf3" opacity="0.85"/>
+  <rect x="1044" y="68" width="48" height="10" rx="5" fill="#30363d"/>
+  
+    <rect x="908" y="92" width="58" height="6" rx="3" fill="#6e7681" opacity="0.75"/>
+    <rect x="908" y="103" width="226" height="22" rx="6" fill="#161b22" stroke="#30363d"/>
+    <rect x="918" y="111" width="148" height="6" rx="3" fill="#6e7681" opacity="0.55"/>
+    <circle cx="1158" cy="114" r="11" fill="#3fb950"/>
+    <path d="M1152.5,114.5 l3.8,3.8 l7,-7.6" fill="none" stroke="#0d1117" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="908" y="134" width="84" height="6" rx="3" fill="#6e7681" opacity="0.75"/>
+    <rect x="908" y="145" width="226" height="22" rx="6" fill="#161b22" stroke="#30363d"/>
+    <rect x="918" y="153" width="182" height="6" rx="3" fill="#6e7681" opacity="0.55"/>
+    <circle cx="1158" cy="156" r="11" fill="#3fb950"/>
+    <path d="M1152.5,156.5 l3.8,3.8 l7,-7.6" fill="none" stroke="#0d1117" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="908" y="176" width="70" height="6" rx="3" fill="#6e7681" opacity="0.75"/>
+    <rect x="908" y="187" width="226" height="22" rx="6" fill="#161b22" stroke="#30363d"/>
+    <rect x="918" y="195" width="116" height="6" rx="3" fill="#6e7681" opacity="0.55"/>
+    <circle cx="1158" cy="198" r="11" fill="#3fb950"/>
+    <path d="M1152.5,198.5 l3.8,3.8 l7,-7.6" fill="none" stroke="#0d1117" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="908" y="228" width="124" height="30" rx="8" fill="#ff8a3d"/>
+  <text x="970" y="248" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#1a0f05">Submit</text>
+  <path d="M1012,243 l0,24 l6,-5.6 l4.2,9.4 l4.4,-2 l-4.2,-9.2 l8.2,-0.6 Z" fill="#f0f6fc" stroke="#0d1117" stroke-width="1.6" stroke-linejoin="round"/>
+  <path d="M1222,41 Q1225.08,48.92 1233,52 Q1225.08,55.08 1222,63 Q1218.92,55.08 1211,52 Q1218.92,48.92 1222,41 Z" fill="#ffc145" opacity="1.0"/><path d="M1246,85.5 Q1247.82,90.18 1252.5,92 Q1247.82,93.82 1246,98.5 Q1244.18,93.82 1239.5,92 Q1244.18,90.18 1246,85.5 Z" fill="#ff8a3d" opacity="0.9"/><path d="M1194,19 Q1195.4,22.6 1199,24 Q1195.4,25.4 1194,29 Q1192.6,25.4 1189,24 Q1192.6,22.6 1194,19 Z" fill="#ffc145" opacity="0.8"/><circle cx="1252" cy="40" r="2.2" fill="#ffc145" opacity="0.8"/><circle cx="1230" cy="118" r="1.8" fill="#ff8a3d" opacity="0.7"/>
+</svg>

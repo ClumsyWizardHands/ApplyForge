@@ -233,7 +233,7 @@ feeds:
   cosnetwork: { enabled: false } # chiefofstaff.network RSS; enable for Chief of Staff roles
   # getro: robots.txt disallows the search endpoint (hard rule 11). Keep disabled.
   getro: { enabled: false }
-  # a16z: experimental parser, currently broken. Keep disabled.
+  # a16z: off until its parser matches the board's new page format.
   a16z: { enabled: false }
   # ---- LinkedIn guest (logged-out) job search: discovery only ----
   # CLAUDE.md hard rule 11 exception; docs/why-no-linkedin.md. OFF unless you

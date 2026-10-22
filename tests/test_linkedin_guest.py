@@ -5,12 +5,16 @@ MockTransports serving the shapes recorded live on 2026-10-12
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import copy
 import datetime
+import importlib
 import json
 import os
 import sqlite3
+import sys
+import types
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -19,6 +23,7 @@ import httpx
 import pytest
 import yaml
 
+from jobkit import discovery
 from jobkit.config import Filters, load_filters, parse_linkedin_guest
 from jobkit.discovery import ingest
 from jobkit.discovery import linkedin_guest as lg
@@ -718,6 +723,54 @@ def test_a_second_run_is_busy_while_one_holds_the_lock(
     assert lg.running_now(conn) is None  # released with the descriptor
     assert run(conn, li).status == "ok" and li.count("search") == 6
     assert lg.running_now(conn) is None  # the run released it too
+
+
+def test_the_lock_loads_and_works_without_fcntl_on_windows(
+    conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """fcntl is Unix-only and the CLI imports this module at startup, so on
+    Windows the lock falls back to msvcrt (faked here) instead of crashing
+    every `jobkit` command at import."""
+    held: set[int] = set()
+
+    def locking(fd: int, mode: int, nbytes: int) -> None:
+        assert mode == 2 and nbytes == 1
+        ino = os.fstat(fd).st_ino
+        if ino in held:
+            raise OSError("locked")
+        held.add(ino)
+
+    fake = types.ModuleType("msvcrt")
+    fake.LK_NBLCK = 2  # type: ignore[attr-defined]
+    fake.locking = locking  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "msvcrt", fake)
+    monkeypatch.setitem(sys.modules, "fcntl", None)  # importing it now fails
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.delitem(sys.modules, "jobkit.discovery.linkedin_guest")
+    # importing rebinds the package attribute too; put it back afterwards
+    monkeypatch.setattr(discovery, "linkedin_guest", lg)
+    win = importlib.import_module("jobkit.discovery.linkedin_guest")
+    assert win is not lg
+    with win.run_lock(conn, wait=0.0) as holder:
+        assert holder is None
+        assert win.running_now(conn) == f"pid {os.getpid()}"
+
+
+def test_no_unix_only_import_at_module_level() -> None:
+    """`jobkit` has to start on Windows: a Unix-only module is imported only
+    under a platform check."""
+    unix_only = {"fcntl", "termios", "tty", "pty", "pwd", "grp", "resource"}
+    src = Path(lg.__file__).resolve().parents[1]
+    found = []
+    for path in sorted(src.rglob("*.py")):
+        for node in ast.parse(path.read_text()).body:
+            names: list[str] = []
+            if isinstance(node, ast.Import):
+                names = [a.name.split(".")[0] for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                names = [node.module.split(".")[0]]
+            found += [f"{path.name}: {n}" for n in names if n in unix_only]
+    assert found == []
 
 
 def test_the_lock_is_one_file_per_database_whatever_the_path(

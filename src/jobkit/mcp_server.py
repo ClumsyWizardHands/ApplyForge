@@ -1173,7 +1173,8 @@ def schedule_status() -> str:
     and loaded, when it runs, launchd's last exit code, the last nightly run
     stage by stage plus the last successful one, and every job a staging run
     stopped on before filling anything (reason, screenshot, apply URL), which
-    waits on you. Not macOS: says scheduling is not supported yet."""
+    waits on you. Off macOS: says the LaunchAgent is macOS-only and still
+    shows the nightly run record."""
     try:
         conn: sqlite3.Connection | None = _conn()
     except q.DatabaseMissing:

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Roadmap
+    url: https://github.com/ClumsyWizardHands/ApplyForge/blob/main/docs/roadmap.md
+    about: What's planned, being explored, or still an idea.
+  - name: Support the project on Ko-fi
+    url: https://ko-fi.com/clumsywizardhands
+    about: If ApplyForge helped your search.

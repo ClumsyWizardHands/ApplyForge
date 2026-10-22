@@ -4,9 +4,14 @@
   `auto_submit` setting, CLAUDE.md hard rule 1 says the browser never clicks
   submit, and the setup and daily skills give the consent reason when someone
   asks jobkit to submit for them.
-* The README is a short product page: who ApplyForge suits and where its
-  discovery is weaker, why you press submit (with the author's prediction, in
-  the author's words), email replies, and the support note, in the author's words.
+* The README is a product page: the banner, who ApplyForge suits and what it
+  does on each kind of job system today, why you press submit (with the
+  author's prediction, in the author's words), email replies, the roadmap, and
+  the support note, in the author's words.
+* It reads as an evolving project, stated plainly: tested on the author's Mac,
+  pain points and ideas welcome through the issue forms, and the hedges the
+  author asked to drop stay gone. The principles are stated firmly, here and
+  on the roadmap.
 * The reference material lives under docs/, and every relative link between
   these pages resolves.
 * Wording that the decisions retired ("calibrated for sales roles", "never
@@ -31,6 +36,8 @@ DOCS = REPO_ROOT / "docs"
 SKILLS = REPO_ROOT / ".claude" / "skills"
 SUBMIT_MODULE = REPO_ROOT / "src" / "jobkit" / "autofill" / "submit.py"
 FUNDING = REPO_ROOT / ".github" / "FUNDING.yml"
+ISSUE_FORMS = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
+ASSETS = REPO_ROOT / "assets"
 
 # docs/ pages that ship (local working notes are gitignored: docs/local/ and
 # the dated audit names, see .gitignore)
@@ -48,6 +55,8 @@ NEW_DOCS = (
     "email-responses.md",
     "why-no-linkedin.md",
     "contributing.md",
+    "roadmap.md",
+    "changelog.md",
 )
 
 # the author's prediction, word for word
@@ -84,6 +93,29 @@ RETIRED = (
     "technically forced",
     "follow-up draft",
 )
+# Hedges the author asked to drop (2026-10-22): the platform line says what it
+# was tested on, and a plain limit isn't an apology. (Setup's "about an hour"
+# is plain information, not a hedge, and stays.)
+HEDGES = (
+    "windows is untested",
+    "only as good as your resume",
+    "the risk you take on",
+    "close every open claude session",
+    "experimental parser",
+    "currently broken",
+    "not supported yet",
+    "planned, not built",
+)
+
+# The principles, stated on the roadmap and in the README's roadmap section
+PRINCIPLE_WORDS = (
+    "press submit",
+    "never solves or gets around",
+    "facts you confirmed",
+    "read-only",
+    "stay on your computer",
+)
+
 # removed with follow-up drafting; SPEC.md's amendment names them as removed
 RETIRED_TOOLS = ("get_followups", "run_followups", "mark_followup_sent", "jobkit followups")
 
@@ -177,7 +209,9 @@ def test_spec_section_8_is_consent_plus_the_employer_key_fact() -> None:
 
 def test_readme_is_a_short_product_page() -> None:
     lines = README.read_text().splitlines()
-    assert 120 <= len(lines) <= 260, len(lines)
+    # a product page, not a manual: detail belongs in docs/. The ceiling leaves
+    # room for the README to grow with the project without becoming a manual.
+    assert 120 <= len(lines) <= 400, len(lines)
     headings = [line for line in lines if line.startswith("## ")]
     for heading in (
         "## What it does",
@@ -188,6 +222,7 @@ def test_readme_is_a_short_product_page() -> None:
         "## Where your data is kept",
         "## LinkedIn",
         "## Costs",
+        "## Roadmap",
         "## Support",
     ):
         assert heading in headings, heading
@@ -198,11 +233,34 @@ def test_readme_is_a_short_product_page() -> None:
 
 def test_readme_names_the_command_once_as_jobkit() -> None:
     first = _flat(README.read_text().split("\n## ", 1)[0])
-    assert first.startswith("# applyforge")
+    assert 'alt="applyforge' in first  # the banner carries the name
     assert "the command and the python package are called `jobkit`" in first
+    assert "evolving project" in first
+    assert "i built applyforge for my own job search" in first
 
 
-def test_readme_says_where_discovery_is_strong_and_weak() -> None:
+def test_readme_banner_has_both_themes_and_stays_self_contained() -> None:
+    text = README.read_text()
+    for theme in ("light", "dark"):
+        name = f"assets/banner-{theme}.svg"
+        assert name in text, name
+        svg = (REPO_ROOT / name).read_text()
+        assert svg.startswith("<svg") and "<title" in svg and "<desc" in svg
+        # no script, no external fetch: it renders the same everywhere
+        assert "<script" not in svg and "href=" not in svg and "@import" not in svg
+    # only the two banners ship (a Finder .DS_Store is gitignored)
+    shipped = sorted(p.name for p in ASSETS.iterdir() if not p.name.startswith("."))
+    assert shipped == ["banner-dark.svg", "banner-light.svg"]
+
+
+def test_readme_says_where_it_was_tested() -> None:
+    start = _flat(_section(README.read_text(), "## Get started"))
+    assert "on my mac" in start
+    assert "linux" in start and "windows" in start
+    assert "you need a mac or linux" not in start
+
+
+def test_readme_says_what_it_does_on_each_job_system() -> None:
     suits = _flat(_section(README.read_text(), "## Who it suits"))
     assert "any job titles" in suits
     for system in ("greenhouse", "lever", "ashby"):
@@ -213,8 +271,57 @@ def test_readme_says_where_discovery_is_strong_and_weak() -> None:
         assert audience in suits, audience
     for fallback in ("paste the job link", "adzuna", "usajobs", "linkedin"):
         assert fallback in suits, fallback
-    assert "workable and smartrecruiters" in suits  # the roadmap
-    assert "prompt_set" in suits  # older configs keep the sales scoring
+    assert "workable and smartrecruiters" in suits  # on the roadmap
+    assert "(#roadmap)" in suits
+
+
+def test_older_configs_are_told_how_to_switch_scoring() -> None:
+    # an install from before any-field scoring has no prompt_set line and keeps
+    # the sales examples; the changelog says how to switch
+    flat = _flat((DOCS / "changelog.md").read_text())
+    assert "prompt_set" in flat and "jobkit rescore" in flat
+
+
+def test_roadmap_states_the_principles_and_the_openai_work() -> None:
+    page = _flat((DOCS / "roadmap.md").read_text())
+    section = _flat(_section(README.read_text(), "## Roadmap"))
+    for word in PRINCIPLE_WORDS:
+        assert word in page, word
+        assert word in section, word
+    # LinkedIn stays logged out ("logged" alone would pass "logged in")
+    assert re.search(r"logged[- ]out", page) and re.search(r"logged[- ]out", section)
+    assert "evolving" in page and "time and resources" in page
+    for item in ("codex", "dots", "agents.md", "workable", "smartrecruiters", "linkedin"):
+        assert item in page, item
+    assert "(docs/roadmap.md)" in section
+    for status in ("`planned`", "`exploring`", "`idea`"):
+        assert status in page, status
+    assert "## sources" in page  # the OpenAI facts carry their sources
+
+
+def test_issue_forms_invite_pain_points_and_ideas() -> None:
+    forms = {p.name: p.read_text() for p in ISSUE_FORMS.glob("*.yml")}
+    assert set(forms) == {"pain-point.yml", "idea.yml", "config.yml"}
+    assert "blank_issues_enabled: true" in forms["config.yml"]
+    assert "ko-fi.com/clumsywizardhands" in forms["config.yml"]
+    assert "leave out your resume" in _flat(forms["pain-point.yml"])
+    # doctor prints the contact email: both pages say to remove it before pasting
+    assert "email address" in _flat(forms["pain-point.yml"])
+    assert "remove the email" in _flat(forms["pain-point.yml"])
+    contributing = _flat((DOCS / "contributing.md").read_text())
+    assert "email address" in contributing and "remove the email" in contributing
+    assert "you still press submit" in _flat(forms["idea.yml"])
+    assert "## pain points and ideas" in _flat((DOCS / "contributing.md").read_text())
+
+
+@pytest.mark.parametrize(
+    "page",
+    [*USER_PAGES, ONBOARDING, *SKILL_FILES, *sorted((REPO_ROOT / "config").glob("*.example.yaml"))],
+    ids=_rel,
+)
+def test_dropped_hedges_stay_gone(page: Path) -> None:
+    flat = _flat(page.read_text())
+    assert [h for h in HEDGES if h in flat] == []
 
 
 def test_why_you_press_submit_gives_consent_the_key_fact_and_the_owners_guess() -> None:

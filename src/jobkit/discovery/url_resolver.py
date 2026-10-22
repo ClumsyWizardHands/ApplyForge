@@ -46,8 +46,8 @@ SUPPORTED_SYSTEMS = ("Greenhouse", "Lever", "Ashby")
 def unsupported_note(system: str) -> str:
     """The message for a posting on a hiring system jobkit does not read."""
     return (
-        f"{system} posting: jobkit can only read job boards on Greenhouse, "
-        "Lever and Ashby, so it can't fetch this one. Apply on the employer's site."
+        f"{system} posting: jobkit reads Greenhouse, Lever and Ashby boards today, "
+        "so it doesn't fetch this one yet. Apply on the employer's site."
     )
 
 

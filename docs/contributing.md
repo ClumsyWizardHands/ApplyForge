@@ -1,7 +1,27 @@
 # Contributing
 
-This page is for changing ApplyForge's code. The command, package and Claude
-tools are named `jobkit`.
+ApplyForge is an evolving project, and the most useful thing you can send is
+what got in your way. The command, package and Claude tools are named `jobkit`.
+
+## Pain points and ideas
+
+[Open an issue](https://github.com/ClumsyWizardHands/ApplyForge/issues/new/choose)
+and pick a form:
+
+- **Pain point or bug**: something broke, confused you, or took longer than it
+  should. Say what you were doing, what happened, and your computer (macOS,
+  Linux or Windows). Paste the output of `uv run jobkit doctor` if it's about
+  setup. It shows your email address, folder paths and the places in your
+  search, so remove the email line, trim the paths, and generalize any town
+  names first. Do the same with error text: trim your home-folder
+  name from paths and remove any email address. Leave out your resume, answers
+  and anything else personal.
+- **Idea**: something you'd like ApplyForge to do. The
+  [roadmap](roadmap.md) lists what's already planned, and what people ask for
+  moves up it.
+
+Fixes land as they're ready; [What's new](changelog.md) lists them. The rest of
+this page is for changing the code.
 
 ## Documents
 
@@ -101,9 +121,12 @@ a checkout that holds other untracked files, commit by naming paths
 
 ## Open items
 
-- Adzuna and USAJOBS are marked untested in `docs/endpoints_verified.md`. Their
-  test fixtures are hand-built in the documented shapes, so they prove the
-  request shape and parsing only. Record one live response from each (with and
-  without locations) into `tests/fixtures/feeds/` and confirm the field names.
-- Google Sheets mirror: optional in the spec, not wired. SQLite stays the only
-  source of truth either way.
+The [roadmap](roadmap.md) has the full list. Two for contributors:
+
+- Adzuna and USAJOBS are still to be checked against live responses in
+  `docs/endpoints_verified.md`. Their test fixtures are hand-built in the
+  documented shapes, so they prove the request shape and parsing. Record one
+  live response from each (with and without locations) into
+  `tests/fixtures/feeds/` and confirm the field names.
+- Google Sheets mirror: not built yet (an idea on the roadmap). SQLite stays
+  the only source of truth either way.

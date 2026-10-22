@@ -1,0 +1,27 @@
+name: Idea
+description: Something you'd like ApplyForge to do.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The [roadmap](https://github.com/ClumsyWizardHands/ApplyForge/blob/main/docs/roadmap.md)
+        lists what's already planned. What people ask for moves up it.
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like it to do?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Where would it help in your search?
+      description: The kind of jobs you're after, the sites your employers use, or the step that takes too long.
+  - type: markdown
+    attributes:
+      value: |
+        Every idea is welcome. What gets built keeps to the fixed points: you
+        still press submit, nothing solves or gets around a CAPTCHA, writing
+        comes only from facts you confirmed, email stays read-only, LinkedIn
+        stays logged out, and your data stays on your computer.

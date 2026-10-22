@@ -82,13 +82,13 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import datetime
-import fcntl
 import http.cookiejar
 import json
 import os
 import random
 import re
 import sqlite3
+import sys
 import time
 import urllib.request
 from collections.abc import Callable, Iterator
@@ -566,16 +566,48 @@ def lock_path(conn: sqlite3.Connection) -> Path:
     return paths.resolve_home() / "data" / f"jobkit{LOCK_SUFFIX}"
 
 
-def _try_lock(fd: int) -> bool:
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        return False
-    return True
+if sys.platform == "win32":
+    import msvcrt
+
+    # Windows has no flock: lock one byte past the pid text, so a probe can
+    # still read who holds it. The lock ends with the handle, like flock.
+    _WIN_LOCK_OFFSET = 1 << 20
+
+    def _try_lock(fd: int) -> bool:
+        os.lseek(fd, _WIN_LOCK_OFFSET, os.SEEK_SET)
+        try:
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        except OSError:
+            return False
+        return True
+
+    def _read_head(fd: int) -> bytes:
+        os.lseek(fd, 0, os.SEEK_SET)
+        return os.read(fd, 32)
+
+    def _write_head(fd: int, data: bytes) -> None:
+        os.lseek(fd, 0, os.SEEK_SET)
+        os.write(fd, data)
+
+else:
+    import fcntl
+
+    def _try_lock(fd: int) -> bool:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return False
+        return True
+
+    def _read_head(fd: int) -> bytes:
+        return os.pread(fd, 32, 0)
+
+    def _write_head(fd: int, data: bytes) -> None:
+        os.pwrite(fd, data, 0)
 
 
 def _holder(fd: int) -> str:
-    raw = os.pread(fd, 32, 0).decode(errors="replace").strip()
+    raw = _read_head(fd).decode(errors="replace").strip()
     return f"pid {raw}" if raw.isdigit() else "another process"
 
 
@@ -597,7 +629,7 @@ def run_lock(conn: sqlite3.Connection, wait: float | None = None) -> Iterator[st
             held = _try_lock(fd)
         if held:
             os.ftruncate(fd, 0)
-            os.pwrite(fd, f"{os.getpid()}\n".encode(), 0)
+            _write_head(fd, f"{os.getpid()}\n".encode())
         yield None if held else _holder(fd)
     finally:
         os.close(fd)

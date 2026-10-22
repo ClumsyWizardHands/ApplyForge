@@ -40,9 +40,9 @@ folder.
 
 ## Step 1 — Is a run needed?
 
-Run `uv run --directory REPO jobkit schedule status` (read-only). On Linux or
-Windows it exits 1 and says launchd is not supported; that is fine, it still
-prints the nightly run record. Read these lines:
+Run `uv run --directory REPO jobkit schedule status` (read-only). Off macOS it
+exits 1 and says the LaunchAgent doesn't apply; that is fine, it still prints
+the nightly run record. Read these lines:
 
 - `still running` under the `last nightly run:` line → a run is already
   going (maybe the macOS LaunchAgent started it). Go to step 3 and wait.

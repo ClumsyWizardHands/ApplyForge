@@ -388,7 +388,7 @@ def test_add_url_on_an_unrecognized_site_says_to_apply_there(
     conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A hospital's own careers domain names no known system: add-url exits 0
-    (nothing failed), says it can't read the site and adds no job."""
+    (nothing failed), says it doesn't read the site yet and adds no job."""
     from typer.testing import CliRunner
 
     from jobkit import cli
@@ -397,6 +397,6 @@ def test_add_url_on_an_unrecognized_site_says_to_apply_there(
     url = "https://jobs.examplehealth.org/job/columbus/registered-nurse/123"
     res = CliRunner().invoke(cli.app, ["add-url", url])
     assert res.exit_code == 0, res.output
-    assert "jobkit can't read this site" in res.output
+    assert "jobkit doesn't read this site yet" in res.output
     assert "Apply on the employer's site." in res.output
     assert conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == 0
