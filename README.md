@@ -13,6 +13,7 @@
   <img alt="Tested on my Mac" src="https://img.shields.io/badge/tested_on-my_Mac-555555?logo=apple&logoColor=white">
   <br>
   <img alt="Your data stays local" src="https://img.shields.io/badge/data-stays_local-2da44e">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-3da639"></a>
   <img alt="Status: evolving" src="https://img.shields.io/badge/status-evolving-c2410c">
   <a href="https://ko-fi.com/clumsywizardhands"><img alt="Support on Ko-fi" src="https://img.shields.io/badge/Ko--fi-support_the_project-ff5e5b?logo=kofi&logoColor=white"></a>
 </p>
@@ -381,6 +382,7 @@ ApplyForge changes often; [what's new](docs/changelog.md) lists what changed.
 - [Roadmap](docs/roadmap.md) and [what's new](docs/changelog.md)
 - [Contributing](docs/contributing.md): pain points, ideas, tests, the build
   spec and the project rules
+- [License](LICENSE): MIT
 
 ## Support
 
