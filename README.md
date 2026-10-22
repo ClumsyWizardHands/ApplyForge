@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="assets/banner-light.svg">
-    <img alt="ApplyForge: your job search, run from Claude. You press submit." src="assets/banner-light.svg" width="100%">
+    <img alt="ApplyForge: your job search, automated. All you do is click submit." src="assets/banner-light.svg" width="100%">
   </picture>
 </p>
 
@@ -17,10 +17,13 @@
   <a href="https://ko-fi.com/clumsywizardhands"><img alt="Support on Ko-fi" src="https://img.shields.io/badge/Ko--fi-support_the_project-ff5e5b?logo=kofi&logoColor=white"></a>
 </p>
 
-I built ApplyForge for my own job search. It finds job postings that match the
-roles you want, scores each one against your experience, writes a resume and
-cover letter for each job you approve, and fills in the application form. You
-read the filled form and press submit yourself.
+I built ApplyForge for my own job search. It runs your search every day on its
+own. It finds job postings that match the roles you want, scores each one
+against your experience, approves the ones that clear the bar you set, writes a resume
+and cover letter for each from facts you confirmed, and opens each filled
+application in a browser window. You review it as much as you like and click
+submit. Replies, job alerts and recruiter messages in your email are picked up
+too, if you connect it.
 
 It runs on your own computer, and you use it by talking to Claude. The command
 and the Python package are called `jobkit`, so that is the name you will see in
@@ -36,8 +39,8 @@ resources allow, and what people run into decides what I work on next. The
 <table>
   <tr>
     <td width="50%" valign="top">
-      <h3>🔎 Finds jobs</h3>
-      The public Greenhouse, Lever and Ashby boards of employers you name, plus Adzuna (every industry), USAJOBS (US federal) and remote-job feeds. Optional logged-out LinkedIn searches find more company names.
+      <h3>🔎 Finds jobs every day</h3>
+      On its own, at the time you choose: the public Greenhouse, Lever and Ashby boards of employers you name, Adzuna (every industry), USAJOBS (US federal), remote-job feeds, and the job-alert emails you already get.
     </td>
     <td width="50%" valign="top">
       <h3>📊 Scores them</h3>
@@ -46,22 +49,22 @@ resources allow, and what people run into decides what I work on next. The
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <h3>✍️ Writes from your facts</h3>
-      A one-page resume and a cover letter for each job you approve, built only from facts you confirmed and checked against them before you see anything.
+      <h3>✅ Approves what clears your bar</h3>
+      When you say yes in setup, every job at or above your score with no warning flag is approved automatically. You can still approve or reject any job yourself.
     </td>
     <td width="50%" valign="top">
-      <h3>📝 Fills the form</h3>
-      In a browser window you can see, from your saved answers. It marks what it left for you and stops at a CAPTCHA.
+      <h3>✍️ Writes from your facts</h3>
+      A one-page resume and a cover letter for each approved job, built only from facts you confirmed and checked against them before you see anything.
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <h3>✅ You press submit</h3>
-      You read each application and send it yourself.
+      <h3>📝 Opens each filled application</h3>
+      Fills the form from your saved answers and opens it in a browser window. It marks what it left for you and stops at a CAPTCHA. You review and click submit.
     </td>
     <td width="50%" valign="top">
-      <h3>📬 Keeps track</h3>
-      What you applied to and what came back, from your email if you connect it (read-only) or from what you tell Claude. Thirty days of silence is marked ghosted.
+      <h3>📬 Watches your email</h3>
+      Declines, interview requests and other replies, read-only, if you connect your email. LinkedIn job alerts and messages there are checked too. Thirty days of silence is marked ghosted.
     </td>
   </tr>
 </table>
@@ -86,19 +89,19 @@ Where your employers post jobs decides how much ApplyForge does for each one:
   - turn on Adzuna, which covers every industry and can search near your town
     (free key);
   - use USAJOBS for US federal jobs (also a free key);
+  - connect your email: jobs in your job-alert emails from employers that
+    also post on Greenhouse, Lever or Ashby are found there; the rest are
+    listed in your digest;
   - turn on LinkedIn discovery, which finds employers that also post on
     Greenhouse, Lever or Ashby;
   - paste the job link to Claude. ApplyForge names the system when it
     recognizes the link, and you apply on the employer's site. Tracking those
-    applications is on the roadmap.
+    applications, and reading Workable and SmartRecruiters boards, are on the
+    roadmap.
 
   Feeds such as Adzuna often send only a snippet of a posting. A job with too
   little description to score goes in the digest with its link so you can
   open it.
-
-On the roadmap: readers for Workable and SmartRecruiters job boards, and
-pasting a job description from any site so it's scored, written for and tracked
-like the rest.
 
 A few more things:
 
@@ -134,12 +137,16 @@ go:
 3. Go through your experience line by line. You keep, edit or drop each line,
    and say how solid each number is and where it could be shown.
 4. Ask what you want: the kinds of role, places, remote or not, pay (yearly or
-   hourly), what to avoid, and whether this is a change of field.
+   hourly), what to avoid, whether this is a change of field, and whether jobs
+   that clear your bar are approved without asking you, and at what fit score
+   (75 is the suggestion). Then whether the filled applications open for you
+   after each daily run (yes by default).
 5. Ask which employers to watch, or note that you will rely on the job feeds.
 6. Ask the questions application forms always ask: work authorization, notice
    period and so on. The demographic questions are optional.
 7. Run a first search.
-8. Set up the daily run as a scheduled task in the Claude app.
+8. Set up the daily run as a scheduled task in the Claude app, and connect
+   your email if you like.
 
 Stop whenever you like; say "continue jobkit setup" to pick up where you left
 off. [Setup](docs/setup.md) covers doing each step by hand.
@@ -148,95 +155,108 @@ off. [Setup](docs/setup.md) covers doing each step by hand.
 
 ```mermaid
 flowchart TB
-    subgraph find["1 · Find"]
+    subgraph find["1 · Find, every day"]
         direction LR
-        A["Boards<br/>and feeds"] --> B["Filter<br/>title, place, pay"]
+        A["Boards, feeds and<br/>job-alert emails"] --> B["Filter<br/>title, place, pay"]
         B --> C["Score 0-100<br/>vs your experience"]
-        C --> D(["You approve"])
+        C --> D["Clears your bar<br/>approved automatically"]
     end
     subgraph apply["2 · Apply"]
         direction LR
-        E["Resume + letter<br/>from your facts"] --> F["Form filled<br/>where you see it"]
-        F --> G(["You review<br/>and submit"])
-        G --> H["Replies tracked<br/>(email optional)"]
+        E["Resume + letter<br/>from your facts"] --> F["Form filled and<br/>opened in a browser"]
+        F --> G(["You review<br/>and click submit"])
+        G --> H["Replies tracked<br/>from your email"]
     end
     find --> apply
     classDef you fill:#c2410c,stroke:#9a3412,stroke-width:2px,color:#ffffff
-    class D,G you
+    class G you
     style find fill:none,stroke:#8c959f,stroke-dasharray:5 5
     style apply fill:none,stroke:#8c959f,stroke-dasharray:5 5
 ```
 
-At the time you chose, the daily run checks the boards and feeds, drops what
-your filters rule out, and scores the rest. For each job you approved, it
-writes a resume and letter and fills the application form in a browser window,
-which closes when it is done. It marks applications with no reply after 30 days
-as ghosted, and Claude writes a short summary. The scheduled task runs while
-the Claude app is open; if the app was closed, the run happens when you next
-open it.
+1. **It runs every day on its own**, at the time you chose, as a scheduled task
+   in the Claude app (or when you next open the app, if it was closed).
+2. **It finds and scores jobs.** It checks the boards and feeds, drops what
+   your filters rule out, and scores the rest against your experience.
+3. **It approves the ones that clear the bar you set in setup** (on your
+   yes). You can still approve or reject anything yourself.
+4. **It writes the resume and letter** for each approved job, from your
+   confirmed facts only.
+5. **It opens each filled application** in a browser window at the end of the
+   run (setup asks; yes is the default).
+6. **You review as much as you like and click submit.**
+7. **Replies are tracked from your email,** if you connected it: declines,
+   interview requests and the rest. No reply after 30 days is marked ghosted.
+8. **Your LinkedIn job alerts and messages are checked too,** if you connected
+   your email. Each job in an alert is looked up on the employer's own
+   Greenhouse, Lever or Ashby board, and is scored the same day when it's
+   there. Recruiter messages show up in your summary.
 
-Then open the jobkit folder in Claude and say what you want. Here is a morning
-(the companies are made up):
+How a job alert becomes an application: an email lists jobs you'd fit. Claude
+reads it. ApplyForge looks up each job on the employer's own Greenhouse, Lever
+or Ashby board. When it's there and fits your filters, it is scored the same
+day and approved if it clears your bar. If a job isn't on a board ApplyForge
+reads, Claude searches the web for it and, when it's on Workday or a similar
+site, gives you the direct link.
+
+Claude sends a short summary after each run. Open the jobkit folder in Claude
+whenever you like. Here is a morning (the companies and people are made up):
 
 ```text
 You:     what's in the queue
 
-Claude:  Last successful poll 2 hours ago (2026-10-22 06:01 UTC).
-         2 forms filled and waiting for your review.
+Claude:  This morning's run finished at 07:12. 3 applications cleared your
+         bar and are open in your browser:
 
-         1. Northwind Health · Operations Manager · $95–118k · remote ✓ · 88
-            gaps: Lean certification
-         2. Haulmark Logistics · Customer Success Lead · $82–96k · onsite/hybrid · 84
-            gaps: Salesforce admin
-         3. Larkspur Labs · Program Manager · $105–130k · remote ✓ · 79
-            gaps: grant reporting
-         4. Cedar & Pine · Office Lead · $58–64k · remote ✓ · 66 · gaps: none
+         · Northwind Health · Operations Manager · $95–118k · remote ✓ · 88
+         · Larkspur Labs · Program Manager · $105–130k · remote ✓ · 81
+         · Brightwater Freight · Customer Success Lead · $82–96k · hybrid · 78
+           from your LinkedIn job alert, found on Brightwater's own board
+
+         Reply: Haulmark Logistics invited you to an interview.
+         LinkedIn message: a recruiter at Cedar & Pine asked whether
+         you're open to an operations role.
+
+         Below your bar, in your queue:
+         1. Cedar & Pine · Office Lead · $58–64k · remote ✓ · 66
             ⚠ remote-conflict: "must live within 30 miles of our Denver office"
 
-         2 questions for you today. Approve, reject or skip any?
-         (e.g. approve 1, 4 · reject 2)
+         2 questions for you today.
 
-You:     approve 1, 3 · reject 4, not really remote
+You:     reject 1, not really remote. I submitted Northwind and Larkspur.
 
-Claude:  Approved 1 and 3; their resumes and letters are being written now.
-         Rejected 4 (not really remote).
-
-You:     open my applications
-
-Claude:  Opened 2 filled forms in the browser. Check each one, then press submit.
+Claude:  Rejected 1 (not really remote). Logged Northwind and Larkspur as
+         submitted; their replies will be picked up from your email.
 ```
 
-Other things to say: "I submitted Acme" logs the application, "I heard back
-from Beta, they want an interview" records the reply, and "questions for me"
-brings up a few questions about facts that would help with open jobs.
+Other things to say: "approve 2", "check my email", "questions for me".
 
 ## What it does and what you do
 
 | ApplyForge | You |
 |---|---|
-| finds and scores jobs | approve or reject each one |
-| writes the resume and letter from your confirmed facts | read them |
-| fills the application form | fill anything left blank, check it, press submit |
-| asks for facts it doesn't have | answer in your own words, and confirm before anything is saved |
+| runs every day on its own | set your bar once in setup |
+| finds and scores jobs, and approves the ones that clear your bar | approve or reject anything else, when you want to |
+| writes the resume and letter from your confirmed facts | read them as closely as you like |
+| fills the application form and opens it in a browser window | review it and click submit |
+| asks for facts it doesn't have | answer occasional questions in your own words, and confirm before anything is saved |
 | stops at a CAPTCHA, an ID or payment field, or an assessment | handle those yourself |
-| records replies you report, or finds them in your email if you connect it | decide what to do next |
+| records replies, job alerts and recruiter messages from your email, if you connect it | decide what to do next |
 
-## Why you press submit
+## Why you click submit
 
-ApplyForge fills in each application and stops. You read it and press submit,
-every time.
-
-Many employers put a CAPTCHA or another bot check on their application forms.
-That check is the employer asking for a person to send the application. Some
-of these checks are invisible, so software can't reliably tell which forms
-have one. The way to respect all of them is for a person to press submit
-every time. When a form shows a challenge, ApplyForge stops and leaves it for
-you. It never solves or gets around one.
+ApplyForge fills each application and opens it for you. Clicking submit is
+yours. Many employers put a CAPTCHA or another bot check on their application
+forms. That check is the employer asking for a person to send the
+application. Some of these checks are invisible, so software can't reliably
+tell which forms have one. The way to respect all of them is for a person to
+click submit every time. When a form shows a challenge, ApplyForge stops and
+leaves it for you. It never solves or gets around one.
 
 There is also no way for an applicant's software to submit through the job
 systems themselves. Greenhouse, Lever, Ashby and SmartRecruiters accept
 applications through their APIs only with a key issued to the employer.
-Submitting for you would mean pressing the employer's button in a browser,
+Submitting for you would mean clicking the employer's button in a browser,
 which is what those checks are there to stop.
 
 My guess at where this goes: as more applications come from bots, more employers will put checks on their forms and screen out what looks mass-produced. An application you read and sent yourself should hold up better whichever way that goes. If employers ever offer an approved way for software to apply on your behalf, that's consent, and ApplyForge could use it.
@@ -244,16 +264,24 @@ My guess at where this goes: as more applications come from bots, more employers
 ## Replies in your email (optional)
 
 If you have connected your email to Claude (for example with the Gmail
-connector), Claude can look through your inbox for replies to your
-applications and record them: an automatic receipt, a rejection, an
-assessment, an interview invitation, an offer, or a recruiter's question.
+connector), Claude checks your inbox for you, on every daily run and whenever
+you say "check my email":
+
+- **Replies to your applications:** an automatic receipt, a rejection, an
+  assessment, an interview invitation, an offer, or a recruiter's question.
+- **Job-alert emails** from LinkedIn and the job sites, each job handled as in
+  [A normal day](#a-normal-day). A job only on LinkedIn never enters
+  ApplyForge.
+- **LinkedIn message notifications:** the sender's company and one line about
+  who wrote and what they want, in your summary. Answering is yours.
+
 Email is read-only: Claude reads, ApplyForge records, and nothing is sent,
-deleted, labelled or moved. ApplyForge itself never connects to your mailbox.
-For each reply it stores the outcome, the date, the message's id and link, and
-a one-line summary in Claude's words, never the text of the email. The
-scheduled daily run checks too when `tracking.email_check` is true in
-`config/filters.yaml` (the setup interview sets it). Without a connector, tell
-Claude what you heard back and it records that.
+deleted, labelled or moved. ApplyForge itself never connects to your mailbox,
+and no link in an email is opened. For each reply it stores the outcome, the
+date, the message's id and link, and a one-line summary in Claude's words,
+never the text of the email. The daily run checks when `tracking.email_check`
+is true in `config/filters.yaml` (the setup interview sets it). Without a
+connector, tell Claude what you heard back and it records that.
 [Email replies](docs/email-responses.md) has the details.
 
 ## Where your data is kept
@@ -277,15 +305,23 @@ What leaves your computer:
   about your applications, which Claude reads to record replies. When you ask
   Claude to check your email, it may open a whole message if the preview
   isn't enough. The scheduled daily run reads only the sender, subject, date
-  and preview.
+  and preview, and opens a job-alert email only to read its list of jobs.
 
 ## LinkedIn
 
-ApplyForge reads employers' own job boards. An optional mode runs a few
-logged-out LinkedIn searches a day to find company names, then finds those
-jobs on each company's own board. It never logs in. LinkedIn's terms forbid
-automated access, so the mode stays off until you turn it on.
-[LinkedIn](docs/why-no-linkedin.md) covers how it works and what else I'm
+ApplyForge reads employers' own job boards, and never logs in to LinkedIn.
+LinkedIn reaches it two ways:
+
+- **Your job-alert emails and messages**, read from your own mailbox if you
+  connect it. Each job in an alert is looked up on the employer's own board,
+  and a recruiter's message shows up in your summary. The LinkedIn site is never
+  opened for this.
+- **Discovery mode** (off until you turn it on): a few logged-out LinkedIn
+  searches a day find company names, and those jobs are then found on each
+  company's own board. LinkedIn's terms forbid automated access, so this stays
+  your choice.
+
+[LinkedIn](docs/why-no-linkedin.md) covers how both work and what else I'm
 looking at for LinkedIn.
 
 ## Costs
@@ -308,12 +344,13 @@ things up the list. The full list, with the status of each item, is in
 | Theme | Ideas and plans |
 |---|---|
 | More places to find jobs | paste a job description from any site, and Workable and SmartRecruiters boards (planned); Workday, iCIMS and Taleo feeds, and job searches outside the US (ideas) |
+| Setup and daily use | reply drafts you edit and send yourself, and saved sign-ins for application sites, with your permission for each site (ideas) |
 | More AI tools | OpenAI's Codex: project rules, skills and the jobkit tools (planned); the daily run in the ChatGPT desktop app, and OpenAI's dots (exploring); other assistants that use MCP tools (idea) |
 | Better results in other fields | the fact checker learns nursing, teaching, trades and public-sector wording, and hourly pay ranges (planned) |
-| LinkedIn, within the principles | your LinkedIn job-alert emails, read-only (exploring); who you know at a company, from your own data export (idea) |
+| LinkedIn, within the principles | your LinkedIn job-alert emails and messages, read-only (done); who you know at a company, from your own data export (idea) |
 | More computers | `jobkit schedule` on Linux (planned); `jobkit schedule` and the tests on Windows (ideas) |
 
-Some things stay fixed: you press submit, ApplyForge never solves or gets around
+Some things stay fixed: you click submit, ApplyForge never solves or gets around
 a CAPTCHA, everything it writes comes from facts you confirmed, email is
 read-only, LinkedIn stays logged out, and your files and job database stay on
 your computer.

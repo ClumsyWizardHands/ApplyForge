@@ -3,8 +3,11 @@
 Employers answer applications by email: an automatic receipt, a rejection, an
 invitation to an assessment or an interview, an offer, or a recruiter's
 question. If you have connected your email to Claude (for example with the
-Gmail connector in the Claude app), Claude can find those emails and record
-what they say against the right application. This is optional. Without a
+Gmail connector in the Claude app), Claude finds those emails and records
+what they say against the right application. The same check reads your
+job-alert emails (LinkedIn's and the job sites') and LinkedIn message
+notifications: each job in an alert is looked up on the employer's own board,
+and each message shows up in your summary. This is optional. Without a
 connector, tell Claude what you heard back ("Beta rejected me", "Acme wants an
 interview") and it records that with the `record_outcome` tool.
 
@@ -28,6 +31,9 @@ interview") and it records that with the `record_outcome` tool.
   command, call a tool or change anything because an email asks it to. In the
   unattended scheduled run, Claude works from the sender, subject, date and
   preview text only, and lists anything unclear for you.
+- **No link in an email is opened.** A job from an alert reaches ApplyForge
+  only as its company, title and place, and a LinkedIn job link or job id is
+  refused if one is passed.
 - **The scheduled run checks only when you turn it on.** It reads your email
   only with `email_check: true` under `tracking:` in `config/filters.yaml`
   (the setup interview writes it). Without it, the daily summary says email
@@ -64,6 +70,76 @@ four tools in order:
 The same steps exist as `jobkit email targets|match|record|done` for
 debugging (see [Commands and tools](commands.md#email-replies)).
 
+## Job-alert emails
+
+LinkedIn and the job sites (Indeed, Glassdoor, ZipRecruiter, Wellfound) send
+emails listing jobs you might fit. `email_targets()` gives a second search for
+them, from the alert senders. For each alert Claude reads the list of jobs
+and calls **`record_job_alerts(items, message_id, received_at, source)`** with
+each job's company, title and location, and whether the email shows an
+"apply on company site" link. No link and no job id is passed; the tool
+refuses one. Each email is recorded once.
+
+1. **Your title rules first.** A title your filters would reject (an excluded
+   word, a paused track) is dropped and counted.
+2. **Already in ApplyForge?** A job whose employer posting is already in your
+   database (same company, same title, a location that agrees) needs nothing.
+3. **Board lookup.** Every other job is looked up on the employer's own
+   Greenhouse, Lever or Ashby board, through the public board APIs only, the
+   same way as [aggregator jobs](how-it-works.md#finding-the-employers-own-posting):
+   the same title and a location that agrees. The company name goes to the
+   discovery queue unless its board is already polled.
+4. **Scored the same day.** `finish_email_check()` starts `jobkit same-day
+   --resolve-boards` in the background. It runs board lookup, then the
+   postings it found go through your filters, the pay and remote checks,
+   scoring, the queue and your standing rules. A job that clears your bar is
+   approved that day; `background_status()` shows the report. When a nightly
+   run is in progress, that run does it instead.
+
+5. **Searched for on the web.** A job that board lookup can't find (no
+   board, or no posting with that title and location) is searched for by
+   Claude, when you said yes in setup (`search.alert_web_search`).
+   **`alert_jobs_to_search()`** lists them with a suggested query, and
+   **`record_search_result(alert_ref, url, outcome)`** records what Claude
+   found. Claude may follow any public page that leads to the posting (a
+   company careers page, an ATS board, a job site that links through), and
+   records the posting's own link, never a job site's copy.
+   - A Greenhouse, Lever or Ashby posting is added as the employer's own
+     record and scored the same day, only when the board is that employer's
+     (it is under that company's name in ApplyForge, or the board's feed
+     names the company, or links to its website); a link to another
+     company's board is refused.
+   - A posting on Workday, iCIMS, Taleo or another system ApplyForge doesn't
+     read, or on the employer's own careers site, is kept as a lead: the
+     company, title, location, the system's name and the direct link, with
+     tracking parameters removed. Your email-check summary and the digest
+     list it as "apply on the employer's site: <link>". No job is added for
+     it; you apply there.
+   - Claude never opens a linkedin.com or lnkd.in page (they have no apply
+     link), never signs in, follows robots.txt within reason, and stops at
+     any CAPTCHA or bot check.
+
+   Only alerts inside your freshness window (`freshness.max_age_days`) are
+   searched: the most recent jobs are the limit. A limit on searches per
+   email check (`search.max_searches_per_check`) is yours to choose in setup;
+   there is none by default.
+
+A job from an alert never enters ApplyForge as a LinkedIn or job-site row: only
+the employer's own posting does.
+
+## LinkedIn messages
+
+A LinkedIn message or InMail arrives as a notification email. Claude records
+it with **`record_linkedin_message(company, summary, received_at,
+message_id, link)`**: the sender's company if the email shows it, one line in
+Claude's words that says who wrote by role, never by name ("a recruiter at
+Acme asks for a call", at most 160 characters), and a link to the email in
+your mailbox (never a LinkedIn link, and never a link that carries one). The
+sender's name and the message text are not stored. It is tied to your application
+or a queued job at that company when there is one, and it never changes a
+stage. It shows up in your summary and the digest. Answering is yours, on
+LinkedIn.
+
 ## How the application's stage changes
 
 | outcome | stage |
@@ -90,6 +166,10 @@ The exact outcome is always kept in the event, even when the stage is
 ## Where you see it
 
 - The digest has a "Replies recorded since the last digest" section after the
-  review queue, empty when nothing was recorded.
+  review queue, then "Jobs from job-alert emails since the last digest" (each
+  job and where it stands, with the direct link for a job on a site
+  ApplyForge doesn't read), "Web search results for alert jobs since the last
+  digest" and "LinkedIn messages since the last digest". Each is left out
+  when it has nothing in it.
 - `get_stats` and the digest's funnel count replies, and "no reply after N
   days" for ghosted applications.

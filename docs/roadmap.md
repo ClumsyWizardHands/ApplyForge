@@ -10,6 +10,7 @@ Each item has a status:
 - `planned`: I intend to build it.
 - `exploring`: looking into whether it works and fits.
 - `idea`: worth doing, not started.
+- `done`: built; [what's new](changelog.md) has the details.
 
 Want something that isn't here, or hit a wall? [Open an
 issue](https://github.com/ClumsyWizardHands/ApplyForge/issues). Pain points
@@ -20,13 +21,14 @@ people report move things up the list, and fixes go in as they're ready.
 
 Every item below works within these:
 
-- You press submit. An employer's bot check is the employer asking for a
+- You click submit. An employer's bot check is the employer asking for a
   person.
 - ApplyForge never solves or gets around a CAPTCHA.
 - Everything it writes comes from facts you confirmed.
 - Email is read-only.
-- On LinkedIn it runs logged-out searches only, never anything in your
-  account.
+- Nothing on LinkedIn is logged in: discovery runs logged-out searches, and
+  job alerts and messages are read from your own email, never from the
+  LinkedIn site.
 - Your files and job database stay on your computer.
 
 ## More places to find jobs
@@ -66,8 +68,17 @@ Every item below works within these:
 
 ## Setup and daily use
 
-- `planned` Propose your first standing rules from your setup answers, for you
-  to accept one by one.
+- `done` Your bar: setup asks for the fit score at which jobs are approved
+  without asking you, and the daily run opens the filled forms for your
+  review. A daily limit only if you want one.
+- `planned` Propose more standing rules from your setup answers (a tier,
+  remote, pay), for you to accept one by one.
+- `idea` Reply drafts you edit and send yourself: for an interview request or
+  a recruiter's message, a draft from your confirmed facts that you copy into
+  your own email. ApplyForge never sends anything.
+- `idea` Saved sign-ins for sites like Workday, with your permission for
+  each site; ApplyForge never handles passwords. Never used to get past a
+  CAPTCHA or bot check.
 - `idea` Add your stories (situation, action, result) during the setup
   interview, instead of by hand.
 - `idea` A Google Sheets copy of your pipeline, written from the database
@@ -113,8 +124,8 @@ OpenAI backend, which is the bigger piece.
   - The dot would get the read-only jobkit tools (`get_queue`, `get_digest`,
     `get_stats`, `schedule_status`, `background_status`) and, at most, approve
     and reject. Staging and opening forms stay something you ask Claude or
-    Codex for at your computer, and you press submit there.
-  - The dot skill would tell it never to open an apply link or press submit.
+    Codex for at your computer, and you click submit there.
+  - The dot skill would tell it never to open an apply link or click submit.
     ApplyForge can't enforce a skill on an agent it doesn't run, so part of
     this item is a way for the jobkit tools to refuse the form tools when a
     dot is asking.
@@ -134,8 +145,14 @@ The logged-out discovery searches stay as they are: nothing logged in, and
 nothing that hides from bot detection. Ideas for doing more without touching
 your account:
 
-- `exploring` Read the LinkedIn job-alert emails you already get (read-only)
-  and look each job up on the employer's own board.
+- `done` Read the LinkedIn job-alert emails and message notifications you
+  already get (read-only). Each job is looked up on the employer's own board
+  and scored the same day; messages show up in your summary.
+- `done` Web search for alert jobs board lookup can't find. Setup asks
+  (yes recommended). The employer's Greenhouse, Lever or Ashby posting enters
+  and is scored the same day; a job on Workday or a similar site is listed
+  with its direct link so you can apply there. LinkedIn pages are never
+  opened.
 - `idea` Who you know at a company: load the Connections file from your own
   LinkedIn data export and keep it on your computer. It holds other people's
   details, so only the names at a company you're looking at are shown, when

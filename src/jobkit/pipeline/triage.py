@@ -20,7 +20,7 @@ import json
 import math
 import re
 import sqlite3
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -231,12 +231,15 @@ def _refuse_missing_jd(
 # ---- stage 3: extract ----
 
 
-def run_extract(conn: sqlite3.Connection, limit: int | None = None) -> int:
+def run_extract(
+    conn: sqlite3.Connection, limit: int | None = None, job_ids: Collection[int] | None = None
+) -> int:
+    only, ids = q.only_jobs(job_ids)
     rows = conn.execute(
-        """SELECT j.* FROM jobs j LEFT JOIN job_requirements r ON r.job_id = j.id
-           WHERE j.status = 'filtered' AND r.job_id IS NULL AND j.closed_at IS NULL
+        f"""SELECT j.* FROM jobs j LEFT JOIN job_requirements r ON r.job_id = j.id
+           WHERE j.status = 'filtered' AND r.job_id IS NULL AND j.closed_at IS NULL{only}
            ORDER BY j.first_seen_at DESC LIMIT ?""",
-        (limit or 10**9,),
+        (*ids, limit or 10**9),
     ).fetchall()
     rows = _refuse_missing_jd(conn, rows, "extract")
     return _extract_rows(conn, rows)
@@ -337,17 +340,20 @@ def geo_restriction_acceptable(geo: str, acceptable: list[str]) -> bool:
     return False
 
 
-def run_remote_check(conn: sqlite3.Connection, limit: int | None = None) -> dict[str, int]:
+def run_remote_check(
+    conn: sqlite3.Connection, limit: int | None = None, job_ids: Collection[int] | None = None
+) -> dict[str, int]:
     filters = load_filters()
     remote_cfg = filters.raw.get("remote_policy", {})
     relocation_buckets = filters.relocation_buckets
     acceptable_geo = filters.acceptable_geo_restrictions
     prompt = llm.PromptFile("remote_check")
+    only, ids = q.only_jobs(job_ids)
     rows = conn.execute(
-        """SELECT j.* FROM jobs j LEFT JOIN sanity s ON s.job_id = j.id
-           WHERE j.status = 'filtered' AND s.job_id IS NULL AND j.closed_at IS NULL
+        f"""SELECT j.* FROM jobs j LEFT JOIN sanity s ON s.job_id = j.id
+           WHERE j.status = 'filtered' AND s.job_id IS NULL AND j.closed_at IS NULL{only}
            ORDER BY j.first_seen_at DESC LIMIT ?""",
-        (limit or 10**9,),
+        (*ids, limit or 10**9),
     ).fetchall()
     rows = _refuse_missing_jd(conn, rows, "remote")
 
@@ -441,15 +447,18 @@ def run_remote_check(conn: sqlite3.Connection, limit: int | None = None) -> dict
 # ---- stage 5: comp sanity ----
 
 
-def run_comp_check(conn: sqlite3.Connection, limit: int | None = None) -> dict[str, int]:
+def run_comp_check(
+    conn: sqlite3.Connection, limit: int | None = None, job_ids: Collection[int] | None = None
+) -> dict[str, int]:
     filters = load_filters()
     cs = filters.comp_sanity
     prompt = llm.PromptFile("comp_sanity")
+    only, ids = q.only_jobs(job_ids)
     rows = conn.execute(
-        """SELECT j.* FROM jobs j JOIN sanity s ON s.job_id = j.id
-           WHERE j.status = 'filtered' AND s.demand_score IS NULL AND j.closed_at IS NULL
+        f"""SELECT j.* FROM jobs j JOIN sanity s ON s.job_id = j.id
+           WHERE j.status = 'filtered' AND s.demand_score IS NULL AND j.closed_at IS NULL{only}
            ORDER BY j.first_seen_at DESC LIMIT ?""",
-        (limit or 10**9,),
+        (*ids, limit or 10**9),
     ).fetchall()
     rows = _refuse_missing_jd(conn, rows, "comp")
 
@@ -706,15 +715,18 @@ def score_rows(
     return out
 
 
-def run_score(conn: sqlite3.Connection, limit: int | None = None) -> int:
+def run_score(
+    conn: sqlite3.Connection, limit: int | None = None, job_ids: Collection[int] | None = None
+) -> int:
     profile = _profile_summary()
+    only, ids = q.only_jobs(job_ids)
     rows = conn.execute(
-        """SELECT j.*, r.must_have, r.nice_to_have, r.implied, r.disqualifier
+        f"""SELECT j.*, r.must_have, r.nice_to_have, r.implied, r.disqualifier
            FROM jobs j JOIN job_requirements r ON r.job_id = j.id
            LEFT JOIN scores sc ON sc.job_id = j.id
-           WHERE j.status = 'filtered' AND sc.job_id IS NULL AND j.closed_at IS NULL
+           WHERE j.status = 'filtered' AND sc.job_id IS NULL AND j.closed_at IS NULL{only}
            ORDER BY j.first_seen_at DESC LIMIT ?""",
-        (limit or 10**9,),
+        (*ids, limit or 10**9),
     ).fetchall()
     rows = _refuse_missing_jd(conn, rows, "score")
     done = len(score_rows(conn, rows, profile=profile))
@@ -764,17 +776,42 @@ def score_gate_reason(score: int, min_score: int) -> str:
     return f"{SCORE_GATE_PREFIX}{score}<{min_score}"
 
 
-def run_queue(conn: sqlite3.Connection, filters: Filters | None = None) -> int:
+def run_queue(
+    conn: sqlite3.Connection,
+    filters: Filters | None = None,
+    job_ids: Collection[int] | None = None,
+    *,
+    require_sanity: bool = False,
+) -> int:
     """The queue gate: a scored, filtered job at or above its gate is queued,
     one below it is rejected (score_below_surface). The gate is the job's
     track min_score when the track sets one, else gates.min_score_to_surface
-    (Filters.min_score_for)."""
+    (Filters.min_score_for). `job_ids`: only these jobs (pipeline/same_day.py).
+    `require_sanity` (only the same-day run, pipeline/same_day.py): a job
+    whose remote or comp check has not finished (no sanity row, or no demand
+    score, as when its LLM call failed) is left filtered for the nightly run,
+    so the same-day standing rules never see an empty flag list that no
+    check wrote. `jobkit triage` and run-all/nightly keep today's behaviour
+    and queue such a job."""
     filters = filters or load_filters()
+    only, ids = q.only_jobs(job_ids)
     rows = conn.execute(
-        """SELECT j.id, j.title, j.jd_html, sc.fit_score FROM jobs j
+        f"""SELECT j.id, j.title, j.jd_html, sc.fit_score,
+                  s.job_id AS sanity_job_id, s.demand_score FROM jobs j
            JOIN scores sc ON sc.job_id = j.id
-           WHERE j.status = 'filtered' AND j.closed_at IS NULL"""
+           LEFT JOIN sanity s ON s.job_id = j.id
+           WHERE j.status = 'filtered' AND j.closed_at IS NULL{only}""",
+        ids,
     ).fetchall()
+    if require_sanity:
+        held = [r for r in rows if r["sanity_job_id"] is None or r["demand_score"] is None]
+        if held:
+            log(
+                "queue.sanity_incomplete",
+                job_ids=[int(r["id"]) for r in held],
+                note="left filtered until the remote and comp checks finish",
+            )
+            rows = [r for r in rows if r not in held]
     # a score written before the JD guard existed must not promote a JD-less job
     rows = _refuse_missing_jd(conn, rows, "queue")
     queued = 0

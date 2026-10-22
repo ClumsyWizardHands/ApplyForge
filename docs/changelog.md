@@ -3,6 +3,47 @@
 ApplyForge changes often. This page lists the changes someone already using it
 might notice, newest first. To update, see [Updating](setup.md#updating).
 
+## 2026-10-22: automatic by default
+
+ApplyForge now runs your search for you: every day it finds and scores jobs,
+approves the ones that clear your bar, writes and fills the applications and
+opens them in a browser window. You review and click submit.
+
+- **Your bar.** Setup asks whether jobs that clear your bar are approved
+  without asking you, and at what fit score (75 suggested); on your yes it
+  writes one rule in `config/autoapprove.yaml`. A `config/autoapprove.yaml`
+  you wrote yourself is never replaced. There is no daily limit unless you set
+  `max_auto_approve_per_day`. You can still approve or reject any job
+  yourself. See [Your bar](how-it-works.md#your-bar-automatic-approval).
+- **Forms open after the daily run** when `staging.open_after_daily_run: true`
+  is in `config/filters.yaml`. `jobkit schedule status` ends with whether it
+  is on and how many applications are ready.
+- **Job-alert emails and LinkedIn messages.** The email check reads them too.
+  Each job in an alert is looked up on the employer's own Greenhouse, Lever or
+  Ashby board and, when it's there, scored the same day (`jobkit same-day`);
+  recruiter messages show up in your summary, by company and role, never by
+  the sender's name. New tools: `record_job_alerts`,
+  `record_linkedin_message`. See [Email replies](email-responses.md#job-alert-emails).
+- **Web search for alert jobs.** When a job from your alert emails isn't on
+  a board ApplyForge reads, Claude searches the web for it. Setup asks (yes
+  recommended, no limit unless you name one). The employer's Greenhouse,
+  Lever or Ashby posting is added and scored the same day; a posting on
+  Workday or a similar site is listed in your email-check summary and digest
+  with its direct link ("apply on the employer's site: <link>"), and no job
+  is added for it. LinkedIn pages are never opened, nothing is signed in to,
+  and Claude stops at any CAPTCHA
+  ([LinkedIn](why-no-linkedin.md#web-search-for-alert-jobs)). Tools:
+  `alert_jobs_to_search`, `record_search_result`.
+- The banner reads "Your job search, automated. All you do is click submit."
+
+**What changes in an existing setup.** The email check, when it runs, now
+includes job alerts and LinkedIn messages. Everything else is a key your files
+don't have yet, and without it ApplyForge behaves as before: no rule is added
+to your `autoapprove.yaml`, forms are not opened after the run, and nothing is
+searched. To turn them on, copy the keys you want from the templates
+(`config/autoapprove.example.yaml`, `config/filters.example.yaml`). `jobkit
+doctor` reports automatic approval and form opening.
+
 ## 2026-10-22: a roadmap and a plainer README
 
 - The README has a banner, a diagram of the daily loop, a sample morning and a

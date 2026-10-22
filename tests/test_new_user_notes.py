@@ -4,10 +4,14 @@
   `auto_submit` setting, CLAUDE.md hard rule 1 says the browser never clicks
   submit, and the setup and daily skills give the consent reason when someone
   asks jobkit to submit for them.
-* The README is a product page: the banner, who ApplyForge suits and what it
-  does on each kind of job system today, why you press submit (with the
-  author's prediction, in the author's words), email replies, the roadmap, and
-  the support note, in the author's words.
+* The README is a product page: the banner with the owner's tagline, the
+  automatic daily flow (find, score, approve what clears your bar, write, open
+  the filled form, you click submit, replies and job alerts from your email),
+  who ApplyForge suits and what it does on each kind of job system today, why
+  you click submit (with the author's prediction, in the author's words),
+  email replies, the roadmap, and the support note, in the author's words.
+* A daily limit on automatic approval is optional: none by default, and no
+  page presents one as part of the default flow.
 * It reads as an evolving project, stated plainly: tested on the author's Mac,
   pain points and ideas welcome through the issue forms, and the hedges the
   author asked to drop stay gone. The principles are stated firmly, here and
@@ -78,6 +82,10 @@ SUPPORT = (
     "Live long and prosper, friends."
 )
 
+# The owner's tagline (2026-10-22), and the one it replaced
+TAGLINE = "Your job search, automated. All you do is click submit."
+OLD_TAGLINE = "run from claude. you press submit"
+
 # The answer the setup and daily skills give when asked to submit
 CONSENT = (
     "jobkit leaves submit to the person, because a bot check on an application form "
@@ -109,7 +117,7 @@ HEDGES = (
 
 # The principles, stated on the roadmap and in the README's roadmap section
 PRINCIPLE_WORDS = (
-    "press submit",
+    "click submit",
     "never solves or gets around",
     "facts you confirmed",
     "read-only",
@@ -217,7 +225,7 @@ def test_readme_is_a_short_product_page() -> None:
         "## What it does",
         "## Who it suits",
         "## Get started",
-        "## Why you press submit",
+        "## Why you click submit",
         "## Replies in your email (optional)",
         "## Where your data is kept",
         "## LinkedIn",
@@ -251,6 +259,66 @@ def test_readme_banner_has_both_themes_and_stays_self_contained() -> None:
     # only the two banners ship (a Finder .DS_Store is gitignored)
     shipped = sorted(p.name for p in ASSETS.iterdir() if not p.name.startswith("."))
     assert shipped == ["banner-dark.svg", "banner-light.svg"]
+
+
+def test_the_banner_carries_the_owners_tagline() -> None:
+    for theme in ("light", "dark"):
+        svg = (ASSETS / f"banner-{theme}.svg").read_text()
+        assert f">{TAGLINE}</text>" in svg, theme
+        assert TAGLINE.lower() in _flat(svg.split("<desc", 1)[1].split("</desc>", 1)[0])
+    assert f'alt="ApplyForge: {TAGLINE[0].lower()}{TAGLINE[1:]}"' in README.read_text()
+    pages = [*USER_PAGES, SPEC, ONBOARDING, *SKILL_FILES, *ASSETS.glob("*.svg")]
+    assert [_rel(p) for p in pages if OLD_TAGLINE in _flat(p.read_text())] == []
+
+
+def test_readme_describes_the_automatic_day_in_order() -> None:
+    day = _section(README.read_text(), "## A normal day")
+    flat = _flat(day)
+    steps = (
+        "it runs every day on its own",
+        "it finds and scores jobs",
+        "it approves the ones that clear the bar you set in setup",
+        "it writes the resume and letter",
+        "it opens each filled application",
+        "you review as much as you like and click submit",
+        "replies are tracked from your email",
+        "your linkedin job alerts and messages are checked too",
+    )
+    at = [flat.find(s) for s in steps]
+    assert -1 not in at and at == sorted(at), dict(zip(steps, at, strict=True))
+    assert "limit" not in flat  # an optional daily limit is no part of the day
+    # the email steps say they need a connected email
+    assert flat.count("if you connected it") + flat.count("if you connected your email") == 2
+    assert "you can still approve or reject anything yourself" in flat
+    # the alert flow: looked up on a board ApplyForge can apply through, never a
+    # LinkedIn row; web search for alert jobs is not part of the day
+    assert "employer's own greenhouse, lever or ashby board" in flat
+    assert "is scored the same day when it's there" in flat
+    assert "scored the same day and approved if it clears your bar" in flat
+    assert "web search" not in flat
+    assert "lands in your queue" not in flat
+    # the diagram: the only human step is reviewing and clicking submit
+    mermaid = day[day.index("```mermaid") : day.index("```", day.index("```mermaid") + 3)]
+    assert re.findall(r"^\s*class (\S+) you$", mermaid, re.M) == ["G"]
+    assert 'G(["You review<br/>and click submit"])' in mermaid
+    assert "Clears your bar<br/>approved automatically" in mermaid
+    assert "You approve" not in mermaid
+
+
+def test_a_daily_limit_is_never_part_of_the_default_flow() -> None:
+    text = README.read_text()
+    assert "max_auto_approve_per_day" not in text
+    flat = _flat(text)
+    # the README never mentions one: the optional limit lives in docs/setup.md
+    # and docs/how-it-works.md
+    assert "daily limit" not in flat
+    assert "limit" not in _flat(_section(text, "## What it does"))
+    # the template ships it commented out; the docs say none by default
+    template = (REPO_ROOT / "config" / "autoapprove.example.yaml").read_text()
+    assert "\n# max_auto_approve_per_day:" in template
+    assert "\nmax_auto_approve_per_day:" not in template
+    how = _flat((DOCS / "how-it-works.md").read_text())
+    assert "no daily limit by default" in how
 
 
 def test_readme_says_where_it_was_tested() -> None:
@@ -297,6 +365,9 @@ def test_roadmap_states_the_principles_and_the_openai_work() -> None:
     for status in ("`planned`", "`exploring`", "`idea`"):
         assert status in page, status
     assert "## sources" in page  # the OpenAI facts carry their sources
+    # LinkedIn job-alert emails were built (2026-10-22)
+    assert "`done` read the linkedin job-alert emails" in page
+    assert "job-alert emails and messages, read-only (done)" in section
 
 
 def test_issue_forms_invite_pain_points_and_ideas() -> None:
@@ -310,7 +381,7 @@ def test_issue_forms_invite_pain_points_and_ideas() -> None:
     assert "remove the email" in _flat(forms["pain-point.yml"])
     contributing = _flat((DOCS / "contributing.md").read_text())
     assert "email address" in contributing and "remove the email" in contributing
-    assert "you still press submit" in _flat(forms["idea.yml"])
+    assert "you still click submit" in _flat(forms["idea.yml"])
     assert "## pain points and ideas" in _flat((DOCS / "contributing.md").read_text())
 
 
@@ -324,8 +395,8 @@ def test_dropped_hedges_stay_gone(page: Path) -> None:
     assert [h for h in HEDGES if h in flat] == []
 
 
-def test_why_you_press_submit_gives_consent_the_key_fact_and_the_owners_guess() -> None:
-    text = _section(README.read_text(), "## Why you press submit")
+def test_why_you_click_submit_gives_consent_the_key_fact_and_the_owners_guess() -> None:
+    text = _section(README.read_text(), "## Why you click submit")
     flat = _flat(text)
     assert "the employer asking for a person to send the application" in flat
     assert "invisible" in flat

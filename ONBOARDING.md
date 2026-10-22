@@ -132,13 +132,15 @@ Then continue to 2.7 and 2.8 — onboarding is not done when the filters are wri
 
 Walk the ~30 recurring screening questions conversationally and write `data/answer_bank.yaml`. Ask each one out loud — never assume, never inherit from the example file: work authorization and sponsorship (a wrong answer is misrepresentation), notice period, start date, comp expectation strategy and floor, relocation, onsite tolerance, non-compete status (ask directly — for anyone who has held a sales or leadership role a restrictive covenant is a live possibility), references, how-did-you-hear preference, and the EEO block, where "decline to self-identify" is an explicit, valid choice and an absent entry means the field stays blank and flagged. With these answers saved, most form fields fill themselves.
 
-### 2.8 Seed standing rules (planned)
+### 2.8 Seed standing rules
 
-On the roadmap: today `autoapprove.yaml` starts with no rules. The design: propose 3–6 `auto_approve` / `auto_reject` rules derived from the interview answers — e.g., *"tier 1, score ≥ 85, no sanity flags → auto-approve?"* The human accepts or rejects each rule individually. Accepted rules go live immediately: auto-approved jobs are tailored and staged without asking and appear in the digest as done-FYI. Calibration (Phase 3) then refines the set from observed behavior. Never seed a rule that duplicates a sanity-layer control — remote conflict, commute, and underpriced belong to `remote_policy` and `comp_sanity`.
+**Built (2026-10-22): the person's bar.** The interview asks one question: should jobs that clear your bar be approved without asking you, at what fit score (75 suggested, `intake.AUTO_APPROVE_MIN_SCORE_DEFAULT`)? On a yes, `run_intake` (answer `auto_approve`) writes one rule, `{when: {score_gte: <score>, sanity_flags: none, sanity_checked: true}, reason: "clears-your-bar"}` (`sanity_checked` holds only once both sanity checks finished), quoting the person's words. A daily limit (`max_auto_approve_per_day`) is asked only as an optional follow-up and written only when the person gives a number; the default is no limit, and the skill never proposes one. On a no, or with no answer, no rule is written. An `autoapprove.yaml` holding rules the interview did not write is always kept as it is, whatever `replace_existing` says; the output names the rule to add (or, on a no, the rule to delete). The same step asks whether the daily run opens the filled forms (`open_forms`, default yes, `staging.open_after_daily_run`). Then it asks about web search for alert jobs (SPEC.md §16.6): "When a job from your alert emails isn't on a board I can read, should I search the web for it?" (yes recommended), and on a yes, "Is there a limit on how many searches per email check you want (no limit is fine; recency already limits it)?" `run_intake` (answer `alert_search`) writes `search.alert_web_search`, and `search.max_searches_per_check` only when the person names a number; the default is on with no limit. With no answer, no `search` block is written and search stays off.
+
+**Still planned: more rules.** The design: propose 3–6 `auto_approve` / `auto_reject` rules derived from the interview answers — e.g., *"tier 1, score ≥ 85, no sanity flags → auto-approve?"* The human accepts or rejects each rule individually. Accepted rules go live immediately: auto-approved jobs are tailored and staged without asking and appear in the digest as done-FYI. Calibration (Phase 3) then refines the set from observed behavior. Never seed a rule that duplicates a sanity-layer control — remote conflict, commute, and underpriced belong to `remote_policy` and `comp_sanity`.
 
 ### 2.9 First run and the daily run
 
-The `jobkit-setup` skill ends the interview by running `jobkit doctor` until only warnings remain, starting the first `jobkit nightly` run, and scheduling the daily one: a scheduled task in the Claude app whose prompt only points at `.claude/skills/jobkit-scheduled-run/SKILL.md` in the checkout (so the routine updates with the code), with the macOS LaunchAgent (`jobkit schedule install`) as the fallback. Each is created only on the person's explicit yes. Nothing is approved during setup: the person approves jobs by number afterwards ("what's in the queue", the `jobkit-daily` skill), and presses submit on each application.
+The `jobkit-setup` skill ends the interview by running `jobkit doctor` until only warnings remain, starting the first `jobkit nightly` run, and scheduling the daily one: a scheduled task in the Claude app whose prompt only points at `.claude/skills/jobkit-scheduled-run/SKILL.md` in the checkout (so the routine updates with the code), with the macOS LaunchAgent (`jobkit schedule install`) as the fallback. Each is created only on the person's explicit yes. Claude approves nothing during setup. From the first run on, the person's bar (2.8, on their yes) approves the jobs that clear it; the person approves or rejects the rest by number ("what's in the queue", the `jobkit-daily` skill), and presses submit on each application.
 
 ---
 
@@ -171,13 +173,13 @@ Present as numbered proposals. Human accepts or rejects each. Accepted changes a
 | `confirm_bullets(decisions)` | Human confirmation loop: keep / edit / add the number / drop, sets `metric_confidence` + `evidence` |
 | `update_corpus_draft(changes)` | Identity (display location asked, never read), roles, education, positioning, `skill_index`, the resume's skills (each kept with the person's own description of depth, or dropped), constraints, voice samples |
 | `promote_corpus()` | Writes `career_corpus.yaml` once everything is confirmed; reports corpus health honestly |
-| `run_intake(answers)` | Claude conducts the branching interview; this writes `filters.yaml` (each setting commented with the answer) + `commute_table.yaml` |
+| `run_intake(answers)` | Claude conducts the branching interview; this writes `filters.yaml` (each setting commented with the answer) + `commute_table.yaml`, and the person's bar in `autoapprove.yaml` on their yes (2.8) |
 | `seed_targets(companies, feed_only_said)` | Board discovery (URL, registry, public-endpoint probe) for the companies named; appends `targets.yaml`. With no companies, records `feed_only_said` instead |
 | `calibrate()` | Decision-log analysis, numbered config proposals |
 | `corpus_health()` | Bullet count, metric coverage, tag distribution, gaps vs recent postings |
 | `answer_bank_questions()` | The screening questions in interview order, with what is set |
 | `build_answer_bank(answers)` | Writes `answer_bank.yaml` from the human's answers (ONBOARDING.md 2.7) |
-| `seed_rules()` | Proposes initial standing rules for per-rule acceptance (ONBOARDING.md 2.8). On the roadmap: `autoapprove.yaml` starts with no rules |
+| `seed_rules()` | Proposes further standing rules for per-rule acceptance (ONBOARDING.md 2.8). On the roadmap; the person's bar is written by `run_intake` |
 
 ---
 

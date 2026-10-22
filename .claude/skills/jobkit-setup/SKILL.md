@@ -1,6 +1,6 @@
 ---
 name: jobkit-setup
-description: The guided ApplyForge (jobkit) setup interview for a new user, start to finish, for any kind of job. Checks the machine, reads the person's resume, confirms every corpus entry and resume skill with them (they set each metric's confidence and evidence), asks their job preferences (titles, career change, pay, places), sets up where postings come from (employer boards or the job feeds), asks their application answers one question at a time, runs the first pass, schedules the daily run as a Claude app scheduled task (macOS LaunchAgent as fallback), and optionally connects the email they apply from. Use when the person says "set up jobkit", "set up ApplyForge", "onboard me", "get me started", "continue jobkit setup", or on a first run (no data/career_corpus.yaml, or `jobkit setup-status` / `jobkit doctor` reports missing setup).
+description: The guided ApplyForge (jobkit) setup interview for a new user, start to finish, for any kind of job. Checks the machine, reads the person's resume, confirms every corpus entry and resume skill with them (they set each metric's confidence and evidence), asks their job preferences (titles, career change, pay, places) and their bar for automatic approval, sets up where postings come from (employer boards or the job feeds), asks their application answers one question at a time, runs the first pass, schedules the daily run as a Claude app scheduled task (macOS LaunchAgent as fallback), and optionally connects the email they apply from (replies, job-alert emails and LinkedIn messages, read-only). Use when the person says "set up jobkit", "set up ApplyForge", "onboard me", "get me started", "continue jobkit setup", or on a first run (no data/career_corpus.yaml, or `jobkit setup-status` / `jobkit doctor` reports missing setup).
 ---
 
 <!-- Maintainers: name jobkit MCP tools as calls, e.g. setup_status(), and CLI
@@ -9,9 +9,11 @@ checks that each one exists. -->
 
 # ApplyForge setup interview
 
-ApplyForge finds job postings, checks them, tailors a resume and cover letter
-from facts the person confirmed, and fills application forms up to the last
-click. The person reviews each form and presses submit. The command, the
+ApplyForge runs the person's job search every day: it finds job postings,
+checks and scores them, approves the ones that clear the bar the person sets
+here, tailors a resume and cover letter from facts the person confirmed, and
+fills each application form up to the last click and opens it for review. The
+person reviews each form and clicks submit. The command, the
 package and the MCP server are all called `jobkit`. This interview builds the
 person's files. It takes about an hour, goes one question at a time, and can
 stop and resume at any point: every answer is saved as it is given.
@@ -55,8 +57,10 @@ reason in plain words and ask again. Do not work around one.
    "I don't wish to answer", or nothing (the field then stays blank and is
    flagged on every form). Do not pick one for them.
 5. **Salary history is never answered.** jobkit leaves it blank and flags it.
-6. **Approve before tailoring.** jobkit tailors only jobs the person approves
-   (or standing rules they accepted one at a time; there are none at first).
+6. **Approve before tailoring.** jobkit tailors only approved jobs: approved
+   by the person, or by the bar they set in step 4 (one standing rule,
+   written only on their yes). A daily limit on automatic approval exists
+   only if they ask for one; never propose a number.
 7. **The person submits.** jobkit fills forms up to the last click and stops;
    it never clicks submit. At a CAPTCHA or bot check it stops and hands the
    form to the person; it never solves one.
@@ -263,9 +267,40 @@ words for each `said` field.
     key from step 1.
 13. Writing style for estimated numbers: `hedged` (estimates keep "about") or
     `confident` (stated plainly, exactly as written).
+14. **Their bar.** "Should jobs that clear your bar be approved without asking
+    you? Each one gets its resume, letter and filled form, and you still
+    review it and click submit. I suggest yes, at a fit score of 75." One
+    line on what the score is: how well their confirmed experience meets the
+    job's must-haves, 0 to 100. Jobs below the bar, and any job with a
+    warning flag (remote claim, pay), wait in their queue for them. They pick
+    the number. Send `auto_approve: {enabled: true, min_score: 75, said}`, or
+    `{enabled: false, said}` on a no.
+15. **A daily limit (optional).** Only on a yes to 14, ask once and plainly:
+    "Do you want a cap on how many jobs are approved in a day? By default
+    there is none." Do not suggest a number or recommend a cap. Only when
+    they give a number, add `per_day` to `auto_approve`; otherwise leave it
+    out.
+16. **Opening the forms.** "When the daily run finishes, should the filled
+    applications open in a browser window for you to review?" Yes is the
+    default. Send `open_forms: {after_daily_run: true, said}` (or `false`).
+17. **Searching for alert jobs.** "When a job from your alert emails isn't
+    on a board I can read, should I search the web for it?" I suggest yes.
+    One line on what it does: Claude follows public pages to the employer's
+    own posting; a job on Workday or a similar site is listed with its
+    direct link so they can apply there; LinkedIn pages are skipped and
+    nothing is signed into. Send `alert_search: {enabled: true, said}`, or
+    `{enabled: false, said}` on a no. With no objection, yes is the answer.
+18. **A search limit (optional).** Only on a yes to 17, ask once: "Is there
+    a limit on how many searches per email check you want (no limit is
+    fine; recency already limits it)?" No limit is the default. Only when
+    they give a number, add `per_check` to `alert_search`; otherwise leave
+    it out.
 
 Then run_intake(answers) (CLI: `uv run jobkit setup intake <file>`). The tool
-description lists every field. On a refusal (for example a kept title their
+description lists every field. A yes to 14 writes one rule in
+`config/autoapprove.yaml`; if that file holds rules the person wrote, it is
+kept as it is, even with replace_existing, and the output names the rule to
+add (or, on a no, the rule to delete). On a refusal (for example a kept title their
 seniority floor would reject), ask the conflicting question again. Do not
 edit a config file the interview did not write without their yes
 (replace_existing=true, CLI `--replace-existing`; the old copy is backed up).
@@ -349,17 +384,21 @@ Claude subscription or API key for scoring):
 mkdir -p logs && uv run jobkit nightly > logs/first-run.log 2>&1
 ```
 
-(MCP: run_nightly().) Do step 8 while it runs. When it finishes, show the
-queue: get_queue() if the MCP tools are connected, else the "Review queue"
-section of `out/digest/<today>.md`. Do not approve anything: explain that
-they approve by number ("approve 1, 3"), and that tailoring and form filling
-happen only for jobs they approve.
+(MCP: run_nightly().) Do step 8 while it runs. When it finishes, show what
+it did: the jobs their bar approved (written for and filled; open_queue()
+opens them for review), and the queue below their bar: get_queue() if the
+MCP tools are connected, else the "Review queue" section of
+`out/digest/<today>.md`. Do not approve anything yourself: explain that they
+approve or reject the rest by number ("approve 1, 3 · reject 2"), and that
+tailoring and form filling happen only for approved jobs.
 
 ## Step 8 of 8 — Daily runs
 
-The daily run is `jobkit nightly`: new postings, scoring, tailoring approved
-jobs, filling approved forms (the person submits), marking applications with
-no reply after 30 days as ghosted, and the digest.
+The daily run is `jobkit nightly`: new postings, scoring, approving the jobs
+that clear their bar, tailoring approved jobs, filling approved forms (the
+person submits), marking applications with no reply after 30 days as
+ghosted, and the digest. The scheduled task then checks their email (D
+below) and, if they said yes in step 4, opens the filled forms for review.
 
 Ask: "What time each day should jobkit run? Pick a time your computer is on
 and the Claude app is open, for example 7:00." Mention that a browser window
@@ -408,18 +447,23 @@ run already finished and only sends the summary.
 scheduler entry) that runs `uv run --directory REPO jobkit nightly`, for them
 to add themselves.
 
-**D. The email they apply from (optional).** Ask: "Want jobkit to notice
-replies from employers? It can read the inbox you apply from through
-Claude's email connector." On a yes, they connect it themselves in the
-Claude app's connector settings (Gmail, or another email connector), for the
-account they put on applications. Tell them what it does: the daily "check
-my email" and the scheduled run search that mailbox for replies to the
-applications they marked submitted, and record each one as an outcome
-(acknowledged, rejected, assessment, interview, offer, or a recruiter's
-question) with a one-line summary and a link to the message. It only reads.
-It does not send, reply, forward, delete, archive, label or mark anything
-read, and it keeps no email text beyond that one line. Without it, they tell
-jobkit about replies themselves.
+**D. The email they apply from (optional).** Ask: "Want jobkit to watch
+your email for replies from employers, job-alert emails and LinkedIn
+messages? It reads the inbox you apply from through Claude's email
+connector." On a yes, they connect it themselves in the Claude app's
+connector settings (Gmail, or another email connector), for the account
+they put on applications. Tell them what it does: the daily "check my email"
+and the scheduled run search that mailbox for replies to the applications
+they marked submitted, and record each one as an outcome (acknowledged,
+rejected, assessment, interview, offer, or a recruiter's question) with a
+one-line summary and a link to the message. Each job in a LinkedIn or job
+site alert is looked up on the employer's own Greenhouse, Lever or Ashby
+board, scored the same day and approved if it clears their bar; LinkedIn
+links are never opened. A LinkedIn message shows up in their summary as who,
+which company and one line. It only reads. It does not send, reply, forward,
+delete, archive, label or mark anything read, and it keeps no email text
+beyond that one line. Without it, they tell jobkit about replies
+themselves.
 
 ## Done
 

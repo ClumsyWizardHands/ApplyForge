@@ -29,6 +29,7 @@ uv run jobkit poll            # poll all configured boards once (repeat-safe, ET
 uv run jobkit feeds           # job feeds (deduplicated against the employer boards)
 uv run jobkit add-url <url> [--no-score]  # a pasted job link; Greenhouse, Lever and Ashby jobs are polled, queued and scored
 uv run jobkit score-jobs <id>...  # extract and score these jobs now (add_job_url runs it in the background)
+uv run jobkit same-day [--resolve-boards] [<id>...]  # jobs from job-alert emails: board lookup, then filter, checks, score, queue and standing rules today (exits 1 if a stage failed)
 uv run jobkit linkedin-discover [--dry-run]            # LinkedIn logged-out search, discovery only (off by default)
 uv run jobkit resolve-boards [--job-id N] [--dry-run]  # aggregator and LinkedIn jobs → the employer's own posting
 uv run jobkit resolve-boards --job-id N --pick <posting id|URL>  # your pick for a flagged job
@@ -64,7 +65,8 @@ uv run jobkit confirm-proposal <id> [--evidence ".." --metric-confidence .. --ro
 
 ## Email replies
 
-These record what Claude read in your own mailbox. They are for debugging; the
+These record what Claude read in your own mailbox: replies, job-alert emails
+and LinkedIn message notifications. They are for debugging; the
 Claude tools below are the normal path. Nothing is sent. Do not paste a
 sender, subject, snippet or summary copied from an email into `email match`
 or `email record`: an email's text inside a shell command can run commands.
@@ -73,7 +75,11 @@ or `email record`: an email's text inside a shell command can run commands.
 uv run jobkit email targets   # applications to look for, the last check, and a suggested Gmail search
 uv run jobkit email match --sender "..." [--subject ..] [--snippet ..] [--received-at ..]  # which application one email belongs to
 uv run jobkit email record --application-id N --outcome rejected --received-at .. --message-id .. [--link ..] [--summary ..]
-uv run jobkit email done [--checked-through ..]  # record that the mailbox was read through a time
+uv run jobkit email alerts --items-file jobs.json --message-id .. --received-at .. [--source linkedin]  # the jobs in one job-alert email
+uv run jobkit email linkedin-message [--company ..] --summary .. --received-at .. --message-id .. [--link ..]
+uv run jobkit email to-search  # alert jobs board lookup missed, to search the web for (when search.alert_web_search is on)
+uv run jobkit email search-result --alert-ref alert-.. --outcome found|not_found [--url ..]  # what a web search found; a Workday-style link is kept as a lead with its direct link
+uv run jobkit email done [--checked-through ..]  # record that the mailbox was read through a time; when alert jobs wait for board lookup, says to run `jobkit same-day --resolve-boards`
 ```
 
 ## Runs and reports
@@ -85,7 +91,7 @@ uv run jobkit digest          # write out/digest/<today>.md
 uv run jobkit stats           # freshness banner + row counts
 uv run jobkit calibrate       # decision-log analysis → numbered proposals (nothing applied)
 uv run jobkit schedule install [--dry-run]    # macOS: LaunchAgent running `jobkit nightly`
-uv run jobkit schedule status     # installed? loaded? last nightly run; jobs stopped in form filling
+uv run jobkit schedule status     # installed? loaded? last nightly run; jobs stopped in form filling; last line: open forms after the daily run, on or off
 uv run jobkit schedule uninstall [--dry-run]  # unload and delete the LaunchAgent
 ```
 
@@ -134,20 +140,24 @@ your reply can't misroute an approval.
 | `retailor(n)` | tailor one job again |
 | `stage_forms(ids, job_ids)` | fill approved forms in one browser process; stops before submit |
 | `restage(n)` | fill one job's form again from its stored form spec |
-| `open_queue()` | open the filled forms for your review |
+| `open_queue()` | open the filled forms for your review; the scheduled run calls it at the end when `staging.open_after_daily_run` is on |
 | `get_novel_questions(n)` | form questions the answer bank didn't cover, with drafts |
 | `answer_novel(n, field_identity, answer)` | your answer to one form question |
 | `mark_submitted(ids, job_ids, submitted_on)` | log submissions (queue numbers or job ids; back-dating allowed) |
 | `record_outcome(job_id, outcome, note)` | `reply`, `rejection`, `interview` or `offer` |
 
-**Email replies** (read-only; see [Email replies](email-responses.md))
+**Email: replies, job alerts and LinkedIn messages** (read-only; see [Email replies](email-responses.md))
 
 | tool | does |
 |---|---|
-| `email_targets(scheduled)` | submitted applications still waiting on news, the last check, and a suggested Gmail search; with `scheduled=true` (the scheduled run) nothing unless `tracking.email_check` is true |
+| `email_targets(scheduled)` | submitted applications still waiting on news, the last check, and a suggested Gmail search; a second search for job-alert emails and LinkedIn messages; whether web search for alert jobs is on. With `scheduled=true` (the scheduled run) nothing unless `tracking.email_check` is true |
 | `match_email(sender, subject, snippet, received_at)` | the applications one email most likely belongs to, ranked, with reasons |
 | `record_email_response(application_id, outcome, received_at, message_id, link, summary)` | record one email's outcome for one application |
-| `finish_email_check(checked_through)` | record when the mailbox was checked through |
+| `record_job_alerts(items, message_id, received_at, source)` | the jobs in one job-alert email (company, title, location, whether it links to the company site); kept jobs are looked for on the employer's own board |
+| `record_linkedin_message(company, summary, received_at, message_id, link)` | one LinkedIn message notification: the sender's company and one line about it (the sender by role, never by name); never answered |
+| `finish_email_check(checked_through)` | record when the mailbox was checked through; starts board lookup and same-day scoring for the jobs from job-alert emails |
+| `alert_jobs_to_search()` | recent alert jobs board lookup could not find, each with a suggested web search and the search's ground rules (only when `search.alert_web_search` is on; setup asks, yes recommended) |
+| `record_search_result(alert_ref, url, outcome)` | what a web search found, recorded once per alert job: a Greenhouse, Lever or Ashby posting is added and scored today; a posting on Workday, iCIMS, a similar system or the employer's careers site is kept as a lead with its direct link ("apply on the employer's site: <link>" in the email-check summary and the digest), with no job added; or not found |
 
 **Questions and corpus**
 
@@ -183,7 +193,7 @@ your reply can't misroute an approval.
 | `get_digest(date)` | the daily digest |
 | `calibrate()` | numbered config proposals from your decisions |
 | `doctor()` | the setup check |
-| `schedule_status()`, `schedule_install(confirm=false)`, `schedule_uninstall(confirm=false)` | the macOS LaunchAgent |
+| `schedule_status()`, `schedule_install(confirm=false)`, `schedule_uninstall(confirm=false)` | the macOS LaunchAgent and the nightly run record; `schedule_status` ends with whether the daily run opens the filled forms, and how many are ready |
 | `repair_applications(confirm=false)` | repair application rows |
 | `purge_empty_jd_cache(confirm=false)` | the cache repair above |
 
@@ -197,7 +207,7 @@ your reply can't misroute an approval.
 | `confirm_bullets(decisions)` | keep, edit, add the number or drop; sets `metric_confidence` and `evidence` |
 | `update_corpus_draft(changes)` | identity, roles, education, positioning, skills, constraints, voice samples |
 | `promote_corpus(replace_existing)` | write `career_corpus.yaml` once everything is confirmed |
-| `run_intake(answers, replace_existing)` | write `filters.yaml` and the commute table from the interview |
+| `run_intake(answers, replace_existing)` | write `filters.yaml` and the commute table from the interview; with `auto_approve`, the clears-your-bar rule in `autoapprove.yaml` (and a daily limit only when you give one); `open_forms` sets opening the forms after the daily run; `alert_search` turns on web search for alert jobs, with a limit per email check only when you give one |
 | `seed_targets(companies, probe, include_not_found, feed_only_said)` | find and verify boards; or record that you rely on the feeds |
 | `answer_bank_questions()` | the screening questions, with what is set |
 | `build_answer_bank(answers, replace_existing)` | write `answer_bank.yaml` |

@@ -1,0 +1,53 @@
+{
+  "_recorded": "hand-built in the shape of GET https://boards-api.greenhouse.io/v1/boards/larkspuranalytics/jobs (no content, HTTP 200): a fictional company for the job-alert email tests; company, titles, locations, ids and timestamps are invented",
+  "jobs": [
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/larkspuranalytics/jobs/7301000101",
+      "internal_job_id": 7300000101,
+      "location": {
+        "name": "New York, NY"
+      },
+      "id": 7301000101,
+      "updated_at": "2026-10-14T09:00:00-04:00",
+      "requisition_id": "R-0101",
+      "title": "Account Executive, Mid-Market",
+      "company_name": "Larkspur Analytics",
+      "first_published": "2026-10-14T08:00:00-04:00",
+      "language": "en",
+      "application_deadline": null
+    },
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/larkspuranalytics/jobs/7301000102",
+      "internal_job_id": 7300000102,
+      "location": {
+        "name": "Chicago, IL"
+      },
+      "id": 7301000102,
+      "updated_at": "2026-10-14T09:00:00-04:00",
+      "requisition_id": "R-0102",
+      "title": "Account Executive, Mid-Market",
+      "company_name": "Larkspur Analytics",
+      "first_published": "2026-10-14T08:00:00-04:00",
+      "language": "en",
+      "application_deadline": null
+    },
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/larkspuranalytics/jobs/7301000103",
+      "internal_job_id": 7300000103,
+      "location": {
+        "name": "New York, NY"
+      },
+      "id": 7301000103,
+      "updated_at": "2026-10-09T09:00:00-04:00",
+      "requisition_id": "R-0103",
+      "title": "Customer Success Manager",
+      "company_name": "Larkspur Analytics",
+      "first_published": "2026-10-09T08:00:00-04:00",
+      "language": "en",
+      "application_deadline": null
+    }
+  ],
+  "meta": {
+    "total": 3
+  }
+}

@@ -20,17 +20,26 @@ DAILY RUN (`jobkit nightly`, from the Claude app's scheduled task, or a
     → form capture        each application form read, matched against your
                           answer bank, new questions drafted (its friction
                           feeds the rules)
-    → standing rules      approve or reject the obvious cases, if you set rules
+    → standing rules      approve the jobs that clear your bar (and any other
+                          rules you set)
     → tailor approved     resume and letter from your confirmed facts only
     → ghost-close         no reply after 30 days: stage 'ghosted'
     → fill approved forms in a visible browser, closed when done; not submitted
     → digest              out/digest/<date>.md
+  then, in the scheduled task (Claude):
+    → email check         replies, job-alert emails and LinkedIn messages,
+                          read-only, if you connected your email; alert jobs
+                          found on the employer's own board are scored,
+                          approved if they clear your bar, written and filled
+    → open the forms      the filled applications open in a browser window,
+                          when staging.open_after_daily_run is on
+    → summary             what is ready for you, replies, alert finds,
+                          messages, the queue below your bar
 
 YOU
-  "what's in the queue" → approve by number → "open my applications": the
-  filled forms open, fields outlined by where each answer came from → you
-  check and press submit → "I submitted Acme" → replies recorded as you
-  report them, or from your email if you connect it
+  review each open application as much as you like and click submit →
+  "I submitted Acme" → approve or reject anything below your bar by number
+  ("what's in the queue", "approve 2") → answer the occasional question
 ```
 
 Every number in a resume or letter must match a fact you confirmed, or the
@@ -60,6 +69,10 @@ would send the form, and a test fails if a click skips that check.
   - A feed whose keys are missing is skipped before any request, and the log
     names the missing variables (`feeds.skipped_no_key`). A keyed feed that
     returns nothing logs `feeds.empty`.
+- **Your job-alert emails**, if you connected your email: each job in a
+  LinkedIn or job-site alert is looked up on the employer's own Greenhouse,
+  Lever or Ashby board and enters as that posting, scored the same day. See
+  [Email replies](email-responses.md#job-alert-emails).
 - **LinkedIn discovery** (off by default): a few logged-out searches a day for
   company names. See [LinkedIn](why-no-linkedin.md).
 - **Links you paste.** `jobkit add-url <link>` (tool `add_job_url`). A
@@ -296,6 +309,46 @@ rescore) to score the jobs already in your queue again.
 only by the score gate when its track sets `min_score`, it was rejected under
 a different gate, its score meets the track's gate, and the filters still pass
 it (a `regated` event each).
+
+## Your bar: automatic approval
+
+`config/autoapprove.yaml` holds standing rules, applied after the filters and
+the sanity checks (`rules` stage). The setup interview asks for your bar and,
+on your yes, writes one rule:
+
+```yaml
+auto_approve:
+  - when: { score_gte: 75, sanity_flags: none, sanity_checked: true }
+    reason: "clears-your-bar"
+```
+
+Every queued job with a fit score at or above the number, both sanity checks
+finished, and no sanity flag (remote conflict, pay) is approved as if you had
+approved it, with a decision marked automatic. A job whose remote or pay check
+did not finish waits in your queue until it does. The same run tailors it and
+fills its form, and, when `staging.open_after_daily_run` is on, the scheduled
+task opens it for you. Jobs below the bar stay in your queue, and
+you can approve or reject any job yourself at any time. Change the number to
+move your bar, or delete the rule to approve everything yourself.
+
+- **No daily limit by default.** `max_auto_approve_per_day: N` in
+  `autoapprove.yaml` sets one, only if you want it. With a limit, the
+  best-scoring jobs are approved first, and the rest stay in your queue (you
+  can approve any of them now), each with an `auto_approve_waiting` event, and
+  the next run tries them again. The digest then has an "Automatic approval"
+  section with the day's count. Without the key nothing changes: no sorting,
+  no section. A value that isn't a whole number of 1 or more stops the rules
+  stage with a message naming the key.
+- **Rejecting rules** (`auto_reject`) work the same way and are never limited.
+- `jobkit doctor` reports the rule count and the limit, and fails on a bad
+  value.
+
+**Opening the forms.** `staging.open_after_daily_run: true` in
+`config/filters.yaml` (setup asks; yes is the default) makes the scheduled
+task end by opening the filled applications in a browser window. The last
+line of `jobkit schedule status` (tool `schedule_status`) says whether it is
+on and how many are ready. Absent, the forms wait until you say "open my
+applications".
 
 ## Tailoring
 
@@ -586,12 +639,26 @@ rest of the digest and the queue render as usual. `answer` and
   seconds, model calls answered and failed, error); `run_all.done` (run id,
   mode, failed stages) closes it. `mode` is `run-all` or `nightly`. The command
   exits 1 when any stage failed.
+- **`same-day`.** `jobkit same-day [--resolve-boards] [<id>...]` scores jobs
+  from job-alert emails and web search without waiting for the night. With
+  `--resolve-boards` it runs board lookup first. Then the given jobs, plus the
+  alert jobs board lookup added in the last two days that have no score yet,
+  go through the nightly stages filter, extract, remote, comp, score and
+  queue, limited to those jobs; form capture when one of them was queued; and
+  the standing rules, so a job that clears your bar is approved the same day.
+  Each stage runs isolated, a `same_day.done` event records the outcome per
+  job, the last line of its output is a one-line summary, and it exits 1 when a
+  stage failed. Tailoring and form filling follow in the scheduled task or the
+  next nightly run. The Claude tools never start it while a nightly run is in
+  progress; that run picks the jobs up.
 - **Background launches.** Tools that do long work start
   `python -m jobkit.cli …` with the server's own interpreter and source, in
   the project root: `approve`, `retailor`, `stage_forms`, `restage`,
   `open_queue`, `run_nightly`, `add_job_url` (its scoring),
   `linkedin_discover`, `resolve_boards`, `rescore` and `rejudge` (with
-  `confirm=true`), and `confirm_proposal` (its rescore). Each
+  `confirm=true`), `confirm_proposal` (its rescore), and `finish_email_check`
+  and `record_search_result` (`jobkit same-day`, for jobs from job-alert
+  emails). Each
   launch's output goes to `logs/spawn/<timestamp>-<command>.log` and is recorded
   as a `spawn` event and a `mcp.spawn` log line; the reply names the pid and the
   log. `background_status(limit=8)` shows each recent launch as running,
@@ -623,7 +690,8 @@ filled. An aggregator row is never canonical. Code:
 - **Which jobs:** open aggregator rows that passed the filter (or, while still
   `new`, would pass it), approved ones first; and LinkedIn cards from the last
   14 days whose company went to the discovery queue (only the company, title and
-  location from the card; no LinkedIn row or URL is stored). Approving runs it
+  location from the card; no LinkedIn row or URL is stored); and the jobs from
+  your job-alert emails, the same way (labelled "job-alert email card"). Approving runs it
   again: the `approve` tool starts `jobkit tailor`, which first resolves approved
   aggregator jobs. After such a merge the queue number you approved keeps
   working: `get_job`, `get_artifacts`, `retailor`, `review_artifacts`,
@@ -751,8 +819,9 @@ last so it reports the filling.
   another, since nobody is in the session.
 - **Outcomes.** A job left `needs_human` (a CAPTCHA, a required question) is a
   normal outcome. A job `deferred` (another browser holds the profile) or
-  `failed` fails the stage, with the reasons. In the morning, `open_queue`
-  reopens the filled forms for you.
+  `failed` fails the stage, with the reasons. At the end of the scheduled
+  task (when `staging.open_after_daily_run` is on), or when you ask,
+  `open_queue` reopens the filled forms for you.
 - **A job whose filling keeps failing is capped.** A `failed` job (the page
   raised: a dead apply link, a page that never loads) writes no run, so the next
   night tries it again. Each failure is a `nightly.stage_failed` event. The

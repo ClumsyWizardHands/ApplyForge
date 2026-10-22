@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-labelledby="title desc">
   <title id="title">ApplyForge</title>
-  <desc id="desc">ApplyForge: your job search, run from Claude. You press submit. A filled application form with every field checked and a pointer on the Submit button.</desc>
+  <desc id="desc">ApplyForge: your job search, automated. All you do is click submit. A filled application form with every field checked and a pointer on the Submit button.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#fffaf4"/>
@@ -23,7 +23,7 @@
 
   <rect x="88" y="94" width="44" height="6" rx="3" fill="#d9480f"/>
   <text x="84" y="186" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="88" font-weight="800" letter-spacing="-2.5" fill="#1f2328">Apply<tspan fill="#d9480f">Forge</tspan></text>
-  <text x="88" y="236" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="27" font-weight="500" fill="#424a53">Your job search, run from Claude. You press submit.</text>
+  <text x="88" y="236" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="27" font-weight="500" fill="#424a53">Your job search, automated. All you do is click submit.</text>
 
   <g filter="url(#shadow)">
     <rect x="884" y="44" width="316" height="232" rx="16" fill="#ffffff" stroke="#ead8c4" stroke-width="1.5"/>

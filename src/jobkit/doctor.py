@@ -27,6 +27,10 @@ Checks, in order:
 * role tracks still holding the template placeholder (a warning);
 * standing rules whose `title_class` names no track (a warning: such a rule
   never matches);
+* automatic approval: how many auto_approve rules, and the daily limit only
+  when the person set one (a bad max_auto_approve_per_day fails: the rules
+  stage would stop on it); whether the daily run opens the filled forms
+  (staging.open_after_daily_run; a bad value fails);
 * an enabled keyed feed (Adzuna, USAJOBS) without its keys, and LinkedIn
   discovery left on the built-in sales keywords for a search with no sales
   track (warnings);
@@ -516,6 +520,69 @@ def check_title_classes(env: Env) -> Check | None:
     )
 
 
+def check_automation(env: Env) -> list[Check]:
+    """Information: automatic approval (rules, and a daily limit only when one
+    is set) and whether the daily run opens the filled forms. A bad value for
+    either key is a failure with its fix."""
+    from jobkit.rules import MAX_PER_DAY_KEY, max_auto_approve_per_day
+
+    out: list[Check] = []
+    path = env.root / "config" / "autoapprove.yaml"
+    rules: Any = None
+    if path.is_file():
+        try:
+            rules = config.read_config_yaml(path)
+        except Exception:  # noqa: BLE001 — check_config_files reports it
+            rules = None
+    if isinstance(rules, dict):
+        approve = [r for r in rules.get("auto_approve") or [] if isinstance(r, dict)]
+        try:
+            cap = max_auto_approve_per_day(rules)
+        except ValueError as e:
+            out.append(
+                Check(
+                    "automatic approval",
+                    False,
+                    str(e),
+                    f"in config/autoapprove.yaml set {MAX_PER_DAY_KEY} to a whole number "
+                    "such as 10, or delete the line for no daily limit",
+                )
+            )
+        else:
+            if not approve:
+                detail = "off: no auto_approve rule, you approve every job yourself"
+            else:
+                n = len(approve)
+                detail = f"{n} auto_approve rule{'s' if n != 1 else ''}"
+                if cap is not None:
+                    detail += f", at most {cap} a day (highest fit first)"
+            out.append(Check("automatic approval", True, detail))
+    filters = _filters(env)
+    if filters is not None:
+        try:
+            on = filters.open_after_daily_run
+        except ValueError as e:
+            out.append(
+                Check(
+                    "open forms after the daily run",
+                    False,
+                    str(e),
+                    "in config/filters.yaml set staging.open_after_daily_run to true or false",
+                )
+            )
+        else:
+            out.append(
+                Check(
+                    "open forms after the daily run",
+                    True,
+                    "on: the scheduled run opens the filled forms for you to review"
+                    if on
+                    else "off: the filled forms wait until you ask to open them",
+                )
+            )
+    return out
+
+
 def check_feeds(env: Env) -> list[Check]:
     """Enabled keyed feeds have their keys; LinkedIn discovery is not left on
     the built-in sales keywords for a search that has no sales track."""
@@ -659,6 +726,7 @@ def run_checks(env: Env | None = None) -> Report:
         check_ghost_after,
         check_tracks,
         check_title_classes,
+        check_automation,
         check_feeds,
         check_data_files,
         check_db,

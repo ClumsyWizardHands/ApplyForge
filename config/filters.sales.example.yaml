@@ -139,6 +139,27 @@ tracking:
   # absent it skips that step. Asking Claude to check your email works either way.
   email_check: true
 
+# ---- staging ------------------------------------------------------------------
+staging:
+  # When true, the scheduled daily run ends by opening the filled application
+  # forms in a browser window for you to review and submit. When false or
+  # absent the forms wait until you ask Claude to open them.
+  open_after_daily_run: true
+
+# ---- web search for alert jobs ------------------------------------------------
+search:
+  # When true, a job from a job-alert email that is on no Greenhouse, Lever or
+  # Ashby board jobkit can find is searched for on the web by Claude, and the
+  # employer's own posting is added (recent alerts only, inside
+  # freshness.max_age_days). A posting on Workday or a similar site is listed
+  # with its direct link for you to apply there. It uses your Claude plan.
+  # When false or absent, those jobs are listed in the digest and nothing is
+  # searched. The setup interview asks and writes your answer
+  # (docs/why-no-linkedin.md).
+  alert_web_search: false
+  # The most searches in one email check. Leave it out for no limit.
+  # max_searches_per_check: 10
+
 # ---- remote reality check (sanity layer: an LLM reads the JD) -------------------
 remote_policy:
   reject_onsite: true            # a JD that is really onsite is rejected

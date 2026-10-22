@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+from collections.abc import Collection
 from pathlib import Path
 
 from jobkit import paths
@@ -180,6 +181,19 @@ CREATE TABLE IF NOT EXISTS rejections (
 
 class DatabaseMissing(FileNotFoundError):
     """No database file at the resolved path. Only `jobkit init` creates one."""
+
+
+def only_jobs(job_ids: Collection[int] | None, alias: str = "j") -> tuple[str, list[int]]:
+    """(SQL fragment, params) that limits a stage's job query to these ids:
+    ' AND <alias>.id IN (?, ...)'. None: no limit (an empty fragment). An
+    empty collection matches nothing. The pipeline stages take it for
+    same-day scoring (pipeline/same_day.py)."""
+    if job_ids is None:
+        return "", []
+    ids = [int(i) for i in job_ids]
+    if not ids:
+        return " AND 0", []
+    return f" AND {alias}.id IN ({','.join('?' * len(ids))})", ids
 
 
 def connect(path: Path | None = None, *, create: bool = False) -> sqlite3.Connection:
@@ -1233,6 +1247,182 @@ WHERE e.kind = 'email_response' AND e.at >= :since
 ORDER BY e.id
 """
 
+# ---- job-alert emails and LinkedIn messages (track/job_alerts.py) ----
+# One 'job_alert.email' event per alert email (its counts), one
+# 'job_alert.item' event per job listed in it (company, title, location and
+# what happened: never a link or a job board's id), one 'linkedin_message'
+# event per LinkedIn message notification (sender, company, one-line summary).
+
+JOB_ALERT_EMAIL_BY_MESSAGE_ID = """
+SELECT id, detail, at FROM events
+WHERE kind = 'job_alert.email' AND json_extract(detail, '$.message_id') = :message_id
+ORDER BY id LIMIT 1
+"""
+
+LINKEDIN_MESSAGE_BY_MESSAGE_ID = """
+SELECT id, job_id, detail, at FROM events
+WHERE kind = 'linkedin_message' AND json_extract(detail, '$.message_id') = :message_id
+ORDER BY id LIMIT 1
+"""
+
+# the jobs a LinkedIn message can be about: one with an application, or one
+# in the review queue or approved (the caller compares company names);
+# submitted applications first, newest first
+JOBS_WITH_APPLICATION_OR_QUEUED = """
+SELECT j.id AS job_id, j.company_name, j.title, j.status,
+       a.id AS application_id, a.stage, a.submitted_at
+FROM jobs j LEFT JOIN applications a ON a.job_id = j.id
+WHERE a.id IS NOT NULL OR j.status IN ('queued', 'approved')
+ORDER BY (a.submitted_at IS NULL), a.submitted_at DESC, (a.id IS NULL), j.id DESC
+"""
+
+# recorded after an event id (the last email check): email_targets lists the
+# messages, finish_email_check counts both
+LINKEDIN_MESSAGES_AFTER = """
+SELECT id, job_id, detail, at FROM events
+WHERE kind = 'linkedin_message' AND id > :after_id
+ORDER BY id
+"""
+
+COUNT_JOB_ALERT_EMAILS_AFTER = """
+SELECT COUNT(*) AS n FROM events WHERE kind = 'job_alert.email' AND id > :after_id
+"""
+
+# recorded after an event id (the last email check), for its summary
+JOB_ALERT_ITEMS_AFTER = """
+SELECT id, job_id, detail, at FROM events
+WHERE kind = 'job_alert.item' AND id > :after_id
+ORDER BY id
+"""
+
+# recorded at or after :since ('YYYY-MM-DD HH:MM:SS' UTC), for the digest
+JOB_ALERT_ITEMS_SINCE = """
+SELECT id, job_id, detail, at FROM events
+WHERE kind = 'job_alert.item' AND at >= :since
+ORDER BY id
+"""
+
+LINKEDIN_MESSAGES_SINCE = """
+SELECT id, job_id, detail, at FROM events
+WHERE kind = 'linkedin_message' AND at >= :since
+ORDER BY id
+"""
+
+# alert jobs handed to the board resolver after an event id (the last email
+# check): finish_email_check starts the resolver when there are any
+COUNT_JOB_ALERT_CARDS_AFTER = """
+SELECT COUNT(*) AS n FROM events
+WHERE kind = 'job_alert.item' AND id > :after_id AND json_extract(detail, '$.card') = 1
+"""
+
+# the employer's own postings jobkit already holds for a company (rows from a
+# Greenhouse/Lever/Ashby board): an alert job found here needs no lookup
+ATS_JOBS_FOR_COMPANY = """
+SELECT j.id, j.title, j.location_raw, j.remote, j.status, b.ats, b.token
+FROM jobs j JOIN boards b ON b.id = j.board_id JOIN companies c ON c.id = j.company_id
+WHERE c.normalized_name = :normalized_name OR j.normalized_company = :normalized_name
+ORDER BY j.closed_at IS NOT NULL, j.id DESC
+"""
+
+# what board resolution last made of one alert job (the 'id' of its
+# job_alert.item event), or no row yet
+CARD_OUTCOME_BY_ID = """
+SELECT job_id, detail FROM events
+WHERE kind = 'board_resolve.card' AND json_extract(detail, '$.li_id') = :card_id
+ORDER BY id DESC LIMIT 1
+"""
+
+# ---- same-day scoring and web search for alert jobs ----
+# (pipeline/same_day.py, track/alert_search.py)
+
+# jobs the board resolver ingested for a job-alert card (the employer's own
+# posting) that are not scored yet: `jobkit same-day` takes them through the
+# filter, the sanity checks, scoring, the queue and the standing rules
+SAME_DAY_ALERT_JOBS = """
+SELECT DISTINCT e.job_id FROM events e
+JOIN jobs j ON j.id = e.job_id
+LEFT JOIN scores sc ON sc.job_id = j.id
+WHERE e.kind = 'board_resolve.card' AND e.at >= datetime('now', :window)
+  AND json_extract(e.detail, '$.li_id') LIKE 'alert-%'
+  AND json_extract(e.detail, '$.outcome') = 'ingested'
+  AND j.status IN ('new', 'filtered') AND j.closed_at IS NULL AND sc.job_id IS NULL
+ORDER BY e.job_id
+"""
+
+# where one job stands after same-day scoring
+SAME_DAY_JOB_STATE = """
+SELECT j.id, j.company_name, j.title, j.status, sc.fit_score,
+       (SELECT d.auto FROM decisions d WHERE d.job_id = j.id
+        ORDER BY d.id DESC LIMIT 1) AS auto_decided,
+       (SELECT r.layer || ': ' || r.reason FROM rejections r WHERE r.job_id = j.id
+        ORDER BY r.id DESC LIMIT 1) AS rejected_by
+FROM jobs j LEFT JOIN scores sc ON sc.job_id = j.id
+WHERE j.id = :job_id
+"""
+
+# one web-search outcome per alert job (its card id): found and ingested,
+# already in jobkit, a lead on a system jobkit does not read (the system's
+# name and the employer's apply link; no job row), or not found
+ALERT_SEARCH_EVENT = "alert_search.result"
+
+ALERT_SEARCH_BY_REF = """
+SELECT id, job_id, detail, at FROM events
+WHERE kind = 'alert_search.result' AND json_extract(detail, '$.alert_ref') = :alert_ref
+ORDER BY id LIMIT 1
+"""
+
+ALERT_SEARCHES_AFTER = """
+SELECT COUNT(*) AS n FROM events WHERE kind = 'alert_search.result' AND id > :after_id
+"""
+
+# the leads recorded after an event id (the last email check), for the
+# email-check summary
+ALERT_SEARCH_LEADS_AFTER = """
+SELECT id, job_id, detail, at FROM events
+WHERE kind = 'alert_search.result' AND id > :after_id
+  AND json_extract(detail, '$.outcome') = 'elsewhere'
+  AND COALESCE(json_extract(detail, '$.url'), '') <> ''
+ORDER BY id
+"""
+
+ALERT_SEARCHES_SINCE = """
+SELECT id, job_id, detail, at FROM events
+WHERE kind = 'alert_search.result' AND at >= :since
+ORDER BY id
+"""
+
+# the open postings on one board (a search result names the board only: the
+# caller matches the alert's title and location)
+OPEN_JOBS_ON_BOARD = """
+SELECT id, title, location_raw, remote, status, closed_at FROM jobs
+WHERE board_id = :board_id AND closed_at IS NULL
+ORDER BY id
+"""
+
+# one job as a search result found it: its status and whether it has a score
+SEARCH_RESULT_JOB = """
+SELECT j.id, j.title, j.status, j.closed_at, sc.job_id IS NOT NULL AS scored
+FROM jobs j LEFT JOIN scores sc ON sc.job_id = j.id
+WHERE j.id = :job_id
+"""
+
+# the newest job_alert.item event of one alert job (its card id)
+JOB_ALERT_ITEM_BY_CARD = """
+SELECT id, job_id, detail, at FROM events
+WHERE kind = 'job_alert.item' AND json_extract(detail, '$.id') = :card_id
+  AND json_extract(detail, '$.card') = 1
+ORDER BY id DESC LIMIT 1
+"""
+
+# alert jobs handed to board lookup inside a window, newest first (the
+# caller keeps the newest event per card id and checks the alert's date)
+JOB_ALERT_CARDS_NEWEST_FIRST = """
+SELECT id, job_id, detail, at FROM events
+WHERE kind = 'job_alert.item' AND json_extract(detail, '$.card') = 1
+  AND at >= datetime('now', :window)
+ORDER BY id DESC
+"""
+
 # idempotent event: written once per (job, kind, detail)
 RECORD_EVENT_ONCE = """
 INSERT INTO events (job_id, kind, detail)
@@ -1502,6 +1692,16 @@ SELECT id, detail FROM events
 WHERE kind = 'linkedin_guest.seen' AND at >= datetime('now', :window)
   AND (json_extract(detail, '$.outcome') LIKE 'queued_company:%'
        OR json_extract(detail, '$.outcome') LIKE 'company_already_queued:%')
+ORDER BY id
+"""
+
+# jobs listed in the person's job-alert emails that the board resolver looks
+# for (track/job_alerts.py: the shape of a LinkedIn card, with a synthetic id
+# that is never a job board's), inside a window
+JOB_ALERT_CARDS_SINCE = """
+SELECT id, detail FROM events
+WHERE kind = 'job_alert.item' AND at >= datetime('now', :window)
+  AND json_extract(detail, '$.card') = 1
 ORDER BY id
 """
 

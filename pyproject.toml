@@ -1,7 +1,7 @@
 [project]
 name = "jobkit"
 version = "0.1.0"
-description = "ApplyForge: a local-first job search that finds, scores, tailors and fills applications; you submit."
+description = "ApplyForge: your job search, automated. All you do is click submit."
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "typer>=0.12",

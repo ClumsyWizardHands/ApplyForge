@@ -1127,6 +1127,90 @@ def test_a_linkedin_card_enters_as_the_employers_posting(conn: sqlite3.Connectio
     assert run(conn, boards).cards == 0 and len(boards.requests) == n
 
 
+GUEST_GOLDEN: dict[str, Any] = json.loads(
+    (FIXTURES / "email" / "guest_cards_golden.json").read_text()
+)
+
+
+def _guest_cards(conn: sqlite3.Connection) -> None:
+    _seen_card(conn, "4100000014", "Soylent.ai", "Sales Director", "New York, NY")
+    _seen_card(conn, "4100000015", "Soylent.ai", "Sales Director", "Chicago, IL")
+    _seen_card(conn, "4100000016", "Wallace Corp", "Account Executive", "Austin, TX")
+
+
+def test_linkedin_guest_cards_are_handled_exactly_as_before(conn: sqlite3.Connection) -> None:
+    """Golden: the resolver accepts job-alert email cards now, and LinkedIn
+    guest cards come out exactly as they did before that (report, card
+    events, flags, digest, queue line; recorded from main cd63c22 in
+    tests/fixtures/email/guest_cards_golden.json)."""
+    _guest_cards(conn)
+    rep = run(conn, Boards())
+    assert rep.render() == GUEST_GOLDEN["render"]
+    assert rep.counts() == GUEST_GOLDEN["counts"]
+    assert events(conn, q.BOARD_RESOLVE_CARD_EVENT) == GUEST_GOLDEN["cards"]
+    assert events(conn, q.BOARD_MATCH_AMBIGUOUS_EVENT) == GUEST_GOLDEN["amb"]
+    assert [f.line() for f in br.flags(conn)] == GUEST_GOLDEN["flags"]
+    assert br.digest_lines(conn) == GUEST_GOLDEN["digest"]
+    assert br.queue_line(conn) == GUEST_GOLDEN["queue"]
+
+
+def test_job_alert_email_cards_beside_guest_cards_change_nothing_for_them(
+    conn: sqlite3.Connection,
+) -> None:
+    """A job-alert email card (track/job_alerts.py's job_alert.item, card=1)
+    is read after the guest cards and labelled as an email card; every
+    guest card's outcome, flag and report line stays the golden one."""
+    _guest_cards(conn)
+    detail = {
+        "id": "alert-0123456789abcdef",
+        "ref": "msg-1#1",
+        "card": 1,
+        "outcome": "queued_company:no_registry_board",
+        "company": "Larkspur Analytics",
+        "title": "Account Executive, Mid-Market",
+        "location": "New York, NY",
+        "source": "linkedin",
+        "queue_source": "linkedin_email",
+        "message_id": "msg-1",
+        "received_at": "2026-10-20 07:12:44",
+    }
+    conn.execute(
+        "INSERT INTO events (kind, detail) VALUES ('job_alert.item', ?)", (json.dumps(detail),)
+    )
+    # an alert item that is not a card (dropped by the title rules) is not read
+    conn.execute(
+        "INSERT INTO events (kind, detail) VALUES ('job_alert.item', ?)",
+        (json.dumps({**detail, "id": "alert-fedcba9876543210", "card": 0}),),
+    )
+    conn.commit()
+    items = br._card_items(conn, FILTERS.board_resolution)
+    assert [(it.li_id, it.source) for it in items] == [
+        ("4100000014", "linkedin_guest"),
+        ("4100000015", "linkedin_guest"),
+        ("4100000016", "linkedin_guest"),
+        ("alert-0123456789abcdef", "linkedin_email"),
+    ]
+    larkspur = json.loads(
+        (FIXTURES / "email" / "boards" / "greenhouse_larkspuranalytics.json").read_text()
+    )
+    rep = run(conn, Boards(boards={("greenhouse", "larkspuranalytics"): larkspur}))
+    assert rep.cards == 4 and rep.ingested == 2, rep.render()
+    golden_lines = GUEST_GOLDEN["render"].splitlines()[1:]
+    assert rep.render().splitlines()[1:4] == golden_lines
+    assert (
+        rep.render()
+        .splitlines()[4]
+        .startswith(
+            "  - job-alert email card alert-0123456789abcdef Larkspur Analytics — Account "
+            "Executive, Mid-Market (New York, NY): the employer's posting is job "
+        )
+    )
+    guest = [e for e in events(conn, q.BOARD_RESOLVE_CARD_EVENT) if e["li_id"][0].isdigit()]
+    assert guest == GUEST_GOLDEN["cards"]
+    assert events(conn, q.BOARD_MATCH_AMBIGUOUS_EVENT) == GUEST_GOLDEN["amb"]
+    assert [f.line() for f in br.flags(conn)] == GUEST_GOLDEN["flags"]
+
+
 # ---------------------------------------------------------------------------
 # wiring: stage order, config, CLI, MCP, digest
 # ---------------------------------------------------------------------------

@@ -906,3 +906,227 @@ def test_other_selling_is_read_as_not_software(title: str) -> None:
     from jobkit.onboarding.intake import _NOT_SOFTWARE_SALES
 
     assert _NOT_SOFTWARE_SALES.search(title) is not None
+
+
+# ---- automatic approval and opening the forms (2026-10-22) -------------------
+
+
+def _auto(home: Path) -> dict[str, Any]:
+    data = read_config_yaml(home / "config" / "autoapprove.yaml")
+    assert isinstance(data, dict)
+    return data
+
+
+def test_yes_to_auto_approval_writes_one_rule_and_no_limit(fresh: Path) -> None:
+    from jobkit import rules
+
+    out = run_intake({**ANSWERS, "auto_approve": {"enabled": True, "said": "yes, approve them"}})
+    text = (fresh / "config" / "autoapprove.yaml").read_text()
+    assert text.startswith(GENERATED_MARK)
+    assert '# you said: "yes, approve them"' in text
+    cfg = _auto(fresh)
+    assert cfg["auto_approve"] == [
+        {
+            "when": {"score_gte": 75, "sanity_flags": "none", "sanity_checked": True},
+            "reason": "clears-your-bar",
+        }
+    ]
+    assert cfg["auto_reject"] == []
+    # no daily limit unless they name one: the key is not written at all
+    assert rules.MAX_PER_DAY_KEY not in cfg and rules.MAX_PER_DAY_KEY not in text
+    assert "automatic approval at a fit score of 75 or more, no daily limit" in out
+    # the rule uses only known condition keys
+    checked = {"fit_score": 80, "flags": [], "sanity_job_id": 1, "demand_score": 3}
+    assert rules._cond_matches(cfg["auto_approve"][0]["when"], checked)
+    # a job whose sanity checks did not finish is never approved by it
+    unchecked = {"fit_score": 80, "flags": [], "sanity_job_id": None, "demand_score": None}
+    assert not rules._cond_matches(cfg["auto_approve"][0]["when"], unchecked)
+
+
+def test_a_daily_limit_is_written_only_when_given(
+    fresh: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from jobkit import rules
+
+    answers = {**ANSWERS, "auto_approve": {"enabled": True, "min_score": 82, "per_day": 6}}
+    out = run_intake(answers)
+    cfg = _auto(fresh)
+    assert cfg["auto_approve"][0]["when"] == {
+        "score_gte": 82,
+        "sanity_flags": "none",
+        "sanity_checked": True,
+    }
+    assert cfg[rules.MAX_PER_DAY_KEY] == 6
+    assert "at most 6 a day" in out
+    monkeypatch.setattr(rules, "RULES_PATH", str(fresh / "config" / "autoapprove.yaml"))
+    assert rules.max_auto_approve_per_day(rules._load_rules()) == 6
+
+
+def test_no_to_auto_approval_writes_no_rule(fresh: Path) -> None:
+    run_intake({**ANSWERS, "auto_approve": {"enabled": False, "said": "I'll pick myself"}})
+    cfg = _auto(fresh)
+    assert cfg["auto_approve"] == [] and cfg["auto_reject"] == []
+    assert "max_auto_approve_per_day" not in cfg
+    assert "I'll pick myself" in (fresh / "config" / "autoapprove.yaml").read_text()
+
+
+def test_rerun_rewrites_the_interviews_own_rule(fresh: Path) -> None:
+    run_intake({**ANSWERS, "auto_approve": {"enabled": True, "per_day": 4}})
+    run_intake({**ANSWERS, "auto_approve": {"enabled": True, "min_score": 70}})
+    cfg = _auto(fresh)
+    assert cfg["auto_approve"][0]["when"]["score_gte"] == 70
+    assert "max_auto_approve_per_day" not in cfg
+    run_intake({**ANSWERS, "auto_approve": {"enabled": False}})
+    assert _auto(fresh)["auto_approve"] == []
+    # no answer on a rerun: the file is kept as it is
+    run_intake({**ANSWERS, "auto_approve": {"enabled": True}})
+    out = run_intake(ANSWERS)
+    assert "kept as they are: config/autoapprove.yaml" in out
+    assert _auto(fresh)["auto_approve"][0]["reason"] == "clears-your-bar"
+
+
+def test_rules_someone_added_are_kept_even_with_replace_existing(jobkit_home: Path) -> None:
+    """The test profile's autoapprove.yaml stands in for the owner's: approve
+    and reject rules accepted one by one. The interview never rewrites it,
+    not even when the person says yes to replacing their filters."""
+    auto = jobkit_home / "config" / "autoapprove.yaml"
+    before = auto.read_text()
+    rules_before = yaml.safe_load(before)
+    assert rules_before["auto_approve"] and rules_before["auto_reject"]
+    for name in ("filters", "commute_table"):  # let the interview write these
+        (jobkit_home / "config" / f"{name}.yaml").unlink()
+    out = run_intake({**ANSWERS, "auto_approve": {"enabled": True, "per_day": 3}})
+    assert auto.read_text() == before
+    assert "already holds standing rules, so it was kept as it is" in out
+    assert "score_gte: 75" in out and "max_auto_approve_per_day: 3" in out
+    assert "replace_existing" not in out
+    # no to automatic approval leaves it alone too
+    run_intake({**ANSWERS, "auto_approve": {"enabled": False}})
+    assert auto.read_text() == before
+    # replace_existing replaces the filters, never the rules: yes or no
+    for choice in ({"enabled": True}, {"enabled": False}):
+        out = run_intake({**ANSWERS, "auto_approve": choice}, replace_existing=True)
+        assert auto.read_text() == before, choice
+        assert "config/autoapprove.yaml" in out.split("kept as they are: ")[1]
+    assert _auto(jobkit_home)["auto_approve"] == rules_before["auto_approve"]
+    assert _auto(jobkit_home)["auto_reject"] == rules_before["auto_reject"]
+    assert not list((jobkit_home / "data" / "setup" / "backup").glob("autoapprove.yaml.*"))
+
+
+def test_a_no_names_the_rule_to_delete_when_others_were_added(jobkit_home: Path) -> None:
+    """A file with the clears-your-bar rule plus a rule someone added: a no
+    keeps the file and says which rule to delete."""
+    auto = jobkit_home / "config" / "autoapprove.yaml"
+    raw = yaml.safe_load(auto.read_text())
+    raw["auto_approve"].append(
+        {"when": {"score_gte": 75, "sanity_flags": "none"}, "reason": "clears-your-bar"}
+    )
+    auto.write_text(yaml.safe_dump(raw, sort_keys=False))
+    before = auto.read_text()
+    out = run_intake({**ANSWERS, "auto_approve": {"enabled": False}}, replace_existing=True)
+    assert auto.read_text() == before
+    assert 'delete the rule with reason "clears-your-bar" under auto_approve' in out
+
+
+@pytest.mark.parametrize(
+    ("auto", "message"),
+    [
+        ({"enabled": True, "per_day": 0}, "per_day must be 1 or more"),
+        ({"enabled": True, "per_day": -1}, "per_day must be 1 or more"),
+        ({"enabled": True, "per_day": True}, "per_day"),
+        ({"enabled": True, "per_day": 2.5}, "per_day"),
+        ({"enabled": False, "per_day": 5}, "leave it out when enabled is false"),
+        ({"enabled": True, "min_score": 120}, "min_score must be 0-100"),
+        ({"enabled": True, "min_score": True}, "min_score"),
+        ({"enabled": True, "min_score": "80"}, "min_score"),
+        ({"min_score": 80}, "enabled"),
+    ],
+)
+def test_bad_auto_approve_answers_write_nothing(
+    fresh: Path, auto: dict[str, Any], message: str
+) -> None:
+    with pytest.raises(SetupError, match=message):
+        run_intake({**ANSWERS, "auto_approve": auto})
+    assert not (fresh / "config" / "autoapprove.yaml").exists()
+    assert not (fresh / "config" / "filters.yaml").exists()
+
+
+def test_forms_open_after_the_daily_run_by_default(fresh: Path) -> None:
+    run_intake(ANSWERS)
+    path = fresh / "config" / "filters.yaml"
+    assert load_filters(path).open_after_daily_run is True
+    run_intake({**ANSWERS, "open_forms": {"after_daily_run": False, "said": "I'll open them"}})
+    text = path.read_text()
+    assert load_filters(path).open_after_daily_run is False
+    assert '# you said: "I\'ll open them"' in text
+    assert "\nstaging:\n" in text
+
+
+def test_mcp_run_intake_takes_the_new_answers(fresh: Path) -> None:
+    import json
+
+    answers = {
+        **ANSWERS,
+        "auto_approve": {"enabled": True, "per_day": 2},
+        "open_forms": {"after_daily_run": True},
+    }
+    out = mcp_tools.run_intake(json.dumps(answers))
+    assert "at most 2 a day" in out
+    assert _auto(fresh)["max_auto_approve_per_day"] == 2
+    assert load_filters(fresh / "config" / "filters.yaml").open_after_daily_run is True
+
+
+# ---- web search for alert jobs (2026-10-22) -----------------------------------
+
+
+def test_no_search_answer_writes_no_search_block(fresh: Path) -> None:
+    run_intake(ANSWERS)
+    path = fresh / "config" / "filters.yaml"
+    assert "\nsearch:\n" not in path.read_text()
+    assert load_filters(path).alert_web_search is False
+    assert load_filters(path).max_searches_per_check is None
+
+
+def test_yes_to_search_writes_it_on_with_no_limit(fresh: Path) -> None:
+    run_intake({**ANSWERS, "alert_search": {"enabled": True, "said": "yes, go find them"}})
+    path = fresh / "config" / "filters.yaml"
+    text = path.read_text()
+    assert '# you said: "yes, go find them"' in text
+    assert "alert_web_search: true" in text and "max_searches_per_check" not in text
+    f = load_filters(path)
+    assert f.alert_web_search is True and f.max_searches_per_check is None
+
+
+def test_a_search_limit_is_written_only_when_given(fresh: Path) -> None:
+    run_intake({**ANSWERS, "alert_search": {"enabled": True, "per_check": 8}})
+    f = load_filters(fresh / "config" / "filters.yaml")
+    assert f.alert_web_search is True and f.max_searches_per_check == 8
+    run_intake({**ANSWERS, "alert_search": {"enabled": False, "said": "no searching"}})
+    f = load_filters(fresh / "config" / "filters.yaml")
+    assert f.alert_web_search is False and f.max_searches_per_check is None
+
+
+@pytest.mark.parametrize(
+    ("search", "message"),
+    [
+        ({"enabled": True, "per_check": 0}, "per_check must be 1 or more"),
+        ({"enabled": True, "per_check": True}, "per_check"),
+        ({"enabled": True, "per_check": "5"}, "per_check"),
+        ({"enabled": False, "per_check": 5}, "leave it out when enabled is false"),
+        ({"enabled": "yes"}, "enabled"),
+        ({"per_check": 3}, "enabled"),
+    ],
+)
+def test_bad_search_answers_write_nothing(
+    fresh: Path, search: dict[str, Any], message: str
+) -> None:
+    with pytest.raises(SetupError, match=message):
+        run_intake({**ANSWERS, "alert_search": search})
+    assert not (fresh / "config" / "filters.yaml").exists()
+
+
+def test_mcp_run_intake_takes_the_search_answer(fresh: Path) -> None:
+    import json
+
+    mcp_tools.run_intake(json.dumps({**ANSWERS, "alert_search": {"enabled": True}}))
+    assert load_filters(fresh / "config" / "filters.yaml").alert_web_search is True

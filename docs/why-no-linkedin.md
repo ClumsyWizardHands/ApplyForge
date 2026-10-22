@@ -1,10 +1,11 @@
 # LinkedIn
 
-ApplyForge (the `jobkit` command) reads jobs from employers' own job boards. If
-you turn it on, it also runs a few logged-out LinkedIn searches a day to find
-company names, then looks for those jobs on each company's own board. This
-page covers what LinkedIn allows, what ApplyForge does, and what could come
-next.
+ApplyForge (the `jobkit` command) reads jobs from employers' own job boards.
+LinkedIn reaches it two ways. If you connect your email, the LinkedIn job
+alerts and messages you already get are read from your mailbox, and each job
+is looked up on the employer's own board. If you turn it on, it also runs a few
+logged-out LinkedIn searches a day to find company names. This page covers
+what LinkedIn allows, what ApplyForge does, and what could come next.
 
 ## What LinkedIn allows
 
@@ -39,12 +40,56 @@ a search. It never gets around bot detection or solves a CAPTCHA. A job board
 is faster anyway: one request returns every open role at a company, in
 structured data.
 
+## Job alerts and messages in your email
+
+If you connected your email to Claude, every email check (the daily run's,
+and "check my email") includes LinkedIn's job-alert emails and its message
+and InMail notifications. The LinkedIn site is never fetched for this: only
+your own emails are read, through your email connector, read-only.
+
+- **Job alerts.** Claude reads each job's company, title and location from
+  the email. No LinkedIn link or job id is stored or followed. ApplyForge
+  looks for the same job (same title, a location that agrees) on the
+  employer's own Greenhouse, Lever or Ashby board, and a job enters only as
+  that posting (CLAUDE.md rule 10: the employer's record wins). It is scored
+  the same day and approved if it clears your bar. A job it can't find there
+  is listed in your digest. Alerts from Indeed, Glassdoor, ZipRecruiter and
+  Wellfound are read the same way.
+- **Messages.** A recruiter's message shows up in your summary and digest as
+  their company and one line in Claude's words ("a recruiter at Acme asks for
+  a call"). The sender's name is not stored. ApplyForge never replies;
+  answering is yours, on LinkedIn.
+
+[Email replies](email-responses.md#job-alert-emails) has the details.
+
+### Web search for alert jobs
+
+When a job from your alert emails isn't on a board ApplyForge reads, Claude
+searches the web for it. Setup asks whether you want this (yes is
+recommended) and whether you want a limit on searches per email check (none
+by default; only recent alerts are searched). It is an owner-approved
+exception to the project's no-scraping rule (CLAUDE.md rule 11):
+
+- Claude may follow any public page that leads to the posting: a company
+  careers page, an ATS board, a job site that links through. What it records
+  is the posting's own link, never a job site's copy.
+- LinkedIn pages are skipped without opening them: a logged-out LinkedIn page
+  has no apply link. A link that names LinkedIn anywhere is refused.
+- No sign-ins. Saved sign-ins for sites like Workday may come later, with
+  your permission for each site; ApplyForge never handles passwords.
+- robots.txt is followed within reason, and Claude stops at any CAPTCHA or
+  bot check.
+- A found job enters as the employer's own Greenhouse, Lever or Ashby record,
+  only when the board is that employer's. A posting on Workday, iCIMS, Taleo
+  or a similar site is listed with its direct link ("apply on the employer's
+  site: <link>") for you to apply there; no job is added for it.
+
 ## Discovery mode (off by default)
 
 `jobkit linkedin-discover [--dry-run]` (Claude tool
 `linkedin_discover(confirm=false)`) and a nightly stage right after the feeds
-use the logged-out search, for discovery only. It is the one exception to the
-project's no-scraping rule (CLAUDE.md hard rule 11). It is off until you set
+use the logged-out search, for discovery only. It is the one exception to
+the project's no-scraping rule (CLAUDE.md hard rule 11). It is off until you set
 `feeds.linkedin_guest.enabled: true` in `config/filters.yaml`. While it is off,
 the nightly `linkedin-guest` stage does nothing and
 `linkedin_discover(confirm=true)` refuses to start.
@@ -161,8 +206,6 @@ principles: nothing logged in, and nothing that hides from bot detection.
 Ideas so far, also on the
 [roadmap](roadmap.md#linkedin-within-the-principles):
 
-- **Job-alert emails.** Read the LinkedIn job-alert emails you already get
-  (read-only) and look each job up on the employer's own board.
 - **Your own LinkedIn data.** LinkedIn lets members download their data,
   including connections. Importing that file would let ApplyForge point out
   people you already know at companies in your queue. The file stays on your

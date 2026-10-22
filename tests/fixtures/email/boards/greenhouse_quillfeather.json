@@ -1,0 +1,38 @@
+{
+  "_recorded": "hand-built in the shape of GET https://boards-api.greenhouse.io/v1/boards/quillfeather/jobs (no content, HTTP 200): a fictional company for the job-alert email tests; company, titles, locations, ids and timestamps are invented",
+  "jobs": [
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/quillfeather/jobs/7303000101",
+      "internal_job_id": 7302000101,
+      "location": {
+        "name": "Remote - US"
+      },
+      "id": 7303000101,
+      "updated_at": "2026-10-11T09:00:00-04:00",
+      "requisition_id": "R-0101",
+      "title": "Senior Account Executive",
+      "company_name": "Quillfeather Labs",
+      "first_published": "2026-10-11T08:00:00-04:00",
+      "language": "en",
+      "application_deadline": null
+    },
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/quillfeather/jobs/7303000102",
+      "internal_job_id": 7302000102,
+      "location": {
+        "name": "Remote - US"
+      },
+      "id": 7303000102,
+      "updated_at": "2026-10-11T09:00:00-04:00",
+      "requisition_id": "R-0102",
+      "title": "Sales Engineer",
+      "company_name": "Quillfeather Labs",
+      "first_published": "2026-10-11T08:00:00-04:00",
+      "language": "en",
+      "application_deadline": null
+    }
+  ],
+  "meta": {
+    "total": 2
+  }
+}

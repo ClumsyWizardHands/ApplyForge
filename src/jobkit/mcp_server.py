@@ -16,6 +16,7 @@ import datetime
 import json
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 from mcp.server import MCPServer
 
@@ -31,7 +32,7 @@ from jobkit.pipeline import halts, nightly, questions
 from jobkit.pipeline.dedup import follow_merges
 from jobkit.pipeline.digest import freshness_banner, write_digest
 from jobkit.rules import run_standing_rules
-from jobkit.track import responses
+from jobkit.track import job_alerts, responses
 from jobkit.track.applications import record_submission
 from jobkit.track.applications import repair as repair_application_rows
 
@@ -550,11 +551,17 @@ def email_targets(scheduled: bool = False) -> str:
     """Step 1 of an email check. Lists the submitted applications still
     waiting on news (id, company, title, ATS, apply host, submission date,
     stage), when the mailbox was last checked, and a suggested Gmail search
-    (ATS sender domains and company names, after the last check). Read-only:
-    use the search in the person's own mailbox through their email connector.
-    Nothing is sent, and no email is changed or stored. The unattended
-    scheduled run passes scheduled=true: then nothing is listed unless
-    tracking.email_check is true in config/filters.yaml."""
+    (ATS sender domains and company names, after the last check). Also a
+    second search, for job-alert emails (LinkedIn's and the job boards') and
+    LinkedIn message notifications, what to take from each (for
+    record_job_alerts and record_linkedin_message), and the LinkedIn
+    messages recorded since the last check, for the summary. The last line
+    says whether Claude searches the web for alert jobs board lookup cannot
+    find (search.alert_web_search; then alert_jobs_to_search lists them).
+    Read-only: use the search in the person's own mailbox through their
+    email connector. Nothing is sent, and no email is changed or stored. The
+    unattended scheduled run passes scheduled=true: then nothing is listed
+    unless tracking.email_check is true in config/filters.yaml."""
     if scheduled:
         from jobkit.config import load_filters
 
@@ -568,7 +575,9 @@ def email_targets(scheduled: bool = False) -> str:
                 "Email not checked: tracking.email_check is off in config/filters.yaml. "
                 "Skip the email check in this run."
             )
-    return responses.email_targets(_conn()).render()
+    from jobkit.track import alert_search
+
+    return responses.email_targets(_conn()).render() + "\n" + alert_search.search_status()
 
 
 @mcp.tool()
@@ -619,9 +628,179 @@ def record_email_response(
 def finish_email_check(checked_through: str = "") -> str:
     """Step 4: record that the person's mailbox was read through
     `checked_through` (ISO date-time; default now), so the next email_targets
-    search starts there. Records a time only; nothing is sent."""
+    search starts there. Lists the jobs from job-alert emails recorded in
+    this check and where each stands. When the check handed any of them to
+    board lookup (record_job_alerts), starts `jobkit same-day
+    --resolve-boards` in the background: board lookup on the employer's own
+    Greenhouse, Lever or Ashby board (public board APIs only), then the
+    postings it found go through the filter, the sanity checks, scoring, the
+    queue and the standing rules, so one that clears the person's bar is
+    approved today (background_status shows its report; the nightly run
+    picks up any it misses). When web search for alert jobs is on, the last
+    line says to call alert_jobs_to_search once that launch finishes.
+    Read-only for the mailbox: nothing is sent."""
+    from jobkit.track import alert_search
+
+    conn = _conn()
+    # read before the check is recorded: a config error never follows a
+    # committed check (search_on reads safely, a broken config means off)
+    searching = alert_search.search_on()
     try:
-        return responses.finish_email_check(_conn(), checked_through).render()
+        check = responses.finish_email_check(conn, checked_through)
+    except ValueError as e:
+        return f"not recorded: {e}"
+    text = check.render()
+    if check.alert_cards_since:
+        text += "\n" + _start_alert_board_lookup(conn, check.alert_cards_since)
+    if searching:
+        text += "\n" + alert_search.search_status()
+    return text
+
+
+def _start_alert_board_lookup(conn: sqlite3.Connection, cards: int) -> str:
+    """Board lookup and same-day scoring for the jobs an email check took
+    from job-alert emails: `jobkit same-day --resolve-boards`, in the
+    background (no LLM here). Not started while a nightly run or board
+    lookup is going: that run, or the next one, picks them up."""
+    from jobkit.pipeline import same_day
+
+    what = f"{cards} job(s) from job-alert emails"
+    night = nightly.in_progress(conn)
+    if night is not None:
+        return f"board lookup for {what}: the nightly run in progress (run {night.run}) does it."
+    busy = same_day.board_lookup_running(conn)
+    if busy is not None:
+        return (
+            f"board lookup for {what}: `jobkit {' '.join(busy.args)}` is already running "
+            f"(launch #{busy.event_id}); the nightly resolve-boards stage picks up any it misses."
+        )
+    try:
+        launch = background.spawn(conn, same_day.COMMAND, same_day.RESOLVE_FLAG)
+    except RuntimeError as e:
+        return f"board lookup for {what} not started ({e}); the nightly run does it."
+    return (
+        f"board lookup for {what}: {launch.describe()}. Postings found on the employer's own "
+        "board are scored in the same run, and the standing rules approve the ones that clear "
+        "your bar; background_status shows the report."
+    )
+
+
+@mcp.tool()
+def alert_jobs_to_search() -> str:
+    """The jobs from recent job-alert emails (inside the person's freshness
+    window, freshness.max_age_days) that board lookup could not find on a
+    Greenhouse, Lever or Ashby board and that have no web search result
+    yet, newest first: each with its alert reference, company, title,
+    location, the alert it came from and a suggested web search. Only when
+    search.alert_web_search is true in config/filters.yaml (otherwise it
+    says search is off and lists nothing to search); search.max_searches_per_check,
+    when the person chose one in setup, limits how many are listed per email
+    check (recency is the limit otherwise). Search the web for each one and
+    follow any public page that leads to the posting (a company careers
+    page, an ATS board, a job site that links through); record the
+    posting's own link (the employer's Greenhouse, Lever or Ashby posting,
+    its apply page on Workday, iCIMS, Taleo and the like, or the posting on
+    the employer's careers site), never a job site's copy. Never open a
+    linkedin.com or lnkd.in page, skip those results without opening them
+    (they have no apply link); never sign in; follow robots.txt within
+    reason; stop at any CAPTCHA or bot check. Then call
+    record_search_result for each. Read-only, deterministic, no LLM."""
+    from jobkit.pipeline import same_day
+    from jobkit.track import alert_search
+
+    conn = _conn()
+    busy = same_day.board_lookup_running(conn)
+    running = f"`jobkit {' '.join(busy.args)}`, launch #{busy.event_id}" if busy else ""
+    try:
+        return alert_search.to_search(conn, lookup_running=running).render()
+    except (ValueError, FileNotFoundError) as e:
+        return f"nothing listed: {e}"
+
+
+@mcp.tool()
+def record_search_result(alert_ref: str, url: str = "", outcome: str = "found") -> str:
+    """Record what a web search found for one job from alert_jobs_to_search
+    (recorded once per alert_ref; a repeat changes nothing). outcome
+    'found' with `url` the posting's apply link: a Greenhouse, Lever or
+    Ashby link is read from the public board API now and the posting enters
+    jobkit as the employer's own record (never twice); a new job is then
+    scored in the background (`jobkit same-day <id>`: filter, sanity checks,
+    score, queue, standing rules), so one that clears the person's bar is
+    approved today (background_status shows it). A link on a system jobkit
+    does not read (Workday, iCIMS, Taleo, SuccessFactors, ...) or on the
+    employer's own careers site is kept as a lead: the system's name and
+    the employer's apply link (tracking parameters removed), listed in the
+    email-check summary and the digest as 'apply on the employer's site:
+    <link>'. No job is added for a lead: a job from an alert enters jobkit
+    only as the employer's Greenhouse, Lever or Ashby posting. outcome
+    'not_found' with no url: recorded, and the job is not offered again. A
+    link that names LinkedIn anywhere is refused (never open a linkedin.com
+    or lnkd.in page; skip those results without opening them), and so is a
+    job site's copy (a link on neither an application system's own host nor
+    the employer's own domain): follow it to the posting's own link. No LLM
+    here."""
+    from jobkit.track import alert_search
+
+    try:
+        return alert_search.record_search_result(_conn(), alert_ref, url, outcome).render()
+    except (ValueError, FileNotFoundError) as e:
+        return f"not recorded: {e}"
+
+
+@mcp.tool()
+def record_job_alerts(
+    items: list[dict[str, Any]] | str,
+    message_id: str,
+    received_at: str,
+    source: str = "linkedin",
+) -> str:
+    """Record the jobs listed in one job-alert email in the person's mailbox
+    (LinkedIn's job alerts, or a job board's such as Indeed). `items` is a
+    list of {company, title, location, company_site_link}: the text of each
+    job as the email shows it, and whether it shows an 'apply on company
+    site' link. Never pass a link or a job id: a field holding one is
+    refused. `message_id` is the mailbox's id for the email (an email is
+    recorded once), `received_at` when it arrived, `source` the sender
+    (linkedin, indeed, glassdoor, ziprecruiter, wellfound, ...). Each title
+    goes through the person's title rules. A kept job whose employer posting
+    jobkit already holds needs nothing; every other kept job goes to board
+    lookup, which finds the same job (title AND location) on the employer's
+    own Greenhouse, Lever or Ashby board and adds that posting (never a
+    LinkedIn job); finish_email_check starts the lookup. The company name
+    goes to the discovery queue unless jobkit already polls its board.
+    Returns the counts (kept, for board lookup, already in jobkit, dropped)
+    and one line per job. Deterministic, no LLM. Read-only for the mailbox:
+    nothing is sent and no link is followed."""
+    try:
+        return job_alerts.record_job_alerts(
+            _conn(), items, message_id, received_at, source
+        ).render()
+    except (ValueError, FileNotFoundError) as e:
+        return f"not recorded: {e}"
+
+
+@mcp.tool()
+def record_linkedin_message(
+    company: str,
+    summary: str,
+    received_at: str,
+    message_id: str,
+    link: str = "",
+) -> str:
+    """Record one LinkedIn message or InMail notification from the person's
+    mailbox: the sender's company if the email shows it ('' if not), ONE
+    line in your words about who wrote, by role and never by name ('a
+    recruiter at Acme'), and what they want (cut to 160 characters; a line
+    break is refused; never the message text), when it
+    arrived, the mailbox's message id (recorded once) and a link that opens
+    the email in the mailbox (never a LinkedIn link). Linked to an
+    application or a queued job at that company when there is one, and
+    listed in the digest. Read-only: nothing is sent and the message is
+    never answered."""
+    try:
+        return job_alerts.record_linkedin_message(
+            _conn(), company, summary, received_at, message_id, link
+        ).render()
     except ValueError as e:
         return f"not recorded: {e}"
 

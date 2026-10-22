@@ -1,0 +1,62 @@
+{
+  "_note": "Hand-written messages in the shape an email connector returns (sender, subject, snippet, date, id, link, body text), with the fields Claude takes from each ('extracted'). Every company, person and address is fictional; the LinkedIn job ids in the bodies are made up and must never reach the database.",
+  "linkedin_job_alert": {
+    "sender": "LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>",
+    "subject": "5 new jobs for 'account executive' in United States",
+    "snippet": "Your job alert for account executive in United States. 5 new jobs match your preferences.",
+    "received_at": "Tue, 20 Oct 2026 07:12:44 +0000",
+    "message_id": "18f2a6c4d1e0c101",
+    "link": "https://mail.google.com/mail/u/0/#all/18f2a6c4d1e0c101",
+    "source": "linkedin",
+    "body_text": "Your job alert for account executive\n\nAccount Executive, Mid-Market\nLarkspur Analytics\nNew York, NY\nApply on company website\nView job: https://www.linkedin.com/comm/jobs/view/4300000101/?trackingId=Zx1&refId=Ab2\n\nSenior Account Executive\nQuillfeather Labs\nRemote - US\nEasy Apply\nView job: https://www.linkedin.com/comm/jobs/view/4300000102/?trackingId=Zx2\n\nSolutions Engineer\nTidewater Systems\nBoston, MA\nView job: https://www.linkedin.com/comm/jobs/view/4300000103/\n\nSales Development Representative\nMarigold Freight\nDenver, CO\nView job: https://www.linkedin.com/comm/jobs/view/4300000104/\n\nRevenue Operations Manager\nCobaltline Health\nChicago, IL\nApply on company website\nView job: https://lnkd.in/e4300000105\n\nSee all jobs: https://www.linkedin.com/comm/jobs/search/?savedSearchId=9900000001",
+    "linkedin_job_ids": ["4300000101", "4300000102", "4300000103", "4300000104", "4300000105", "9900000001"],
+    "extracted": [
+      {"company": "Larkspur Analytics", "title": "Account Executive, Mid-Market", "location": "New York, NY", "company_site_link": true},
+      {"company": "Quillfeather Labs", "title": "Senior Account Executive", "location": "Remote - US", "company_site_link": false},
+      {"company": "Tidewater Systems", "title": "Solutions Engineer", "location": "Boston, MA", "company_site_link": false},
+      {"company": "Marigold Freight", "title": "Sales Development Representative", "location": "Denver, CO", "company_site_link": false},
+      {"company": "Cobaltline Health", "title": "Revenue Operations Manager", "location": "Chicago, IL", "company_site_link": true}
+    ]
+  },
+  "linkedin_inmail": {
+    "sender": "Morgan Vale via LinkedIn <inmail-hit-reply@linkedin.com>",
+    "subject": "Morgan Vale sent you an InMail: Account Executive at Larkspur Analytics",
+    "snippet": "Hi Jordan, I lead recruiting at Larkspur Analytics and saw your application for our Account Executive role. Would you have 20 minutes this week to talk?",
+    "received_at": "2026-10-20T15:30:00Z",
+    "message_id": "18f2a6c4d1e0c102",
+    "link": "https://mail.google.com/mail/u/0/#all/18f2a6c4d1e0c102",
+    "body_text": "Morgan Vale\nHead of Recruiting at Larkspur Analytics\n\nHi Jordan, I lead recruiting at Larkspur Analytics and saw your application for our Account Executive role.\nWould you have 20 minutes this week to talk?\n\nReply: https://www.linkedin.com/messaging/thread/2-ZmFrZTEyMzQ1Njc4OQ==/",
+    "extracted": {
+      "company": "Larkspur Analytics",
+      "summary": "Larkspur Analytics' head of recruiting asks for a 20 minute call about the Account Executive role."
+    }
+  },
+  "linkedin_message": {
+    "sender": "Riley Ashgrove via LinkedIn <messages-noreply@linkedin.com>",
+    "subject": "Riley just messaged you",
+    "snippet": "Riley Ashgrove: Hey Jordan, good to connect. Are you open to roles in sales operations?",
+    "received_at": "2026-10-21T09:05:00Z",
+    "message_id": "18f2a6c4d1e0c103",
+    "link": "https://mail.google.com/mail/u/0/#all/18f2a6c4d1e0c103",
+    "body_text": "Riley Ashgrove\nHey Jordan, good to connect. Are you open to roles in sales operations?\nView message: https://www.linkedin.com/messaging/thread/2-ZmFrZTk4NzY1NDMyMQ==/",
+    "extracted": {
+      "company": "",
+      "summary": "A new connection asks whether you are open to sales operations roles."
+    }
+  },
+  "indeed_alert": {
+    "sender": "Indeed <alert@indeed.com>",
+    "subject": "3 new sales manager jobs in your area",
+    "snippet": "Sales Manager - Harborview Outfitters - Austin, TX. Account Executive - Larkspur Analytics - New York, NY.",
+    "received_at": "2026-10-21T06:00:00Z",
+    "message_id": "18f2a6c4d1e0c104",
+    "link": "https://mail.google.com/mail/u/0/#all/18f2a6c4d1e0c104",
+    "source": "indeed",
+    "body_text": "Sales Manager\nHarborview Outfitters - Austin, TX\nhttps://www.indeed.com/rc/clk?jk=a1b2c3d4e5f60718\n\nAccount Executive\nLarkspur Analytics - New York, NY\nhttps://www.indeed.com/rc/clk?jk=a1b2c3d4e5f60719\n\nRetail Store Manager\nPinecrest Goods - Austin, TX\nhttps://www.indeed.com/rc/clk?jk=a1b2c3d4e5f60720",
+    "extracted": [
+      {"company": "Harborview Outfitters", "title": "Sales Manager", "location": "Austin, TX"},
+      {"company": "Larkspur Analytics", "title": "Account Executive", "location": "New York, NY"},
+      {"company": "Pinecrest Goods", "title": "Retail Store Manager", "location": "Austin, TX"}
+    ]
+  }
+}

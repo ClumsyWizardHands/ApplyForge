@@ -1,0 +1,91 @@
+{
+  "_note": "LinkedIn guest card handling as main (cd63c22) produced it, before job-alert email cards existed: the board resolver must still produce exactly this for guest cards (tests/test_board_resolver.py::test_linkedin_guest_cards_are_handled_exactly_as_before).",
+  "render": "resolve boards: 0 aggregator job(s), 3 LinkedIn card(s); merged 0 into the employer's posting, 1 card(s) ingested, 1 flagged (board-match-ambiguous or board-match-unconfirmed), 0 without a matching title, 1 without a board; 38 request(s)\n  - LinkedIn card 4100000014 Soylent.ai — Sales Director (New York, NY): the employer's posting is job 3: Sales Director — New York (ashby/soylent, registry board: the board names soylent.ai)\n  - LinkedIn card 4100000015 Soylent.ai — Sales Director (Chicago, IL): board-match-ambiguous: 2 posting(s) with this title, none in a location that agrees with 'Chicago, IL'. Candidates: Sales Director — London (ashby/soylent, posting 3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e01); Sales Director — New York (ashby/soylent, posting 3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e03)\n  - LinkedIn card 4100000016 Wallace Corp — Account Executive (Austin, TX): no Greenhouse, Lever or Ashby board found",
+  "counts": {
+    "jobs": 0,
+    "cards": 3,
+    "companies": 2,
+    "requests": 38,
+    "probed": 1,
+    "cache_hits": 0,
+    "merged": 0,
+    "ingested": 1,
+    "held": 0,
+    "ambiguous": 1,
+    "no_title_match": 0,
+    "no_board": 1,
+    "deferred": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "cards": [
+    {
+      "job_id": 3,
+      "ats": "ashby",
+      "company": "Soylent.ai",
+      "li_id": "4100000014",
+      "location": "New York, NY",
+      "outcome": "ingested",
+      "title": "Sales Director",
+      "token": "soylent"
+    },
+    {
+      "job_id": null,
+      "candidates": 2,
+      "company": "Soylent.ai",
+      "li_id": "4100000015",
+      "location": "Chicago, IL",
+      "outcome": "ambiguous",
+      "title": "Sales Director"
+    },
+    {
+      "job_id": null,
+      "company": "Wallace Corp",
+      "li_id": "4100000016",
+      "location": "Austin, TX",
+      "outcome": "no_board",
+      "title": "Account Executive"
+    }
+  ],
+  "amb": [
+    {
+      "job_id": null,
+      "candidates": [
+        {
+          "ats": "ashby",
+          "external_id": "3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e01",
+          "location": "London",
+          "title": "Sales Director",
+          "token": "soylent",
+          "url": "https://jobs.ashbyhq.com/Soylent/3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e01/application"
+        },
+        {
+          "ats": "ashby",
+          "external_id": "3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e03",
+          "location": "New York",
+          "title": "Sales Director",
+          "token": "soylent",
+          "url": "https://jobs.ashbyhq.com/Soylent/3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e03/application"
+        }
+      ],
+      "company": "Soylent.ai",
+      "flag": "board-match-ambiguous",
+      "li_id": "4100000015",
+      "location": "Chicago, IL",
+      "source": "linkedin_guest",
+      "title": "Sales Director",
+      "why": "2 posting(s) with this title, none in a location that agrees with 'Chicago, IL'"
+    }
+  ],
+  "flags": [
+    "LinkedIn card 4100000015: Soylent.ai — Sales Director (Chicago, IL) [board-match-ambiguous]: 2 posting(s) with this title, none in a location that agrees with 'Chicago, IL'. Candidates: posting 3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e01: Sales Director — London (ashby/soylent) https://jobs.ashbyhq.com/Soylent/3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e01/application; posting 3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e03: Sales Director — New York (ashby/soylent) https://jobs.ashbyhq.com/Soylent/3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e03/application. if one is the job, add it with add_job_url(url) (`jobkit add-url`)"
+  ],
+  "digest": [
+    "## Aggregator jobs → the employer's own board",
+    "Today: 0 aggregator job(s) merged into the employer's posting, 1 LinkedIn card(s) found on the employer's board, 0 with no posting of that title on the board, 1 with no Greenhouse/Lever/Ashby board found.",
+    "⚠ 1 flagged board-match-ambiguous or board-match-unconfirmed (nothing was picked; a title alone never decides, and a board found by name only must be confirmed):",
+    "- LinkedIn card 4100000015: Soylent.ai — Sales Director (Chicago, IL) [board-match-ambiguous]: 2 posting(s) with this title, none in a location that agrees with 'Chicago, IL'. Candidates: posting 3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e01: Sales Director — London (ashby/soylent) https://jobs.ashbyhq.com/Soylent/3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e01/application; posting 3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e03: Sales Director — New York (ashby/soylent) https://jobs.ashbyhq.com/Soylent/3f1c2a9e-5b7d-4e21-9c84-1a2b3c4d5e03/application. if one is the job, add it with add_job_url(url) (`jobkit add-url`)",
+    ""
+  ],
+  "queue": "⚠ 1 aggregator job(s) or LinkedIn card(s) flagged board-match-ambiguous or board-match-unconfirmed: a board has the title, but no posting was picked (none or several agree on location, or the board was found by name only and nothing on it confirms it is the company's). resolve_boards() lists the candidates; pick with resolve_boards(job_id=N, pick=<posting id>)."
+}

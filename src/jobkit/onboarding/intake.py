@@ -3,9 +3,26 @@ run_intake.
 
 Claude asks the questions (against the corpus: ONBOARDING.md says why); this
 module turns the human's answers into config/filters.yaml and
-config/commute_table.yaml, and writes config/autoapprove.yaml (no rules: each
-standing rule is accepted one at a time, later) and
+config/commute_table.yaml, and writes config/autoapprove.yaml and
 config/banned_phrases.yaml (the template's lists) when those are missing.
+
+Automatic approval is the person's choice (answer `auto_approve`). Yes writes
+one standing rule: approve every job with a fit score at or above their bar
+(default 75) and no sanity flag, reason "clears-your-bar". A daily limit
+(max_auto_approve_per_day) is written only when they give a number; the
+default is no limit. No, or no answer, writes no rule. An autoapprove.yaml
+holding rules the interview did not write is always kept as it is, whatever
+replace_existing says (that flag is for filters.yaml and the commute table):
+the notes name the rule to add, or to remove on a no.
+
+The answer `open_forms` sets staging.open_after_daily_run: whether the
+scheduled daily run ends by opening the filled forms for review. It is yes
+when not given.
+
+The answer `alert_search` writes the `search` block: search.alert_web_search
+(whether Claude searches the web for alert jobs board lookup cannot find)
+and, only when the person names a number, search.max_searches_per_check.
+No answer writes no block, and search stays off.
 
 Every interview-driven setting in filters.yaml carries a comment quoting the
 answer that produced it, so when a filter rejects something surprising the
@@ -73,6 +90,7 @@ from jobkit.onboarding.files import (
     today,
     write_text_atomic,
 )
+from jobkit.rules import max_auto_approve_per_day
 
 # ---------------------------------------------------------------------------
 # the answers
@@ -178,6 +196,65 @@ class IndustryAnswer(_Answer):
     refused: list[str] = Field(default_factory=list)
 
 
+AUTO_APPROVE_MIN_SCORE_DEFAULT = 75
+
+
+class AutoApproveAnswer(_Answer):
+    """Whether jobs that clear the person's bar are approved without asking.
+    `per_day` is an optional daily limit: absent (the default) means none."""
+
+    enabled: bool
+    # strict: true is not a bar of 1, and "80" is not a number
+    min_score: int = Field(default=AUTO_APPROVE_MIN_SCORE_DEFAULT, strict=True)
+    per_day: int | None = Field(default=None, strict=True)  # strict: true is not 1
+
+    @model_validator(mode="after")
+    def _check_auto(self) -> AutoApproveAnswer:
+        if not 0 <= self.min_score <= 100:
+            raise ValueError("auto_approve.min_score must be 0-100")
+        if self.per_day is not None:
+            if not self.enabled:
+                raise ValueError(
+                    "auto_approve.per_day is a limit on automatic approval; leave it out "
+                    "when enabled is false"
+                )
+            if self.per_day < 1:
+                raise ValueError(
+                    "auto_approve.per_day must be 1 or more; leave it out for no daily limit"
+                )
+        return self
+
+
+class OpenFormsAnswer(_Answer):
+    """Whether the scheduled daily run ends by opening the filled forms."""
+
+    after_daily_run: bool = True
+
+
+class AlertSearchAnswer(_Answer):
+    """Whether Claude searches the web for a job from a job-alert email that
+    board lookup cannot find, and how much of the person's Claude usage that
+    may take: `per_check` is an optional number of searches per email check;
+    absent (the default) means no limit."""
+
+    enabled: bool = Field(strict=True)
+    per_check: int | None = Field(default=None, strict=True)  # strict: true is not 1
+
+    @model_validator(mode="after")
+    def _check_search(self) -> AlertSearchAnswer:
+        if self.per_check is not None:
+            if not self.enabled:
+                raise ValueError(
+                    "alert_search.per_check is a limit on web searches; leave it out when "
+                    "enabled is false"
+                )
+            if self.per_check < 1:
+                raise ValueError(
+                    "alert_search.per_check must be 1 or more; leave it out for no limit"
+                )
+        return self
+
+
 class StyleAnswer(_Answer):
     estimate_style: Literal["hedged", "confident"]
 
@@ -230,6 +307,9 @@ class Preferences(BaseModel):
     max_age_days: int | None = None
     nightly_at: str | None = None
     writing_style: StyleAnswer | None = None
+    auto_approve: AutoApproveAnswer | None = None
+    open_forms: OpenFormsAnswer = Field(default_factory=OpenFormsAnswer)
+    alert_search: AlertSearchAnswer | None = None
 
     @model_validator(mode="after")
     def _check(self) -> Preferences:
@@ -1143,6 +1223,19 @@ def render_filters(prefs: Preferences, template_text: str) -> tuple[str, list[st
             "",
         ]
 
+    forms = prefs.open_forms
+    out += [
+        "# ---- staging ------------------------------------------------------------------",
+        *_said(forms.said, ""),
+        "staging:",
+        "  # true: the scheduled daily run ends by opening the filled application forms",
+        "  # in a browser window for you to review and submit",
+        f"  open_after_daily_run: {'true' if forms.after_daily_run else 'false'}",
+        "",
+    ]
+    if prefs.alert_search is not None:
+        out += alert_search_block(prefs.alert_search)
+
     rp = dict(template.get("remote_policy") or {})
     geo = (
         loc.acceptable_geo_restrictions
@@ -1192,6 +1285,25 @@ def render_filters(prefs: Preferences, template_text: str) -> tuple[str, list[st
     except (yaml.YAMLError, ValueError) as e:
         raise SetupError(f"the generated filters.yaml would not load: {e}") from e
     return text, plan.notes + _comp_expectation_notes(plan, filters)
+
+
+def alert_search_block(answer: AlertSearchAnswer) -> list[str]:
+    """The `search` block of filters.yaml for the person's answer:
+    alert_web_search always, max_searches_per_check only when they named a
+    number (no number: no limit)."""
+    lines = [
+        "# ---- web search for alert jobs ----------------------------------------------",
+        *_said(answer.said, ""),
+        "search:",
+        "  # true: a job from a job-alert email that is on no Greenhouse, Lever or Ashby",
+        "  # board jobkit finds is searched for on the web by Claude (recent alerts only;",
+        "  # it uses your Claude plan). A posting on Workday or a similar site is listed",
+        "  # with its direct link for you to apply there.",
+        f"  alert_web_search: {'true' if answer.enabled else 'false'}",
+    ]
+    if answer.per_check is not None:
+        lines.append(f"  max_searches_per_check: {answer.per_check}   # leave out for no limit")
+    return [*lines, ""]
 
 
 def _comp_expectation_notes(plan: _Plan, filters: Filters) -> list[str]:
@@ -1266,6 +1378,89 @@ auto_approve: []
 auto_reject: []
 """
 
+# the reason on the one rule the interview writes; a file whose only rules
+# carry it is the interview's own and may be rewritten
+INTERVIEW_RULE_REASON = "clears-your-bar"
+
+
+def interview_rule(min_score: int) -> dict[str, Any]:
+    """The automatic-approval rule the interview writes on a yes."""
+    return {
+        "when": {"score_gte": min_score, "sanity_flags": "none", "sanity_checked": True},
+        "reason": INTERVIEW_RULE_REASON,
+    }
+
+
+def render_autoapprove(answer: AutoApproveAnswer | None) -> str:
+    """config/autoapprove.yaml for the person's answer: no rule for no (or no
+    answer), the clears-your-bar rule for yes, and max_auto_approve_per_day
+    only when they gave a number."""
+    if answer is None or not answer.enabled:
+        head = AUTOAPPROVE_TEXT
+        if answer is not None:
+            said = _said(answer.said, "")
+            if said:
+                head = head.replace('version: "1.0"', "\n".join([*said, 'version: "1.0"']), 1)
+        return head
+    lines = [
+        f"{GENERATED_MARK} — config/autoapprove.yaml",
+        "#",
+        "# Standing rules: let the queue pre-decide the obvious cases (SPEC.md §6.2).",
+        "# Rules only see jobs that passed the filters and the sanity checks. The",
+        "# conditions a rule can use are documented in config/autoapprove.example.yaml.",
+        "",
+        'version: "1.0"',
+        "",
+        *_said(answer.said, ""),
+        f"# Automatic approval: every job with a fit score of {answer.min_score} or more and",
+        "# no sanity flag, once both sanity checks have run, is approved without asking,",
+        "# tailored, and its form filled for you to review. Nothing is submitted: you",
+        "# click submit.",
+        "auto_approve:",
+        f"  - when: {{ score_gte: {answer.min_score}, sanity_flags: none, sanity_checked: true }}",
+        f'    reason: "{INTERVIEW_RULE_REASON}"',
+        "",
+        "auto_reject: []",
+    ]
+    if answer.per_day is not None:
+        lines += [
+            "",
+            f"# at most {answer.per_day} approved automatically per day, highest fit first;",
+            "# the rest wait in your queue for the next day's run",
+            f"max_auto_approve_per_day: {answer.per_day}",
+        ]
+    return "\n".join(lines) + "\n"
+
+
+def _interview_owned_rules(path: Path) -> bool:
+    """True when autoapprove.yaml is the interview's own output: its marker
+    line, no auto_reject rule, and no auto_approve rule but the interview's
+    clears-your-bar rule. Rules anyone added are never rewritten silently."""
+    if not is_generated(path):
+        return False
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return False
+    if not isinstance(data, dict) or data.get("auto_reject"):
+        return False
+    approve = data.get("auto_approve") or []
+    return isinstance(approve, list) and all(
+        isinstance(r, dict) and r.get("reason") == INTERVIEW_RULE_REASON for r in approve
+    )
+
+
+def _has_interview_rule(path: Path) -> bool:
+    """autoapprove.yaml holds the interview's clears-your-bar rule."""
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return False
+    approve = data.get("auto_approve") if isinstance(data, dict) else None
+    return isinstance(approve, list) and any(
+        isinstance(r, dict) and r.get("reason") == INTERVIEW_RULE_REASON for r in approve
+    )
+
 
 def _banned_phrases_text(files: SetupFiles, style: StyleAnswer | None) -> str:
     text = template_path(files, "config/banned_phrases.example.yaml").read_text(encoding="utf-8")
@@ -1315,11 +1510,58 @@ def run_intake(
         write_text_atomic(path, text)
         written.append(files.rel(path) + (f" (previous kept at {files.rel(prev)})" if prev else ""))
     auto = files.config_file("autoapprove.yaml")
-    if not auto.is_file():
-        write_text_atomic(auto, AUTOAPPROVE_TEXT)
-        written.append(files.rel(auto) + " (no standing rules yet)")
+    choice = prefs.auto_approve
+    if choice is None:
+        # no answer: as before, an empty rule file when there is none
+        if not auto.is_file():
+            write_text_atomic(auto, AUTOAPPROVE_TEXT)
+            written.append(files.rel(auto) + " (no standing rules yet)")
+        else:
+            kept.append(files.rel(auto))
     else:
-        kept.append(files.rel(auto))
+        what = (
+            f"automatic approval at a fit score of {choice.min_score} or more, "
+            + (f"at most {choice.per_day} a day" if choice.per_day else "no daily limit")
+            if choice.enabled
+            else "no automatic approval"
+        )
+        # replace_existing never reaches here: rules someone added (approve or
+        # reject) are theirs, and a rerun of setup keeps every one of them
+        if not auto.is_file() or _interview_owned_rules(auto):
+            auto_text = render_autoapprove(choice)
+            try:
+                max_auto_approve_per_day(yaml.safe_load(auto_text))
+            except ValueError as e:  # pragma: no cover — the answer model checks first
+                raise SetupError(f"the generated autoapprove.yaml would not load: {e}") from e
+            prev = backup(files, auto)
+            write_text_atomic(auto, auto_text)
+            written.append(
+                files.rel(auto)
+                + f" ({what})"
+                + (f" (previous kept at {files.rel(prev)})" if prev else "")
+            )
+        else:
+            kept.append(files.rel(auto))
+            if choice.enabled:
+                rule = interview_rule(choice.min_score)
+                notes.append(
+                    f"{files.rel(auto)} already holds standing rules, so it was kept as it "
+                    f"is and {what} was not written. To add it, put this rule under "
+                    f"auto_approve: {{when: {{score_gte: {rule['when']['score_gte']}, "
+                    "sanity_flags: none, sanity_checked: true}, "
+                    f'reason: "{INTERVIEW_RULE_REASON}"}}'
+                    + (
+                        f", and the line max_auto_approve_per_day: {choice.per_day}"
+                        if choice.per_day
+                        else ""
+                    )
+                )
+            elif _has_interview_rule(auto):
+                notes.append(
+                    f"{files.rel(auto)} already holds standing rules, so it was kept as it "
+                    f'is. To stop automatic approval, delete the rule with reason "'
+                    f'{INTERVIEW_RULE_REASON}" under auto_approve; your other rules stay'
+                )
     banned = files.config_file("banned_phrases.yaml")
     if not banned.is_file() or (is_generated(banned) and prefs.writing_style is not None):
         write_text_atomic(banned, _banned_phrases_text(files, prefs.writing_style))

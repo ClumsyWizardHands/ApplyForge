@@ -2,8 +2,8 @@
 # obvious cases so only real judgment calls reach you (SPEC.md §6.2).
 #
 # This is the TEMPLATE. Your own copy, config/autoapprove.yaml, is personal and
-# gitignored. The setup interview proposes rules from your answers and writes
-# only the ones you accept, one at a time; or copy this file and edit it.
+# gitignored. The setup interview asks for your bar and writes the
+# automatic-approval rule below when you say yes; or copy this file and edit it.
 #
 # Order of evaluation, fixed: deterministic filters → sanity checks → standing
 # rules. Rules only see jobs that survived both earlier layers (status queued).
@@ -14,14 +14,19 @@
 # auto_approve rule; the first rule whose `when` matches decides.
 #   auto_reject:  the job is rejected (layer standing_rule), logged with the
 #                 rule's reason, reviewable — never silently dropped.
-#   auto_approve: the job is approved WITHOUT asking you: tailored and its form
-#                 staged overnight (never submitted — you always click submit).
-#                 The digest lists it as "done, FYI". Start with none.
+#   auto_approve: the job is approved without asking you: tailored and its
+#                 form filled by the daily run for you to review (opened for
+#                 you at the end of the run when staging.open_after_daily_run
+#                 is true in filters.yaml). Nothing is submitted: you click
+#                 submit.
 #
 # Conditions in `when` (all must hold):
 #   tier: 1|2|3               company tier from targets.yaml
 #   score_gte: N / score_lt: N    fit score 0-100
 #   sanity_flags: none        no sanity flag on the job
+#   sanity_checked: true      both sanity checks finished (the remote check and
+#                             the comp check); a job whose check failed has no
+#                             flags yet, so pair this with sanity_flags: none
 #   friction_lte: N           application-form friction score
 #   remote: true|false
 #   comp_min_gte: N           published minimum (base; an OTE minimum never matches)
@@ -38,8 +43,14 @@
 
 version: "1.0"
 
-auto_approve: []
-  # Examples — uncomment and adjust only once you trust the scores:
+# The recommended start: every job that clears your bar (fit score 75 or more)
+# with no sanity flag, once both sanity checks have run, is approved and its
+# form filled for you. Raise or lower the score to move your bar. Delete the
+# rule to approve every job yourself.
+auto_approve:
+  - when: { score_gte: 75, sanity_flags: none, sanity_checked: true }
+    reason: "clears-your-bar"
+  # More examples:
   # - when: { tier: 1, score_gte: 80, sanity_flags: none, friction_lte: 40 }
   #   reason: "tier1-quick-apply"
   # - when: { score_gte: 90, remote: true, comp_min_gte: 200000 }
@@ -55,3 +66,8 @@ auto_reject: []
   #   reason: "tier2-weak-fit"
   # - when: { title_class: my_role, comp_max_lt: 60000 }
   #   reason: "low-comp"
+
+# Optional daily limit on automatic approvals. There is none unless you set
+# one. With it, the best-scoring jobs are approved first and the rest wait in
+# your queue for the next day's run.
+# max_auto_approve_per_day: 10

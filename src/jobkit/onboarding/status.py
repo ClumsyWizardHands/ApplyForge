@@ -31,6 +31,7 @@ from jobkit.onboarding.corpus_confirm import (
 )
 from jobkit.onboarding.files import SetupFiles, load_yaml, setup_files
 from jobkit.onboarding.targets import feed_only_said
+from jobkit.rules import max_auto_approve_per_day
 
 
 @dataclass(frozen=True)
@@ -149,8 +150,11 @@ def _config_ok(files: SetupFiles, name: str) -> tuple[bool, str]:
         elif name == "targets.yaml":
             config.load_targets(path)
         else:
-            if not isinstance(config.read_config_yaml(path), dict):
+            data = config.read_config_yaml(path)
+            if not isinstance(data, dict):
                 return False, "empty"
+            if name == "autoapprove.yaml":
+                max_auto_approve_per_day(data)
     except Exception as e:  # noqa: BLE001
         return False, f"does not load ({' '.join(str(e).split())[:100]})"
     return True, "ok"
@@ -174,7 +178,32 @@ def _preferences_step(files: SetupFiles) -> Step:
             "filters.yaml ok; " + ", ".join(others),
             action + " (writes the missing files), or copy config/<name>.example.yaml",
         )
-    return Step("preferences (config/filters.yaml)", "done", "filters and companion config load")
+    return Step(
+        "preferences (config/filters.yaml)",
+        "done",
+        "filters and companion config load; " + automation_summary(files),
+    )
+
+
+def automation_summary(files: SetupFiles) -> str:
+    """How much of the daily run is automatic: the auto_approve rules (and a
+    daily limit, only when one is set) and whether the run opens the filled
+    forms. Read-only; assumes both files load."""
+    rules = config.read_config_yaml(files.config_file("autoapprove.yaml")) or {}
+    approve = [r for r in rules.get("auto_approve") or [] if isinstance(r, dict)]
+    if approve:
+        auto = f"automatic approval: {len(approve)} rule{'s' if len(approve) != 1 else ''}"
+        cap = max_auto_approve_per_day(rules)
+        if cap is not None:
+            auto += f", at most {cap} a day"
+    else:
+        auto = "automatic approval: off"
+    try:
+        on = config.load_filters(files.config_file("filters.yaml")).open_after_daily_run
+        forms = "on" if on else "off"
+    except ValueError as e:
+        forms = f"not read ({e})"
+    return f"{auto}; forms open after the daily run: {forms}"
 
 
 def _targets_step(files: SetupFiles) -> Step:

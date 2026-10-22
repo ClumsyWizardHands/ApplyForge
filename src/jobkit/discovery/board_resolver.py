@@ -11,9 +11,11 @@ misses). This module does it for every aggregator job that passes the filter
 (the nightly / run-all stage `resolve-boards`, after discovery and before
 filter, so triage scores the employer's JD), for every LinkedIn card whose
 company went to the discovery queue (rule 11's exception: a posting enters
-only when the same job is found on the company's own board), and again at
-approve time (`jobkit tailor`, which MCP approve starts, resolves approved
-aggregator jobs first).
+only when the same job is found on the company's own board), for every job
+listed in one of the person's job-alert emails (track/job_alerts.py: the same
+card shape, with a synthetic id; read from the email, never from LinkedIn),
+and again at approve time (`jobkit tailor`, which MCP approve starts,
+resolves approved aggregator jobs first).
 
 Board lookup, per company, in this order:
 
@@ -183,6 +185,7 @@ _NAME_DOMAIN = re.compile(
 # a human status an ATS row can take in a merge that needs its requirements and
 # score: approved (tailoring reads them), snoozed (the queue needs a score)
 CARRIED_NEEDS_TRIAGE = ("approved", "snoozed")
+GUEST_SOURCE = "linkedin_guest"
 CARD_WINDOW_DAYS = 14  # LinkedIn cards seen this recently (linkedin_guest.SEEN_WINDOW_DAYS)
 CARD_FLAG_DAYS = 7  # a LinkedIn card's flag is listed this long (it has no job row to close)
 FLAG_KEY = "board-match-ambiguous"
@@ -1340,14 +1343,28 @@ class Item:
     domain: str | None = None
     url_board: tuple[str, str] | None = None  # a board the apply URL names (no job id)
     exact_id: str | None = None  # a posting id the apply URL names (gh_jid)
+    # a card's origin: LinkedIn guest discovery, or a job listed in one of the
+    # person's job-alert emails (track/job_alerts.py: 'linkedin_email',
+    # 'job_alert_email'; its li_id is a synthetic 'alert-...' id)
+    source: str = GUEST_SOURCE
 
     def ref(self) -> str:
-        return f"job {self.job_id}" if self.kind == "job" else f"LinkedIn card {self.li_id}"
+        if self.kind == "job":
+            return f"job {self.job_id}"
+        return card_label(self.source, self.li_id)
 
     def head(self) -> str:
         return (
             f"{self.ref()} {self.company} — {self.title} ({self.location.strip() or 'no location'})"
         )
+
+
+def card_label(source: str, li_id: str) -> str:
+    """'LinkedIn card <id>' for a LinkedIn guest card; 'job-alert email card
+    <id>' for a job listed in one of the person's job-alert emails."""
+    if source == GUEST_SOURCE:
+        return f"LinkedIn card {li_id}"
+    return f"job-alert email card {li_id}"
 
 
 def _job_item(r: sqlite3.Row) -> Item:
@@ -1996,7 +2013,7 @@ class _Run:
         if self.dry_run:
             return
         if it.kind == "card":
-            detail.update(source="linkedin_guest", li_id=it.li_id)
+            detail.update(source=it.source, li_id=it.li_id)
             self._event(None, q.BOARD_MATCH_AMBIGUOUS_EVENT, detail)
             self._card_event(it, "ambiguous", candidates=len(d.candidates))
             return
@@ -2177,24 +2194,31 @@ def _card_items(conn: sqlite3.Connection, cfg: BoardResolution) -> list[Item]:
         )
     }
     items: list[Item] = []
-    for r in conn.execute(q.LINKEDIN_QUEUED_CARDS_SINCE, {"window": f"-{CARD_WINDOW_DAYS} days"}):
-        d = json.loads(r["detail"] or "{}")
-        li_id = str(d.get("id") or "")
-        company, title = str(d.get("company") or ""), str(d.get("title") or "")
-        if not li_id or li_id in done or not company or not title:
-            continue
-        done.add(li_id)
-        items.append(
-            Item(
-                kind="card",
-                company=company,
-                norm=normalize_company(company),
-                title=title,
-                location=str(d.get("location") or ""),
-                remote=None,
-                li_id=li_id,
+    window = {"window": f"-{CARD_WINDOW_DAYS} days"}
+    # LinkedIn guest cards first, then the jobs listed in job-alert emails
+    # (the same shape; their source names the email)
+    for query, alert in ((q.LINKEDIN_QUEUED_CARDS_SINCE, False), (q.JOB_ALERT_CARDS_SINCE, True)):
+        for r in conn.execute(query, window):
+            d = json.loads(r["detail"] or "{}")
+            li_id = str(d.get("id") or "")
+            company, title = str(d.get("company") or ""), str(d.get("title") or "")
+            if not li_id or li_id in done or not company or not title:
+                continue
+            done.add(li_id)
+            items.append(
+                Item(
+                    kind="card",
+                    company=company,
+                    norm=normalize_company(company),
+                    title=title,
+                    location=str(d.get("location") or ""),
+                    remote=None,
+                    li_id=li_id,
+                    source=str(d.get("queue_source") or "job_alert_email")
+                    if alert
+                    else GUEST_SOURCE,
+                )
             )
-        )
     return items
 
 
@@ -2398,6 +2422,7 @@ class Flag:
     at: str
     li_id: str = ""
     key: str = FLAG_KEY  # board-match-ambiguous | board-match-unconfirmed
+    source: str = GUEST_SOURCE  # a card's origin (Item.source)
 
     def line(self) -> str:
         cands = "; ".join(
@@ -2413,7 +2438,7 @@ class Flag:
             head = f"job {self.job_id} {self.company} — {self.title}"
         else:
             how = "if one is the job, add it with add_job_url(url) (`jobkit add-url`)"
-            head = f"LinkedIn card {self.li_id}: {self.company} — {self.title}"
+            head = f"{card_label(self.source, self.li_id)}: {self.company} — {self.title}"
         return (
             f"{head} ({self.location or 'no location'}) [{self.key}]: {self.why}. "
             f"Candidates: {cands}. {how}"
@@ -2451,6 +2476,7 @@ def flags(conn: sqlite3.Connection) -> list[Flag]:
                 at=str(r["at"]),
                 li_id=str(d.get("li_id") or ""),
                 key=str(d.get("flag") or FLAG_KEY),
+                source=str(d.get("source") or GUEST_SOURCE),
             )
         )
     return out

@@ -276,6 +276,35 @@ def test_a_finished_check_moves_the_search_window(
         responses.finish_email_check(conn, "2026-12-01")
 
 
+def test_the_alert_search_follows_the_application_search(
+    conn: sqlite3.Connection, apps: dict[str, int]
+) -> None:
+    """email_targets also suggests a second search, for job-alert emails and
+    LinkedIn message notifications (track/job_alerts.py); the application
+    search is unchanged and names none of those senders."""
+    t = responses.email_targets(conn)
+    text = t.render()
+    replies = text.index("Suggested Gmail search: after:2026/09/30 ")
+    alerts = text.index(
+        "Job alerts and LinkedIn messages: suggested Gmail search: after:2026/10/14 "
+    )
+    assert replies < alerts
+    assert t.alert_senders == responses.ALERT_SENDERS
+    assert "linkedin" not in t.query and "indeed" not in t.query
+    assert "record_job_alerts" in text and "record_linkedin_message" in text
+
+
+def test_a_check_with_no_alerts_or_messages_reads_as_before(
+    conn: sqlite3.Connection, apps: dict[str, int]
+) -> None:
+    check = responses.finish_email_check(conn, "2026-10-18T08:00:00Z")
+    assert (check.alert_emails_since, check.linkedin_messages_since) == (0, 0)
+    assert check.render() == (
+        "mailbox checked through 2026-10-18 08:00:00 UTC; 0 response(s) recorded since the "
+        "previous check"
+    )
+
+
 def test_no_targets_means_no_search(conn: sqlite3.Connection) -> None:
     t = responses.email_targets(conn)
     assert t.targets == [] and t.query == ""

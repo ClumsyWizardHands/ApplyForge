@@ -148,8 +148,8 @@ def build_answer_bank(answers: dict[str, Any] | str, replace_existing: bool = Fa
 def run_intake(answers: dict[str, Any] | str, replace_existing: bool = False) -> str:
     """Turn the intake interview into config: writes config/filters.yaml and
     config/commute_table.yaml (each setting commented with the answer that
-    produced it), plus config/autoapprove.yaml (no rules) and
-    config/banned_phrases.yaml when missing. `answers`:
+    produced it), plus config/autoapprove.yaml and config/banned_phrases.yaml
+    when missing. `answers`:
     tracks: [{name, titles?, title_words? {all: [word or [alternatives]],
       any: [words]}, should_match?, should_not_match?, comp_floor?,
       comp_basis: base|ote, pivot?, min_score?, emphasis?, said}]
@@ -174,7 +174,21 @@ def run_intake(answers: dict[str, Any] | str, replace_existing: bool = False) ->
     federal {wanted: true|false, said} (turns on USAJOBS);
     industries {wanted, refused, said}, blocklist_companies {items, said},
     max_age_days?, nightly_at?, writing_style? {estimate_style:
-    hedged|confident, said}.
+    hedged|confident, said};
+    auto_approve? {enabled, min_score (default 75), per_day?, said}: yes
+      writes one standing rule, approve every job scoring min_score or more
+      with no sanity flag; per_day only when the person names a daily limit
+      (the default is no limit); no, or left out, writes no rule;
+    open_forms? {after_daily_run (default true), said}: whether the
+      scheduled daily run ends by opening the filled forms for review
+      (staging.open_after_daily_run);
+    alert_search? {enabled, per_check?, said}: whether Claude searches the
+      web for jobs from job-alert emails that board lookup cannot find
+      (search.alert_web_search; the setup interview asks, recommending
+      yes) and how much Claude usage that may take: per_check only when
+      the person names a number of searches per email check (the default
+      is no limit; recent alerts only either way); left out, search stays
+      off.
     `said` is the person's own words. Ask against their corpus. prompt_set
     is written as general, or sales when every track is a software sales
     title. A

@@ -29,7 +29,7 @@ import json
 import re
 import sqlite3
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -221,11 +221,19 @@ def unsnooze(conn: sqlite3.Connection) -> int:
     return cur.rowcount
 
 
-def run_filters(conn: sqlite3.Connection, filters: Filters | None = None) -> dict[str, int]:
-    """Move status=new jobs to 'filtered' (passed) or 'rejected' (logged)."""
+def run_filters(
+    conn: sqlite3.Connection,
+    filters: Filters | None = None,
+    job_ids: Collection[int] | None = None,
+) -> dict[str, int]:
+    """Move status=new jobs to 'filtered' (passed) or 'rejected' (logged).
+    `job_ids`: only these jobs (pipeline/same_day.py)."""
     filters = filters or load_filters()
     stats = {"examined": 0, "passed": 0, "rejected": 0}
-    rows = conn.execute("SELECT * FROM jobs WHERE status = 'new' AND closed_at IS NULL").fetchall()
+    only, ids = q.only_jobs(job_ids, "jobs")
+    rows = conn.execute(
+        f"SELECT * FROM jobs WHERE status = 'new' AND closed_at IS NULL{only}", ids
+    ).fetchall()
     for row in rows:
         stats["examined"] += 1
         reason = _reject_reason(dict(row), filters)

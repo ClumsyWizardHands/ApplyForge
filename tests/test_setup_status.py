@@ -71,6 +71,34 @@ def test_test_profile_counts_as_configured(jobkit_home: Path) -> None:
     assert states["target companies"] == "done"
 
 
+def _prefs(root: Path | None = None) -> str:
+    step = next(s for s in setup_status(root=root).steps if s.name.startswith("preferences"))
+    return f"{step.state}: {step.detail}"
+
+
+def test_preferences_say_how_automatic_the_daily_run_is(jobkit_home: Path) -> None:
+    # the test profile (like the owner's config): two rules, no limit, forms
+    # not opened after the run
+    assert _prefs() == (
+        "done: filters and companion config load; automatic approval: 2 rules; "
+        "forms open after the daily run: off"
+    )
+    auto = jobkit_home / "config" / "autoapprove.yaml"
+    auto.write_text(auto.read_text() + "\nmax_auto_approve_per_day: 5\n")
+    filters = jobkit_home / "config" / "filters.yaml"
+    filters.write_text(filters.read_text() + "\nstaging:\n  open_after_daily_run: true\n")
+    assert _prefs().endswith("2 rules, at most 5 a day; forms open after the daily run: on")
+    auto.write_text('version: "1.0"\nauto_approve: []\nauto_reject: []\n')
+    assert "automatic approval: off" in _prefs()
+
+
+def test_a_bad_daily_limit_leaves_preferences_partial(jobkit_home: Path) -> None:
+    auto = jobkit_home / "config" / "autoapprove.yaml"
+    auto.write_text(auto.read_text() + "\nmax_auto_approve_per_day: 0\n")
+    out = _prefs()
+    assert out.startswith("partial:") and "max_auto_approve_per_day" in out
+
+
 def test_answer_bank_partial_then_done(fresh: Path) -> None:
     build_answer_bank({"identity.first_name": "Morgan"})
     step = next(s for s in setup_status().steps if s.name.startswith("answer bank"))

@@ -1,10 +1,11 @@
 # Form filling
 
-For each job you approve, ApplyForge (the `jobkit` command) opens the
+For each approved job (approved by you, or by the bar you set), ApplyForge
+(the `jobkit` command) opens the
 application form in a visible browser window, attaches the tailored resume and
 cover letter, fills what it can from your answer bank, and stops. You check the
-form, fill what was left blank, and press submit. [Why you press
-submit](../README.md#why-you-press-submit) explains that choice.
+form, fill what was left blank, and click submit. [Why you click
+submit](../README.md#why-you-click-submit) explains that choice.
 
 ## Which forms
 
@@ -327,7 +328,7 @@ of its aliases is the label word for word. Such a field is left blank as
   is not preceded by this probe on the same element in the same function.
 - **CAPTCHA.** Filling stops for a challenge that is shown: a visible reCAPTCHA
   checkbox or challenge frame, hCaptcha, or Turnstile. The invisible-reCAPTCHA
-  badge in the corner doesn't stop it. That is one reason you press submit
+  badge in the corner doesn't stop it. That is one reason you click submit
   yourself. The widget that triggered a stop is logged as
   `stage.captcha_detected`. Nothing interacts with a challenge.
 - **A CAPTCHA the fill brings up.** Some forms show a challenge only after a

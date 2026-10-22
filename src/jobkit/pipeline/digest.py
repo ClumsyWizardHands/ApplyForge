@@ -35,6 +35,11 @@ employer's own posting, LinkedIn cards found on the employer's board, and
 every job flagged board-match-ambiguous with its candidate postings and how
 to pick one.
 
+Then, only when the person set a daily limit on automatic approval
+(max_auto_approve_per_day in autoapprove.yaml), one line: how many jobs the
+standing rules approved that day and how many more cleared the bar and wait
+in the queue for the next run (rules.digest_lines).
+
 Then "Replies recorded since the last digest" (track/responses.py): employer
 emails the person's mailbox showed and Claude recorded through MCP
 record_email_response since the previous digest was written, each
@@ -53,7 +58,7 @@ import sqlite3
 from pathlib import Path
 
 from jobkit import db as q
-from jobkit import paths
+from jobkit import paths, rules
 from jobkit.config import load_filters
 from jobkit.discovery import board_resolver, linkedin_guest
 from jobkit.pipeline import halts, letter_gate, questions
@@ -234,6 +239,9 @@ def write_digest(conn: sqlite3.Connection, date: str | None = None) -> Path:
     # aggregator jobs matched to the employer's own posting today, and every
     # job flagged board-match-ambiguous (nothing picked: the human picks)
     lines.extend(board_resolver.digest_lines(conn, day=date))
+    # only when the person set a daily limit on automatic approval: how many
+    # were approved today and how many wait for tomorrow (rules.py)
+    lines.extend(rules.digest_lines(conn, day=date))
 
     queue = conn.execute(
         """SELECT j.id, j.title, j.company_name, j.comp_min, j.comp_max, j.remote,

@@ -1,0 +1,38 @@
+{
+  "_recorded": "hand-built in the shape of GET https://boards-api.greenhouse.io/v1/boards/cobaltlinehealth/jobs (no content, HTTP 200): a fictional company for the job-alert email tests; company, titles, locations, ids and timestamps are invented",
+  "jobs": [
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/cobaltlinehealth/jobs/7302000101",
+      "internal_job_id": 7301000101,
+      "location": {
+        "name": "Chicago, IL"
+      },
+      "id": 7302000101,
+      "updated_at": "2026-10-12T09:00:00-04:00",
+      "requisition_id": "R-0101",
+      "title": "Revenue Operations Manager",
+      "company_name": "Cobaltline Health",
+      "first_published": "2026-10-12T08:00:00-04:00",
+      "language": "en",
+      "application_deadline": null
+    },
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/cobaltlinehealth/jobs/7302000102",
+      "internal_job_id": 7301000102,
+      "location": {
+        "name": "Chicago, Illinois (Hybrid)"
+      },
+      "id": 7302000102,
+      "updated_at": "2026-10-15T09:00:00-04:00",
+      "requisition_id": "R-0102",
+      "title": "Revenue Operations Manager",
+      "company_name": "Cobaltline Health",
+      "first_published": "2026-10-15T08:00:00-04:00",
+      "language": "en",
+      "application_deadline": null
+    }
+  ],
+  "meta": {
+    "total": 2
+  }
+}

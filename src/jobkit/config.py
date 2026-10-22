@@ -740,6 +740,62 @@ class Filters(BaseModel):
             raise ValueError(f"tracking.email_check must be true or false, got {v!r}")
         return v
 
+    # ---- staging ----
+
+    @property
+    def open_after_daily_run(self) -> bool:
+        """staging.open_after_daily_run: whether the scheduled daily run ends
+        by opening the filled application forms (MCP open_queue) for the
+        person to review and submit. Off when absent, so a config written
+        before this key existed keeps its scheduled run as it was. Read by
+        `jobkit schedule status` (MCP schedule_status), which the scheduled
+        run reads; nothing about staging or filling changes with it."""
+        staging = self.raw.get("staging")
+        if staging is not None and not isinstance(staging, dict):
+            raise ValueError("staging must be a mapping")
+        v = (staging or {}).get("open_after_daily_run")
+        if v is None:
+            return False
+        if not isinstance(v, bool):
+            raise ValueError(f"staging.open_after_daily_run must be true or false, got {v!r}")
+        return v
+
+    # ---- web search for alert jobs (track/alert_search.py) ----
+
+    def _search(self) -> dict[str, Any]:
+        search = self.raw.get("search")
+        if search is not None and not isinstance(search, dict):
+            raise ValueError("search must be a mapping")
+        return search or {}
+
+    @property
+    def alert_web_search(self) -> bool:
+        """search.alert_web_search: whether Claude searches the web for a job
+        from a job-alert email that board lookup did not find on a
+        Greenhouse, Lever or Ashby board (MCP alert_jobs_to_search). Off when
+        absent, so a config written before this key existed works as it did."""
+        v = self._search().get("alert_web_search")
+        if v is None:
+            return False
+        if not isinstance(v, bool):
+            raise ValueError(f"search.alert_web_search must be true or false, got {v!r}")
+        return v
+
+    @property
+    def max_searches_per_check(self) -> int | None:
+        """search.max_searches_per_check: the most alert jobs Claude searches
+        for in one email check. Absent or null means no limit (recency is
+        the limit: only alerts inside freshness.max_age_days)."""
+        v = self._search().get("max_searches_per_check")
+        if v is None:
+            return None
+        if isinstance(v, bool) or not isinstance(v, int) or v < 1:
+            raise ValueError(
+                "search.max_searches_per_check must be a whole number of 1 or more, or left "
+                f"out for no limit; got {v!r}"
+            )
+        return v
+
     # ---- comp sanity ----
 
     @property

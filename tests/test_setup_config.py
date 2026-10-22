@@ -85,6 +85,24 @@ def test_filters_template_loads_with_neutral_defaults() -> None:
     assert feeds["getro"]["enabled"] is False
     assert feeds["cosnetwork"]["enabled"] is False
     assert f.linkedin_guest.enabled is False
+    # new setups open the filled forms at the end of the daily run
+    assert f.open_after_daily_run is True
+
+
+def test_open_after_daily_run_is_off_when_absent_and_strict() -> None:
+    # a config written before the key existed keeps its scheduled run as it was
+    assert Filters(raw={}).open_after_daily_run is False
+    assert Filters(raw={"staging": {}}).open_after_daily_run is False
+    assert Filters(raw={"staging": {"open_after_daily_run": False}}).open_after_daily_run is False
+    assert Filters(raw={"staging": {"open_after_daily_run": None}}).open_after_daily_run is False
+    for bad in ("yes", 1):
+        f = Filters(raw={"staging": {"open_after_daily_run": bad}})
+        with pytest.raises(ValueError, match="staging.open_after_daily_run"):
+            _ = f.open_after_daily_run
+    with pytest.raises(ValueError, match="staging must be a mapping"):
+        _ = Filters(raw={"staging": True}).open_after_daily_run
+    # the test profile (like the owner's own config) does not set it
+    assert load_filters().open_after_daily_run is False
 
 
 def test_sales_example_keeps_the_sales_profile() -> None:
@@ -98,6 +116,7 @@ def test_sales_example_keeps_the_sales_profile() -> None:
     assert f.comp_sanity == config.CompSanity()
     assert f.raw["feeds"]["remotive"]["categories"] == ["sales", "business"]
     assert f.raw["feeds"]["getro"]["enabled"] is False
+    assert f.open_after_daily_run is True
 
 
 def test_targets_template_loads() -> None:
@@ -117,18 +136,44 @@ def _rule_job(**kw: Any) -> dict[str, Any]:
         "comp_min": None,
         "comp_max": None,
         "comp_basis": "unknown",
+        "sanity_job_id": 1,
+        "demand_score": 3,
     }
     job.update(kw)
     return job
 
 
-def test_autoapprove_template_uses_known_keys_and_approves_nothing() -> None:
+def test_autoapprove_template_recommends_one_rule_and_no_limit() -> None:
     cfg = yaml.safe_load((TEMPLATES / "autoapprove.example.yaml").read_text())
-    # nothing is approved or rejected without asking until you add a rule
-    # yourself (feed companies are tier 3: an active tier-3 rule would reject
-    # feed jobs under a track's lower min_score)
-    assert cfg["auto_approve"] == [] and cfg["auto_reject"] == []
+    # the recommended start: approve what clears the bar, with no sanity flag
+    assert cfg["auto_approve"] == [
+        {
+            "when": {"score_gte": 75, "sanity_flags": "none", "sanity_checked": True},
+            "reason": "clears-your-bar",
+        }
+    ]
+    # nothing is rejected without asking until you add a rule yourself (feed
+    # companies are tier 3: an active tier-3 rule would reject feed jobs under
+    # a track's lower min_score)
+    assert cfg["auto_reject"] == []
+    # no daily limit unless you set one: the key is only a commented-out line
+    assert rules.MAX_PER_DAY_KEY not in cfg
+    assert rules.max_auto_approve_per_day(cfg) is None
     text = (TEMPLATES / "autoapprove.example.yaml").read_text()
+    limit = [ln for ln in text.splitlines() if rules.MAX_PER_DAY_KEY in ln]
+    assert limit and all(ln.lstrip().startswith("#") for ln in limit)
+    commented = yaml.safe_load(limit[-1].lstrip().lstrip("#").strip())
+    assert rules.max_auto_approve_per_day(commented) is not None  # valid once uncommented
+    rules._cond_matches(cfg["auto_approve"][0]["when"], _rule_job())  # known keys
+    assert rules._cond_matches(cfg["auto_approve"][0]["when"], _rule_job(fit_score=75))
+    assert not rules._cond_matches(
+        cfg["auto_approve"][0]["when"], _rule_job(fit_score=90, flags=["remote-conflict: x"])
+    )
+    # a job whose remote or comp check did not finish is never approved by it
+    for unchecked in ({"sanity_job_id": None, "demand_score": None}, {"demand_score": None}):
+        assert not rules._cond_matches(
+            cfg["auto_approve"][0]["when"], _rule_job(fit_score=90, **unchecked)
+        )
     examples = [
         yaml.safe_load(line.strip().lstrip("#").strip().removeprefix("- when:").strip())
         for line in text.splitlines()

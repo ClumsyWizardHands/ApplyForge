@@ -57,20 +57,22 @@ Claude loads these from `.claude/skills/` when its folder is your checkout.
 
 | skill | say | what it does |
 |---|---|---|
-| `jobkit-setup` | "set up jobkit", "continue jobkit setup" | the setup interview, then the first run and the daily schedule |
-| `jobkit-daily` | "what's in the queue" | approve or reject by number, check the tailored files, open the filled forms, log submissions and employer responses, answer jobkit's questions |
-| `jobkit-scheduled-run` | (the scheduled task runs it) | starts `jobkit nightly` unless a nightly run finished in the last 12 hours, waits for it, checks your email for replies if `tracking.email_check` is on and an email connector is available (read-only; records only clear matches), then writes one summary from the digest: what failed, what waits on you, the queue and the questions for you |
+| `jobkit-setup` | "set up jobkit", "continue jobkit setup" | the setup interview (your bar included), then the first run and the daily schedule |
+| `jobkit-daily` | "what's in the queue", "check my email" | the applications waiting for your review, approve or reject the rest by number, check the tailored files, open the filled forms, log submissions, check your email for replies, job alerts and LinkedIn messages, answer jobkit's questions |
+| `jobkit-scheduled-run` | (the scheduled task runs it) | starts `jobkit nightly` unless a nightly run finished in the last 12 hours and waits for it; if `tracking.email_check` is on and an email connector is available, checks your email (read-only; records only clear reply matches) for replies, job alerts and LinkedIn messages, and gets the alert jobs your bar approved written for and filled; opens the filled forms when `staging.open_after_daily_run` is on; then writes one summary: what failed, what is ready for you, replies, alert finds, messages, the queue below your bar and the questions for you |
 
 The scheduled task's prompt is one line that points at
 `.claude/skills/jobkit-scheduled-run/SKILL.md` in your checkout, so the routine
 updates with the code. The task runs while the Claude app is open; a run missed
 while it is closed happens at the next launch. The unattended run doesn't
-approve jobs, answer questions or submit anything. Use a scheduled task in
+approve jobs itself (your bar does), answer questions or submit anything. Use a scheduled task in
 the app, not a cloud routine: cloud routines run on another machine and can't
 see your checkout. `tests/test_claude_skills.py` checks
 that every `jobkit` command and Claude tool the skills name exists, with the
 options they use, and that the scheduled run only starts the nightly run,
-reads its results and records clear email replies.
+reads its results, records clear email replies, job alerts and messages,
+writes and fills the jobs your bar approved, and opens the forms only when you
+turned that on.
 
 ## Installing by hand
 
@@ -130,9 +132,9 @@ commented template next to it, so you can also copy and edit by hand.
 
 | file | what it holds | template |
 |---|---|---|
-| `config/filters.yaml` | prompt set, role tracks, title include/exclude, places, pay floors, remote policy, schedule, no-reply rule, feeds | `config/filters.example.yaml` (any field); `config/filters.sales.example.yaml` (a worked sales search) |
+| `config/filters.yaml` | prompt set, role tracks, title include/exclude, places, pay floors, remote policy, schedule, no-reply rule, email check, opening the forms after the daily run, web search for alert jobs, feeds | `config/filters.example.yaml` (any field); `config/filters.sales.example.yaml` (a worked sales search) |
 | `config/targets.yaml` | companies polled directly, with tiers and job boards | `config/targets.example.yaml` |
-| `config/autoapprove.yaml` | standing approve and reject rules (none approve at first) | `config/autoapprove.example.yaml` |
+| `config/autoapprove.yaml` | your bar (the clears-your-bar rule, written on your yes in setup), any other standing rules, and an optional daily limit | `config/autoapprove.example.yaml` (the template has the clears-your-bar rule on: after copying it, delete that rule if you want to approve every job yourself) |
 | `config/banned_phrases.yaml` | writing-style lists and `drift.estimate_style` | `config/banned_phrases.example.yaml` |
 | `config/commute_table.yaml` | minutes from home per location bucket | `config/commute_table.example.yaml` |
 | `data/career_corpus.yaml` | every fact a resume, letter or answer may use | `data/career_corpus.example.yaml` |
@@ -156,7 +158,7 @@ read-only) lists the steps in order, which are done, and the next action.
 |---|---|---|---|
 | 1. read the resume | `ingest_resume(path, text)` | `jobkit setup ingest <file> [--text-file f]` | `data/career_corpus.draft.yaml`, `data/resume_critique.md`, `data/setup/resume_source.txt` |
 | 2. confirm the corpus | `corpus_draft_status`, `confirm_bullets`, `update_corpus_draft`, `promote_corpus` | `jobkit setup draft`, `confirm`, `update-draft`, `promote` | `data/career_corpus.yaml` |
-| 3. preferences | `run_intake(answers)` | `jobkit setup intake <answers.yaml>` | `config/filters.yaml`, `config/commute_table.yaml`; `autoapprove.yaml` (no rules) and `banned_phrases.yaml` when missing |
+| 3. preferences | `run_intake(answers)` | `jobkit setup intake <answers.yaml>` | `config/filters.yaml`, `config/commute_table.yaml`; `autoapprove.yaml` (your bar, when you said yes) and `banned_phrases.yaml` when missing |
 | 4. target companies | `seed_targets(companies, feed_only_said)` | `jobkit setup targets <name>... [--file f]`, or `--feed-only "<your words>"` | `config/targets.yaml` (new entries appended) |
 | 5. answer bank | `answer_bank_questions`, `build_answer_bank(answers)` | `jobkit setup questions`, `jobkit setup answers <answers.yaml>` | `data/answer_bank.yaml` |
 
@@ -266,6 +268,22 @@ descriptions list every field. What each step does and checks:
 - ApplyForge has no industry filter, because postings carry no industry. Wanted and
   refused industries are recorded as comments and used to choose target
   companies; companies you refuse go in `blocklist_companies`.
+- **Your bar** (`auto_approve`). On a yes it writes one rule in
+  `config/autoapprove.yaml`: approve every job scoring your number or more
+  (75 suggested) with no sanity flag. A daily limit
+  (`max_auto_approve_per_day`) is written only when you give a number; by
+  default there is none. On a no, no rule is written and you approve every
+  job yourself. A rule file you wrote yourself is kept, and the output names
+  the rule to add. See [Your bar](how-it-works.md#your-bar-automatic-approval).
+- **Opening the forms** (`open_forms`). `staging.open_after_daily_run`, true
+  unless you say no: the scheduled run ends by opening the filled
+  applications for your review.
+- **Web search for alert jobs** (`alert_search`). "When a job from your
+  alert emails isn't on a board I can read, should I search the web for
+  it?" Yes is recommended; a job on Workday or a similar site is then listed
+  with its direct link. A limit on searches per email check is written only
+  when you give one. See
+  [LinkedIn](why-no-linkedin.md#web-search-for-alert-jobs).
 
 ### Target companies
 
@@ -301,10 +319,9 @@ bank) is replaced only if you ask (`replace_existing=true`,
 What you said is kept in `data/setup/*.answers.yaml`. All of `data/` and
 `config/*.yaml` is gitignored.
 
-`config/autoapprove.yaml` starts with no standing rules; you add them as
-patterns show up, and `calibrate` proposes some. STAR stories go into the
-corpus by hand for now. Having setup propose your first rules is on the
-[roadmap](roadmap.md#setup-and-daily-use).
+`config/autoapprove.yaml` starts with your bar when you said yes to it, and
+no other rules. You add more as patterns show up, and `calibrate` proposes
+some. STAR stories go into the corpus by hand for now.
 
 ## Keys and contact address (`.env`)
 
@@ -386,7 +403,13 @@ created only on your yes.
 
 - **A scheduled task in the Claude app** (the default). Its prompt points at
   the `jobkit-scheduled-run` skill in your checkout. It runs while the app is
-  open, at the time you chose.
+  open, at the time you chose. After `jobkit nightly` it checks your email
+  (replies, job-alert emails, LinkedIn messages) when `tracking.email_check`
+  is on and an email connector is there, gets the alert jobs found on the
+  employer's own board scored, written for and filled, opens the filled forms
+  when `staging.open_after_daily_run` is on, and sends you a summary. The
+  first time it runs `jobkit tailor`, `jobkit stage` or `jobkit open-queue`,
+  the Claude app may ask; choose "always allow".
 - **A macOS LaunchAgent**, `com.jobkit.nightly` in `~/Library/LaunchAgents`,
   managed by `jobkit schedule install|uninstall|status` (tools
   `schedule_install`, `schedule_uninstall`, `schedule_status`).

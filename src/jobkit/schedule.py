@@ -42,8 +42,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from jobkit import paths
 from jobkit.config import load_filters
+from jobkit.db import OPEN_QUEUE_JOBS
 from jobkit.log import log
 from jobkit.pipeline import nightly
 
@@ -395,7 +398,9 @@ def _installed_lines() -> list[str]:
 def status(conn: sqlite3.Connection | None) -> tuple[str, bool]:
     """(report, supported). Read-only: the plist, `launchctl print`, and the
     nightly run record in the DB (when there is one), with the jobs a staging
-    run stopped on that wait on the human (pipeline/halts.py)."""
+    run stopped on that wait on the human (pipeline/halts.py), and last the
+    open_forms_line the scheduled run reads to decide whether to call
+    open_queue."""
     lines: list[str] = []
     supported = _platform() == "darwin"
     if not supported:
@@ -423,4 +428,28 @@ def status(conn: sqlite3.Connection | None) -> tuple[str, bool]:
         lines.append("last nightly run: no database (run `jobkit init`)")
     else:
         lines.append(nightly.report(conn))
+    lines.append(open_forms_line(conn))
     return "\n".join(lines), supported
+
+
+OPEN_FORMS_PREFIX = "open forms after the daily run:"
+
+
+def open_forms_line(conn: sqlite3.Connection | None) -> str:
+    """One line for the scheduled run: whether it ends by opening the filled
+    forms (staging.open_after_daily_run in config/filters.yaml) and, when it
+    does, how many applications open_queue would open now. Read-only."""
+    try:
+        on = load_filters().open_after_daily_run
+    except (ValueError, FileNotFoundError, yaml.YAMLError) as e:
+        # FileNotFoundError covers ConfigMissing: no config/filters.yaml yet;
+        # YAMLError a filters.yaml that does not parse
+        return f"{OPEN_FORMS_PREFIX} off ({e})"
+    if not on:
+        return f"{OPEN_FORMS_PREFIX} off (staging.open_after_daily_run)"
+    if conn is None:
+        return f"{OPEN_FORMS_PREFIX} on; no database, nothing to open"
+    n = len(conn.execute(OPEN_QUEUE_JOBS).fetchall())
+    return (
+        f"{OPEN_FORMS_PREFIX} on; {n} application{'s' if n != 1 else ''} ready to open (open_queue)"
+    )

@@ -1,20 +1,69 @@
 """Standing rules engine (SPEC §6.2). Evaluation order is fixed: deterministic
 filters → sanity checks → standing rules. Rules only ever see jobs that already
 survived the first two layers (status=queued). Auto-approved jobs are tailored
-and staged without asking; auto-rejects are logged, reviewable, never dropped."""
+and staged without asking; auto-rejects are logged, reviewable, never dropped.
+
+There is no daily limit on automatic approval unless the person sets one:
+`max_auto_approve_per_day` in autoapprove.yaml (a whole number, 1 or more).
+With it, at most that many jobs are approved automatically per local calendar
+day, highest fit score first. A job over the limit stays queued, gets one
+`auto_approve_waiting` event that day, and is tried again on the next run.
+Without the key nothing here changes."""
 
 from __future__ import annotations
 
 import json
 import re
 import sqlite3
+from collections.abc import Mapping
 from typing import Any
+
+import yaml
 
 from jobkit.adapters.ats.greenhouse import comp_basis
 from jobkit.config import Filters, load_filters, read_config_yaml
 from jobkit.log import log
 
 RULES_PATH = "config/autoapprove.yaml"
+
+# the optional daily limit on automatic approvals; absent means no limit
+MAX_PER_DAY_KEY = "max_auto_approve_per_day"
+# the event a job over the daily limit gets (once per job per local day)
+WAITING_EVENT = "auto_approve_waiting"
+
+# automatic approvals decided on a local calendar day ('YYYY-MM-DD')
+_COUNT_AUTO_APPROVED_ON = """
+SELECT COUNT(*) AS n FROM decisions
+WHERE auto = 1 AND decision = 'approve' AND date(decided_at, 'localtime') = :day
+"""
+# jobs that cleared an auto_approve rule on that day but were over the daily
+# limit, and are still queued
+_COUNT_WAITING_ON = """
+SELECT COUNT(DISTINCT e.job_id) AS n FROM events e JOIN jobs j ON j.id = e.job_id
+WHERE e.kind = :kind AND date(e.at, 'localtime') = :day AND j.status = 'queued'
+"""
+_WAITING_RECORDED_ON = """
+SELECT 1 FROM events
+WHERE job_id = :job_id AND kind = :kind AND date(at, 'localtime') = :day
+"""
+_TODAY = "SELECT date('now', 'localtime') AS day"
+
+
+def max_auto_approve_per_day(rules: Mapping[str, Any]) -> int | None:
+    """The optional daily limit on automatic approvals
+    (`max_auto_approve_per_day`). None when the key is absent or empty: no
+    limit, the default. A value that is not a whole number of 1 or more
+    (true, 0, -3, 2.5, "five") raises ValueError."""
+    value = rules.get(MAX_PER_DAY_KEY)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(
+            f"{MAX_PER_DAY_KEY} in config/autoapprove.yaml must be a whole number of 1 or "
+            f"more, got {value!r}. Delete the line for no daily limit."
+        )
+    return value
+
 
 _FOUNDING_PAT = re.compile(r"\b(founding|first)\b", re.I)
 
@@ -83,6 +132,13 @@ def _cond_matches(when: dict[str, Any], job: dict[str, Any]) -> bool:
         elif key == "sanity_flags":
             if want == "none" and job["flags"]:
                 return False
+        elif key == "sanity_checked":
+            # both sanity checks finished: the remote check wrote the row and
+            # the comp check its demand_score. A job whose check failed has
+            # no flags to read, so `sanity_flags: none` alone would pass it.
+            checked = job.get("sanity_job_id") is not None and job.get("demand_score") is not None
+            if checked != bool(want):
+                return False
         elif key == "friction_lte":
             if job["friction"] is None or job["friction"] > want:
                 return False
@@ -115,14 +171,78 @@ def _cond_matches(when: dict[str, Any], job: dict[str, Any]) -> bool:
 
 
 def _load_rules() -> dict[str, Any]:
-    """config/autoapprove.yaml; a missing file is a ConfigMissing error."""
+    """config/autoapprove.yaml; a missing file is a ConfigMissing error, and a
+    bad max_auto_approve_per_day a ValueError."""
     rules: dict[str, Any] = read_config_yaml(RULES_PATH) or {}
+    if isinstance(rules, dict):
+        max_auto_approve_per_day(rules)
     return rules
 
 
+def _today(conn: sqlite3.Connection) -> str:
+    return str(conn.execute(_TODAY).fetchone()["day"])
+
+
+def _record_waiting(conn: sqlite3.Connection, job_id: int, day: str, cap: int) -> None:
+    """One auto_approve_waiting event per job per local day: get_queue runs
+    the rules too, so the same job can be over the limit several times."""
+    args = {"job_id": job_id, "kind": WAITING_EVENT, "day": day}
+    if conn.execute(_WAITING_RECORDED_ON, args).fetchone():
+        return
+    conn.execute(
+        "INSERT INTO events (job_id, kind, detail) VALUES (?, ?, ?)",
+        (job_id, WAITING_EVENT, f"daily limit of {cap} reached; tried again on the next run"),
+    )
+
+
+def waiting_for_tomorrow(conn: sqlite3.Connection, day: str | None = None) -> int:
+    """How many still-queued jobs cleared an auto_approve rule on `day` (local
+    'YYYY-MM-DD', default today) but were over the daily limit."""
+    day = day or _today(conn)
+    return int(conn.execute(_COUNT_WAITING_ON, {"kind": WAITING_EVENT, "day": day}).fetchone()["n"])
+
+
+def auto_approved_on(conn: sqlite3.Connection, day: str | None = None) -> int:
+    """How many jobs the standing rules approved on `day` (local 'YYYY-MM-DD',
+    default today)."""
+    day = day or _today(conn)
+    return int(conn.execute(_COUNT_AUTO_APPROVED_ON, {"day": day}).fetchone()["n"])
+
+
+def digest_lines(conn: sqlite3.Connection, day: str | None = None) -> list[str]:
+    """The digest's "Automatic approval" section. Empty unless the person set
+    a daily limit (max_auto_approve_per_day): then how many jobs were approved
+    automatically that day against the limit, and how many more cleared their
+    bar and wait in the queue for the next day's run. A missing or unreadable
+    autoapprove.yaml (missing, a YAML syntax error, a bad limit) gives nothing
+    here: the rules stage reports it, and the digest is still written."""
+    try:
+        rules = read_config_yaml(RULES_PATH) or {}
+        cap = max_auto_approve_per_day(rules) if isinstance(rules, dict) else None
+    except (OSError, ValueError, yaml.YAMLError):
+        return []
+    if cap is None:
+        return []
+    day = day or _today(conn)
+    approved = auto_approved_on(conn, day)
+    waiting = waiting_for_tomorrow(conn, day)
+    line = f"Approved automatically today: {approved} (your daily limit is {cap})."
+    if waiting:
+        line += (
+            f" {waiting} more cleared your bar and wait for tomorrow's run. They are in "
+            "your queue, and you can approve any of them now."
+        )
+    return ["## Automatic approval", line, ""]
+
+
 def run_standing_rules(conn: sqlite3.Connection) -> dict[str, int]:
-    """Apply autoapprove.yaml to the queue. Returns counts."""
+    """Apply autoapprove.yaml to the queue. Returns counts. With a daily
+    limit set (max_auto_approve_per_day), jobs are tried highest fit score
+    first, approvals stop at the limit for the local day, and the counts gain
+    `waiting_for_tomorrow`: jobs that cleared an auto_approve rule and stay
+    queued."""
     rules = _load_rules()
+    cap = max_auto_approve_per_day(rules)
     filters = load_filters()
     unknown = unknown_title_classes(rules, filters)
     if unknown:
@@ -134,7 +254,8 @@ def run_standing_rules(conn: sqlite3.Connection) -> dict[str, int]:
         )
     rows = conn.execute(
         """SELECT j.id, j.title, j.remote, j.comp_min, j.comp_max, c.tier,
-                  sc.fit_score, s.flags, fs.friction_score AS friction,
+                  sc.fit_score, s.flags, s.job_id AS sanity_job_id, s.demand_score,
+                  fs.friction_score AS friction,
                   CASE WHEN j.comp_max IS NOT NULL THEN j.jd_html END AS jd_html
            FROM jobs j
            JOIN companies c ON c.id = j.company_id
@@ -144,6 +265,17 @@ def run_standing_rules(conn: sqlite3.Connection) -> dict[str, int]:
            WHERE j.status = 'queued'"""
     ).fetchall()
     stats = {"evaluated": len(rows), "auto_approved": 0, "auto_rejected": 0}
+    day = ""
+    approved_today = 0
+    if cap is not None:
+        # the limit goes to the best jobs: highest fit first, unscored last
+        rows = sorted(
+            rows,
+            key=lambda r: (r["fit_score"] is None, -(r["fit_score"] or 0), r["id"]),
+        )
+        day = _today(conn)
+        approved_today = auto_approved_on(conn, day)
+        stats["waiting_for_tomorrow"] = 0
     for row in rows:
         job = dict(row)
         job["flags"] = json.loads(row["flags"] or "[]") if row["flags"] else []
@@ -169,6 +301,19 @@ def run_standing_rules(conn: sqlite3.Connection) -> dict[str, int]:
             continue
         for rule in rules.get("auto_approve", []):
             if _cond_matches(rule["when"], job):
+                if cap is not None and approved_today >= cap:
+                    # over the person's daily limit: left queued for the next run
+                    _record_waiting(conn, row["id"], day, cap)
+                    log(
+                        "standing_rules.auto_approve_waiting",
+                        job_id=row["id"],
+                        fit_score=row["fit_score"],
+                        reason=rule.get("reason", ""),
+                        max_per_day=cap,
+                    )
+                    stats["waiting_for_tomorrow"] += 1
+                    break
+                approved_today += 1
                 conn.execute("UPDATE jobs SET status='approved' WHERE id=?", (row["id"],))
                 # one application row per job: never a second one
                 if not conn.execute(

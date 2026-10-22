@@ -19,6 +19,12 @@ debugging):
 * finish_email_check: the time the mailbox was checked through, so the next
   search starts there.
 
+email_targets also suggests a second search, for job-alert emails
+(LinkedIn's and the job boards') and LinkedIn message notifications since
+the last check, and lists the LinkedIn messages recorded since then. Those
+are recorded through record_job_alerts and record_linkedin_message
+(track/job_alerts.py).
+
 What is stored, as an 'email_response' event: the outcome, the day and time
 the email arrived, its message id, a link to it, and a one-line summary the
 caller writes (cut to SUMMARY_MAX characters). The body of an email is never
@@ -95,6 +101,18 @@ SEARCH_DOMAINS: tuple[str, ...] = tuple(
     for domains in (*ATS_SENDER_DOMAINS.values(), *SERVICE_SENDER_DOMAINS.values())
     for d in domains
 )
+
+# job-alert emails and LinkedIn message notifications (track/job_alerts.py):
+# the person's own mail, read; the LinkedIn site is never fetched
+LINKEDIN_ALERT_SENDERS = ("jobalerts-noreply@linkedin.com", "jobs-noreply@linkedin.com")
+LINKEDIN_MESSAGE_SENDERS = ("messages-noreply@linkedin.com", "inmail-hit-reply@linkedin.com")
+JOB_BOARD_ALERT_DOMAINS = ("indeed.com", "glassdoor.com", "ziprecruiter.com", "wellfound.com")
+ALERT_SENDERS: tuple[str, ...] = (
+    *LINKEDIN_ALERT_SENDERS,
+    *LINKEDIN_MESSAGE_SENDERS,
+    *JOB_BOARD_ALERT_DOMAINS,
+)
+ALERT_FIRST_DAYS = 7  # how far back the first alert search goes
 
 # words too common in titles to tell two applications apart
 _TITLE_STOP = frozenset(
@@ -193,14 +211,46 @@ class EmailTargets:
     query: str
     sender_domains: tuple[str, ...] = SEARCH_DOMAINS
     companies_left_out: int = 0
+    # job-alert emails and LinkedIn messages (track/job_alerts.py)
+    alert_after: datetime.date | None = None
+    alert_query: str = ""
+    alert_senders: tuple[str, ...] = ALERT_SENDERS
+    alert_emails_recorded: int = 0
+    linkedin_messages: list[str] = field(default_factory=list)
 
     def render(self) -> str:
+        return "\n".join([*self._application_lines(), "", *self._alert_lines()])
+
+    def _alert_lines(self) -> list[str]:
+        lines = [
+            f"Job alerts and LinkedIn messages: suggested Gmail search: {self.alert_query}",
+            "For a job-alert email (LinkedIn, Indeed, Glassdoor, ZipRecruiter, Wellfound), "
+            "open it and list each job's company, title and location, and whether it shows "
+            "an 'apply on company site' link. Do not open or follow any link in it. Call "
+            "record_job_alerts once per email with those jobs, its message id, the date it "
+            "arrived and the sender (source: linkedin, indeed, ...). jobkit keeps the jobs "
+            "that pass the title rules and looks for each one on the employer's own "
+            "Greenhouse, Lever or Ashby board; finish_email_check starts that lookup.",
+            "For a LinkedIn message or InMail notification, note the sender's company if "
+            "shown, and one line in your words about who wrote (by role, never by name) and "
+            "what they want; call record_linkedin_message. Never reply.",
+        ]
+        if self.alert_emails_recorded or self.linkedin_messages:
+            lines.append(
+                f"Since the last check: {self.alert_emails_recorded} job-alert email(s) and "
+                f"{len(self.linkedin_messages)} LinkedIn message(s) recorded."
+            )
+        if self.linkedin_messages:
+            lines += ["LinkedIn messages to include in the summary:", *self.linkedin_messages]
+        return lines
+
+    def _application_lines(self) -> list[str]:
         if not self.targets:
-            return (
+            return [
                 "No submitted application is waiting on a reply (stages "
                 f"{', '.join(OPEN_STAGES)}), so there is nothing to look for. Mark "
                 "applications with mark_submitted first."
-            )
+            ]
         checked = (
             f"Mailbox last checked through {self.last_checked_through} UTC."
             if self.last_checked_through
@@ -225,7 +275,7 @@ class EmailTargets:
             "to find its application, then record_email_response with the outcome "
             "and a one-line summary. Call finish_email_check when done.",
         ]
-        return "\n".join(lines)
+        return lines
 
 
 def last_check(conn: sqlite3.Connection) -> str | None:
@@ -243,6 +293,12 @@ def last_check(conn: sqlite3.Connection) -> str | None:
 
 def _quoted(name: str) -> str:
     return '"' + name.replace('"', "").strip() + '"'
+
+
+def alert_query(after: datetime.date | None) -> str:
+    """after:YYYY/MM/DD {from:<alert or LinkedIn sender> ...}"""
+    query = "{" + " ".join(f"from:{s}" for s in ALERT_SENDERS) + "}"
+    return (f"after:{after.strftime('%Y/%m/%d')} " if after else "") + query
 
 
 def gmail_query(after: datetime.date | None, companies: list[str]) -> str:
@@ -282,12 +338,25 @@ def email_targets(conn: sqlite3.Connection) -> EmailTargets:
         if t.company not in companies:
             companies.append(t.company)
     left_out = max(0, len(companies) - QUERY_COMPANY_MAX)
+    from jobkit.track import job_alerts  # it builds on this module
+
+    check_row = conn.execute(q.LAST_EMAIL_CHECK).fetchone()
+    after_id = int(check_row["id"]) if check_row is not None else 0
+    alert_after = (
+        datetime.date.fromisoformat(through[:10]) - datetime.timedelta(days=1)
+        if through
+        else _now().date() - datetime.timedelta(days=ALERT_FIRST_DAYS)
+    )
     return EmailTargets(
         targets=targets,
         last_checked_through=through,
         search_after=after,
         query=gmail_query(after, companies[:QUERY_COMPANY_MAX]) if targets else "",
         companies_left_out=left_out,
+        alert_after=alert_after,
+        alert_query=alert_query(alert_after),
+        alert_emails_recorded=job_alerts.alert_emails_after(conn, after_id),
+        linkedin_messages=job_alerts.messages_after(conn, after_id),
     )
 
 
@@ -676,13 +745,34 @@ class Check:
     checked_through: str
     previous: str | None
     recorded_since: int
+    alert_emails_since: int = 0
+    linkedin_messages_since: int = 0
+    alert_cards_since: int = 0  # alert jobs handed to board lookup (job_alerts.py)
+    alert_jobs: list[str] = field(default_factory=list)  # job_alerts.items_after
+    # leads web search kept since the previous check (alert_search.lead_lines_after)
+    leads: list[str] = field(default_factory=list)
 
     def render(self) -> str:
         prev = f" (previous check: through {self.previous} UTC)" if self.previous else ""
-        return (
+        more = ""
+        if self.alert_emails_since or self.linkedin_messages_since:
+            more = (
+                f", {self.alert_emails_since} job-alert email(s) and "
+                f"{self.linkedin_messages_since} LinkedIn message(s)"
+            )
+        head = (
             f"mailbox checked through {self.checked_through} UTC{prev}; "
-            f"{self.recorded_since} response(s) recorded since the previous check"
+            f"{self.recorded_since} response(s){more} recorded since the previous check"
         )
+        lines = [head]
+        if self.alert_jobs:
+            lines += ["Jobs from job-alert emails in this check:", *self.alert_jobs]
+        if self.leads:
+            lines += [
+                "Found by web search on sites jobkit does not read (apply there yourself):",
+                *self.leads,
+            ]
+        return "\n".join(lines)
 
 
 def finish_email_check(conn: sqlite3.Connection, checked_through: str = "") -> Check:
@@ -696,13 +786,38 @@ def finish_email_check(conn: sqlite3.Connection, checked_through: str = "") -> C
     recorded = int(
         conn.execute(q.COUNT_EMAIL_RESPONSES_AFTER, {"after_id": after_id}).fetchone()[0]
     )
+    from jobkit.track import job_alerts  # it builds on this module
+
+    alerts = job_alerts.alert_emails_after(conn, after_id)
+    messages = len(job_alerts.messages_after(conn, after_id))
+    cards = job_alerts.alert_cards_after(conn, after_id)
+    alert_jobs = job_alerts.items_after(conn, after_id)
+    from jobkit.track import alert_search  # it builds on this module
+
+    leads = alert_search.lead_lines_after(conn, after_id)
     conn.execute(
         q.RECORD_EVENT,
         {"job_id": None, "kind": CHECK_EVENT, "detail": json.dumps({"checked_through": when})},
     )
     conn.commit()
-    log("responses.check_finished", checked_through=when, recorded=recorded)
-    return Check(checked_through=when, previous=previous, recorded_since=recorded)
+    log(
+        "responses.check_finished",
+        checked_through=when,
+        recorded=recorded,
+        alert_emails=alerts,
+        linkedin_messages=messages,
+        alert_cards=cards,
+    )
+    return Check(
+        checked_through=when,
+        previous=previous,
+        recorded_since=recorded,
+        alert_emails_since=alerts,
+        linkedin_messages_since=messages,
+        alert_cards_since=cards,
+        alert_jobs=alert_jobs,
+        leads=leads,
+    )
 
 
 # ---- the digest ------------------------------------------------------------------
@@ -710,11 +825,14 @@ def finish_email_check(conn: sqlite3.Connection, checked_through: str = "") -> C
 
 def digest_lines(conn: sqlite3.Connection, since: str) -> list[str]:
     """'Replies recorded since the last digest': every email response
-    recorded at or after `since` ('YYYY-MM-DD HH:MM:SS' UTC). Empty when
-    there are none."""
+    recorded at or after `since` ('YYYY-MM-DD HH:MM:SS' UTC), then the
+    job-alert and LinkedIn message sections (job_alerts.digest_lines). Empty
+    when there is nothing."""
+    from jobkit.track import job_alerts  # it builds on this module
+
     rows = conn.execute(q.EMAIL_RESPONSES_SINCE, {"since": since}).fetchall()
     if not rows:
-        return []
+        return job_alerts.digest_lines(conn, since)
     lines = [f"## Replies recorded since the last digest ({len(rows)})"]
     for r in rows:
         d = json.loads(r["detail"] or "{}")
@@ -729,4 +847,4 @@ def digest_lines(conn: sqlite3.Connection, since: str) -> list[str]:
             f"{d.get('outcome')}, received {str(d.get('received_at') or '')[:10]}, {moved}{summary}"
         )
     lines.append("")
-    return lines
+    return lines + job_alerts.digest_lines(conn, since)

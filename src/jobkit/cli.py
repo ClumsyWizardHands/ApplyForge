@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
+from typing import Annotated
 
 import typer
 
@@ -38,7 +39,7 @@ from jobkit.pipeline.triage import (
     run_remote_check,
     run_score,
 )
-from jobkit.track import responses
+from jobkit.track import job_alerts, responses
 from jobkit.track.applications import close_ghosted
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -684,6 +685,33 @@ def _echo_scores(conn: sqlite3.Connection, job_ids: list[int]) -> None:
             )
 
 
+@app.command(name="same-day")
+def same_day_cmd(
+    job_ids: Annotated[
+        list[int] | None, typer.Argument(help="jobs to score now (any found by search)")
+    ] = None,
+    resolve_boards: bool = typer.Option(
+        False,
+        "--resolve-boards",
+        help="run board lookup first (resolve-boards), for the jobs in job-alert emails",
+    ),
+) -> None:
+    """Score the jobs found from job-alert emails today: with --resolve-boards,
+    board lookup first; then these jobs (with no ids or with
+    --resolve-boards, also every posting board lookup found for an alert job
+    that is not scored yet) go through the filter, the remote
+    and comp checks, extraction, scoring, the queue gate, the form-spec stage
+    and the standing rules, so one that clears your bar is approved today.
+    MCP finish_email_check and record_search_result start it in the
+    background. Exits 1 when a stage failed."""
+    from jobkit.pipeline import same_day
+
+    conn = _db()
+    rep = same_day.run(conn, job_ids or [], resolve_boards=resolve_boards, echo=typer.echo)
+    if rep.failed:
+        raise typer.Exit(1)
+
+
 @app.command(name="score-jobs")
 def score_jobs(job_ids: list[int]) -> None:
     """Extract and score these jobs now, whatever their status. Used for a
@@ -705,9 +733,10 @@ def ghost_close(
 
 email_app = typer.Typer(
     no_args_is_help=True,
-    help="Replies in your own mailbox, recorded by hand (debugging; the MCP tools "
-    "email_targets, match_email, record_email_response and finish_email_check are the "
-    "normal path). Nothing is ever sent.",
+    help="Replies, job alerts and LinkedIn messages in your own mailbox, recorded by hand "
+    "(debugging; the MCP tools email_targets, match_email, record_email_response, "
+    "record_job_alerts, record_linkedin_message and finish_email_check are the normal "
+    "path). Nothing is ever sent.",
 )
 app.add_typer(email_app, name="email")
 
@@ -753,18 +782,101 @@ def email_record_cmd(
     typer.echo(rec.render())
 
 
+@email_app.command("alerts")
+def email_alerts_cmd(
+    items_file: str = typer.Option(
+        ..., "--items-file", help="a JSON list of {company, title, location, company_site_link}"
+    ),
+    message_id: str = typer.Option(..., "--message-id", help="the mailbox's id for the email"),
+    received_at: str = typer.Option(..., "--received-at", help="when it arrived"),
+    source: str = typer.Option("linkedin", help="the sender: linkedin, indeed, glassdoor, ..."),
+) -> None:
+    """Record the jobs listed in one job-alert email. No link or job id is stored."""
+    try:
+        with open(items_file) as f:
+            items = f.read()
+        rec = job_alerts.record_job_alerts(_db(), items, message_id, received_at, source)
+    except (ValueError, OSError) as e:
+        typer.echo(f"not recorded: {e}", err=True)
+        raise typer.Exit(1) from None
+    typer.echo(rec.render())
+
+
+@email_app.command("linkedin-message")
+def email_linkedin_message_cmd(
+    company: str = typer.Option("", help="their company, if the email shows it"),
+    summary: str = typer.Option(
+        ..., help="one line in your words: who wrote, by role, and what they want (160 characters)"
+    ),
+    received_at: str = typer.Option(..., "--received-at", help="when it arrived"),
+    message_id: str = typer.Option(..., "--message-id", help="the mailbox's id for it"),
+    link: str = typer.Option("", help="a link that opens the email in the mailbox"),
+) -> None:
+    """Record one LinkedIn message notification. Never answered; the text is never stored."""
+    try:
+        rec = job_alerts.record_linkedin_message(
+            _db(), company, summary, received_at, message_id, link
+        )
+    except ValueError as e:
+        typer.echo(f"not recorded: {e}", err=True)
+        raise typer.Exit(1) from None
+    typer.echo(rec.render())
+
+
+@email_app.command("to-search")
+def email_to_search_cmd() -> None:
+    """The recent alert jobs board lookup could not find, to search the web
+    for (only when search.alert_web_search is on)."""
+    from jobkit.track import alert_search
+
+    typer.echo(alert_search.to_search(_db()).render())
+
+
+@email_app.command("search-result")
+def email_search_result_cmd(
+    alert_ref: str = typer.Option(..., "--alert-ref", help="alert-<hash> from to-search"),
+    outcome: str = typer.Option("found", help="found or not_found"),
+    url: str = typer.Option("", help="with found: the posting's apply link"),
+) -> None:
+    """Record what a web search found for one alert job. A Greenhouse, Lever
+    or Ashby link is read from the board now; run `jobkit same-day <id>` to
+    score the job (MCP record_search_result starts that itself)."""
+    from jobkit.track import alert_search
+
+    conn = _db()
+
+    def hint(_c: sqlite3.Connection, ids: list[int]) -> str:
+        return f"score it now: `jobkit same-day {' '.join(str(i) for i in ids)}`"
+
+    try:
+        rec = alert_search.record_search_result(conn, alert_ref, url, outcome, start_scoring=hint)
+    except ValueError as e:
+        typer.echo(f"not recorded: {e}", err=True)
+        raise typer.Exit(1) from None
+    typer.echo(rec.render())
+
+
 @email_app.command("done")
 def email_done_cmd(
     checked_through: str = typer.Option(
         "", "--checked-through", help="ISO date-time the mailbox was read through; default now"
     ),
 ) -> None:
-    """Record that the mailbox was checked through a time."""
+    """Record that the mailbox was checked through a time. (MCP
+    finish_email_check also starts board lookup for the jobs taken from
+    job-alert emails; here, run `jobkit same-day --resolve-boards`.)"""
     try:
-        typer.echo(responses.finish_email_check(_db(), checked_through).render())
+        check = responses.finish_email_check(_db(), checked_through)
     except ValueError as e:
         typer.echo(f"not recorded: {e}", err=True)
         raise typer.Exit(1) from None
+    typer.echo(check.render())
+    if check.alert_cards_since:
+        typer.echo(
+            f"{check.alert_cards_since} job(s) from job-alert emails wait for board lookup: "
+            "`jobkit same-day --resolve-boards` looks for them and scores what it finds now "
+            "(the nightly run does it otherwise)."
+        )
 
 
 @app.command()
