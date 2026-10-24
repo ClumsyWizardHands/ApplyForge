@@ -1,5 +1,12 @@
 """Stage 1 — poll. Concurrent board fetch with ETags, raw JSON cache, idempotent
-upsert, vanished postings marked closed. Concurrency 4, backoff on 429/5xx (SPEC §5)."""
+upsert, vanished postings marked closed. Concurrency 4, backoff on 429/5xx (SPEC §5).
+
+Repost sites (discovery/reposters.py, owner decision D5): a board on the
+built-in list (registries/reposters.yml) is not fetched; a board whose
+postings mostly read like reposts ("Our partner is looking for...") is not
+upserted, unless the person listed it in config/targets.yaml. Either way the
+board is set stale, its undecided open jobs are rejected and the digest says
+so (stats key `reposters`)."""
 
 from __future__ import annotations
 
@@ -15,6 +22,7 @@ from jobkit import db as q
 from jobkit import paths
 from jobkit.adapters import ADAPTERS
 from jobkit.config import Targets, load_targets
+from jobkit.discovery import reposters
 from jobkit.log import log
 from jobkit.normalize import (
     cluster_key,
@@ -184,22 +192,49 @@ async def poll(conn: sqlite3.Connection, targets: Targets | None = None) -> dict
     return stats
 
 
+def owner_boards() -> frozenset[tuple[str, str]]:
+    """(ats, lowercased token) of every board listed in config/targets.yaml.
+    A config that will not load lists none (the repost heuristic then judges
+    every board)."""
+    try:
+        targets = load_targets()
+    except Exception as e:  # noqa: BLE001 — no owner list: nothing is exempt
+        log("poll.targets_unavailable", error=str(e)[:150])
+        return frozenset()
+    return frozenset(
+        (c.board.ats, c.board.token.lower()) for c in targets.companies if c.board is not None
+    )
+
+
+def _reposter_heuristic(
+    board: dict[str, Any], payload: Any, owner: frozenset[tuple[str, str]]
+) -> str | None:
+    """Why a fetched board's postings read like reposts, or None. Never for a
+    board listed in targets.yaml; a payload the adapter cannot parse is left
+    to upsert_jobs."""
+    if (board["ats"], str(board["token"]).lower()) in owner:
+        return None
+    try:
+        jobs = ADAPTERS[board["ats"]].parse(payload)
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return None
+    return reposters.heuristic(j.jd_html for j in jobs)
+
+
 async def poll_selected(
     conn: sqlite3.Connection,
     boards: list[dict[str, Any]],
     transport: httpx.AsyncBaseTransport | None = None,
+    owner: frozenset[tuple[str, str]] | None = None,
 ) -> dict[str, int]:
     """Fetch and upsert exactly these boards (dicts with board_id, company_id,
     company_name, ats, token): ETag-conditional, retried on 429/5xx, raw
     payload cached, vanished postings closed. poll() runs it over every board;
     discovery/ingest.py over the one board a pasted or discovered URL names.
+    A repost board is kept out (module docstring); `owner`: the boards
+    exempt from the repost heuristic (default: config/targets.yaml's).
     `transport` is for tests (recorded fixtures)."""
-    etags = {
-        b["board_id"]: r["etag"]
-        for b in boards
-        if (r := conn.execute("SELECT etag FROM boards WHERE id=?", (b["board_id"],)).fetchone())
-    }
-    sem = asyncio.Semaphore(CONCURRENCY)
+    owner = owner_boards() if owner is None else owner
     stats = {
         "boards": len(boards),
         "ok": 0,
@@ -207,7 +242,30 @@ async def poll_selected(
         "failed": 0,
         "jobs_seen": 0,
         "jobs_new": 0,
+    }  # + "reposters" when a repost board was kept out
+    kept: list[dict[str, Any]] = []
+    for b in boards:
+        why = reposters.built_in(b["ats"], b["token"], b.get("company_name"))
+        if why:  # never fetched
+            reposters.keep_out(
+                conn,
+                ats=b["ats"],
+                token=b["token"],
+                company=str(b.get("company_name") or ""),
+                why=why,
+                where="poll",
+                board_id=int(b["board_id"]),
+            )
+            stats["reposters"] = stats.get("reposters", 0) + 1
+        else:
+            kept.append(b)
+    boards = kept
+    etags = {
+        b["board_id"]: r["etag"]
+        for b in boards
+        if (r := conn.execute("SELECT etag FROM boards WHERE id=?", (b["board_id"],)).fetchone())
     }
+    sem = asyncio.Semaphore(CONCURRENCY)
     async with httpx.AsyncClient(follow_redirects=True, transport=transport) as client:
         tasks = [_fetch_board(client, sem, b, etags.get(b["board_id"])) for b in boards]
         for coro in asyncio.as_completed(tasks):
@@ -222,6 +280,19 @@ async def poll_selected(
                 conn.execute(
                     q.SET_BOARD_POLLED, {"etag": result.etag, "board_id": board["board_id"]}
                 )
+                continue
+            why = _reposter_heuristic(board, result.payload, owner)
+            if why:
+                reposters.keep_out(
+                    conn,
+                    ats=board["ats"],
+                    token=board["token"],
+                    company=str(board.get("company_name") or ""),
+                    why=why,
+                    where="poll",
+                    board_id=int(board["board_id"]),
+                )
+                stats["reposters"] = stats.get("reposters", 0) + 1
                 continue
             _cache_raw(board["ats"], board["token"], result.payload)
             seen, new = upsert_jobs(conn, board, result.payload)

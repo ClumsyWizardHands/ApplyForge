@@ -38,6 +38,7 @@ from jobkit.pipeline.triage import (
     run_queue,
     run_remote_check,
     run_score,
+    stage_limit,
 )
 from jobkit.track import job_alerts, responses
 from jobkit.track.applications import close_ghosted
@@ -199,9 +200,19 @@ def refilter(
 
 
 @app.command()
-def triage(limit: int = typer.Option(25, help="max jobs per LLM stage this run")) -> None:
-    """LLM triage: extract -> remote check -> comp sanity -> score -> queue."""
+def triage(
+    limit: int | None = typer.Option(
+        None,
+        min=1,
+        help="max jobs per LLM stage this run; default: triage.max_jobs_per_stage in "
+        "filters.yaml, which is no limit when absent",
+    ),
+) -> None:
+    """LLM triage: extract -> remote check -> comp sanity -> score -> queue.
+    Every job that passes the filters, unless a limit is given or set."""
     conn = _db()
+    if limit is None:
+        limit = stage_limit()
     typer.echo(f"extract: {run_extract(conn, limit)}")
     typer.echo(f"remote:  {run_remote_check(conn, limit)}")
     typer.echo(f"comp:    {run_comp_check(conn, limit)}")
@@ -497,10 +508,12 @@ def _run_all_stages() -> list[Stage]:
         # filter and triage so the employer's JD is the one scored
         ("resolve-boards", board_resolver.run_stage),
         ("filter", run_filters),
-        ("extract", lambda c: run_extract(c, 100)),
-        ("remote", lambda c: run_remote_check(c, 100)),
-        ("comp", lambda c: run_comp_check(c, 100)),
-        ("score", lambda c: run_score(c, 100)),
+        # no cap: every job that passes the filters, unless the person set
+        # triage.max_jobs_per_stage (read when the stage runs)
+        ("extract", lambda c: run_extract(c, stage_limit())),
+        ("remote", lambda c: run_remote_check(c, stage_limit())),
+        ("comp", lambda c: run_comp_check(c, stage_limit())),
+        ("score", lambda c: run_score(c, stage_limit())),
         ("unsnooze", unsnooze),
         ("queue", run_queue),
         ("form-specs", lambda c: capture_form_specs(c, 50)),  # BEFORE rules: friction feeds them
@@ -636,6 +649,10 @@ def add_url(
     if res.poll is None:
         if hit.supported:  # the system is readable but the link names no board
             typer.echo("no board name in that link, so nothing was added")
+        raise typer.Exit()
+    if res.status == "reposter":
+        # a repost site, not the employer: nothing is added (registries/reposters.yml)
+        typer.echo(f"not added: {res.poll.describe()}")
         raise typer.Exit()
     typer.echo(f"polled board: {res.poll.describe()}")
     if res.status == "poll_failed":

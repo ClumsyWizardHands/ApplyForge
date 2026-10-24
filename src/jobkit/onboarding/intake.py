@@ -7,13 +7,23 @@ config/commute_table.yaml, and writes config/autoapprove.yaml and
 config/banned_phrases.yaml (the template's lists) when those are missing.
 
 Automatic approval is the person's choice (answer `auto_approve`). Yes writes
-one standing rule: approve every job with a fit score at or above their bar
-(default 75) and no sanity flag, reason "clears-your-bar". A daily limit
+one standing rule, reason "clears-your-bar": approve every job with a fit
+score at or above their bar (default 75) once both sanity checks have run,
+with no deal-breaker flag (blocking_flags: none: doubts about remote work or
+the location, unrealistic pay; filters.yaml auto_approve lists them), a clear
+remote/location verdict (location_known) and the employer's own posting
+(employer_posting: a feed job with no employer posting found waits for the
+person, marked "apply on the employer's site"). A daily limit
 (max_auto_approve_per_day) is written only when they give a number; the
 default is no limit. No, or no answer, writes no rule. An autoapprove.yaml
 holding rules the interview did not write is always kept as it is, whatever
 replace_existing says (that flag is for filters.yaml and the commute table):
 the notes name the rule to add, or to remove on a no.
+
+The answer `scoring_limit` writes triage.max_jobs_per_stage: the most jobs
+each LLM stage (extract, the checks, score) takes in one run. It is written
+only when the person names a number; without it there is no limit, and every
+job that passes the filters is scored in the run.
 
 The answer `open_forms` sets staging.open_after_daily_run: whether the
 scheduled daily run ends by opening the filled forms for review. It is yes
@@ -27,7 +37,7 @@ No answer writes no block, and search stays off.
 Every interview-driven setting in filters.yaml carries a comment quoting the
 answer that produced it, so when a filter rejects something surprising the
 comment says which answer to revisit. Sections the interview does not cover
-(gates, tracking, tailoring, friction) are copied from
+(gates, auto_approve's flag lists, tracking, tailoring, friction) are copied from
 config/filters.example.yaml with its documentation.
 
 It works for any field. A track's titles become a phrase regex in which a
@@ -225,6 +235,21 @@ class AutoApproveAnswer(_Answer):
         return self
 
 
+class ScoringLimitAnswer(_Answer):
+    """An optional limit on how many jobs each LLM triage stage takes in one
+    run (triage.max_jobs_per_stage). Absent (the default): no limit."""
+
+    per_stage: int = Field(strict=True)  # strict: true is not 1
+
+    @model_validator(mode="after")
+    def _check_limit(self) -> ScoringLimitAnswer:
+        if self.per_stage < 1:
+            raise ValueError(
+                "scoring_limit.per_stage must be 1 or more; leave scoring_limit out for no limit"
+            )
+        return self
+
+
 class OpenFormsAnswer(_Answer):
     """Whether the scheduled daily run ends by opening the filled forms."""
 
@@ -308,6 +333,7 @@ class Preferences(BaseModel):
     nightly_at: str | None = None
     writing_style: StyleAnswer | None = None
     auto_approve: AutoApproveAnswer | None = None
+    scoring_limit: ScoringLimitAnswer | None = None
     open_forms: OpenFormsAnswer = Field(default_factory=OpenFormsAnswer)
     alert_search: AlertSearchAnswer | None = None
 
@@ -1198,6 +1224,16 @@ def render_filters(prefs: Preferences, template_text: str) -> tuple[str, list[st
 
     if "gates" in blocks:
         out += [blocks["gates"], ""]
+    # the optional limit on jobs scored per run: the person's number, else the
+    # template's block (no limit)
+    if prefs.scoring_limit is not None:
+        out += scoring_limit_block(prefs.scoring_limit)
+    elif "triage" in blocks:
+        out += [blocks["triage"], ""]
+    # which sanity flags keep a job from automatic approval (rules.py
+    # blocking_flags: none): the template's defaults, with their documentation
+    if "auto_approve" in blocks:
+        out += [blocks["auto_approve"], ""]
     sched = dict(template.get("schedule") or {})
     out += [
         "# ---- schedule ----------------------------------------------------------------",
@@ -1267,7 +1303,7 @@ def render_filters(prefs: Preferences, template_text: str) -> tuple[str, list[st
         f"  acceptable_geo_restrictions: {_flow([str(g) for g in geo])}",
         "",
     ]
-    for key in ("location_strategy", "resume", "self_review", "questions"):
+    for key in ("location_strategy", "resume", "self_review", "tailoring", "questions"):
         if key in blocks:
             out += [blocks[key], ""]
     out += plan.comp_sanity_block()
@@ -1304,6 +1340,20 @@ def alert_search_block(answer: AlertSearchAnswer) -> list[str]:
     if answer.per_check is not None:
         lines.append(f"  max_searches_per_check: {answer.per_check}   # leave out for no limit")
     return [*lines, ""]
+
+
+def scoring_limit_block(answer: ScoringLimitAnswer) -> list[str]:
+    """The `triage` block of filters.yaml, written only when the person named
+    a limit (no answer: no block, and no limit)."""
+    return [
+        "# ---- triage: how many jobs are scored per run ---------------------------------",
+        *_said(answer.said, ""),
+        "triage:",
+        "  # the most jobs each LLM stage (extract, the remote and comp checks, score)",
+        "  # takes in one run; the rest wait for the next run. Delete for no limit.",
+        f"  max_jobs_per_stage: {answer.per_stage}",
+        "",
+    ]
 
 
 def _comp_expectation_notes(plan: _Plan, filters: Filters) -> list[str]:
@@ -1386,9 +1436,23 @@ INTERVIEW_RULE_REASON = "clears-your-bar"
 def interview_rule(min_score: int) -> dict[str, Any]:
     """The automatic-approval rule the interview writes on a yes."""
     return {
-        "when": {"score_gte": min_score, "sanity_flags": "none", "sanity_checked": True},
+        "when": {
+            "score_gte": min_score,
+            "sanity_checked": True,
+            "blocking_flags": "none",
+            "location_known": True,
+            "employer_posting": True,
+        },
         "reason": INTERVIEW_RULE_REASON,
     }
+
+
+def _interview_rule_flow(min_score: int) -> str:
+    """The interview rule's `when`, as one YAML flow mapping."""
+    return (
+        f"{{ score_gte: {min_score}, sanity_checked: true, blocking_flags: none, "
+        "location_known: true, employer_posting: true }"
+    )
 
 
 def render_autoapprove(answer: AutoApproveAnswer | None) -> str:
@@ -1412,12 +1476,20 @@ def render_autoapprove(answer: AutoApproveAnswer | None) -> str:
         'version: "1.0"',
         "",
         *_said(answer.said, ""),
-        f"# Automatic approval: every job with a fit score of {answer.min_score} or more and",
-        "# no sanity flag, once both sanity checks have run, is approved without asking,",
-        "# tailored, and its form filled for you to review. Nothing is submitted: you",
-        "# click submit.",
+        f"# Automatic approval: every job with a fit score of {answer.min_score} or more is",
+        "# approved without asking, tailored, and its form filled for you to review, once",
+        "# both sanity checks have run, when",
+        "#   - no flag is a deal-breaker (blocking_flags: none): a doubt about remote work",
+        "#     or the location, or pay that is not realistic. A missing pay range or",
+        "#     several roles in one posting do not hold a job back. filters.yaml",
+        "#     auto_approve lists which flags do;",
+        "#   - where the work happens is clear (location_known: true);",
+        "#   - it is the employer's own posting (employer_posting: true). A job from a",
+        "#     job feed with no employer posting found waits in your queue, marked",
+        '#     "apply on the employer\'s site".',
+        "# Nothing is submitted: you click submit.",
         "auto_approve:",
-        f"  - when: {{ score_gte: {answer.min_score}, sanity_flags: none, sanity_checked: true }}",
+        f"  - when: {_interview_rule_flow(answer.min_score)}",
         f'    reason: "{INTERVIEW_RULE_REASON}"',
         "",
         "auto_reject: []",
@@ -1547,8 +1619,7 @@ def run_intake(
                 notes.append(
                     f"{files.rel(auto)} already holds standing rules, so it was kept as it "
                     f"is and {what} was not written. To add it, put this rule under "
-                    f"auto_approve: {{when: {{score_gte: {rule['when']['score_gte']}, "
-                    "sanity_flags: none, sanity_checked: true}, "
+                    f"auto_approve: {{when: {_interview_rule_flow(rule['when']['score_gte'])}, "
                     f'reason: "{INTERVIEW_RULE_REASON}"}}'
                     + (
                         f", and the line max_auto_approve_per_day: {choice.per_day}"

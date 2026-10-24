@@ -357,8 +357,53 @@ description or the corpus is a hard fail (`wrong_company`).
 
 ### When a letter fails
 
-The letter is written again up to twice with the violations fed back. If it
-still fails:
+The letter is written again, up to `tailoring.cover_attempts` drafts in all
+(in `config/filters.yaml`; 5 when the key is absent). Every draft gets the
+whole check: the rules, the claim judge and the authenticity review. The
+checks are not loosened for a later draft: the code in `src/jobkit/validate/`
+is the same as before this change.
+
+**What a new draft is told.** Each new draft is a new letter, written from
+the same prompt. It gets the list of what failed in every earlier draft of
+the run, not only the last one, so it cannot bring back a problem an earlier
+draft had fixed. Fact-check problems and authenticity problems are listed in
+separate sections, each grouped by the draft it came from. For each problem
+it gets the kind, the sentence it was found in, the rule in plain words and
+the checker's own detail:
+
+```
+Draft 1 FAILED THE FACT CHECK (1):
+
+1. unsourced_experience_claim
+   sentence: "When can we talk this week?"
+   rule: A sentence about what the candidate did, has, knows or would bring
+         uses only the words of the bullets it cites. …
+   detail: talk: in no cited bullet. …
+```
+
+A problem that comes back in a later draft is listed once, with every draft
+it failed in. The checker keeps the first 160 characters of a sentence; a
+sentence that long is marked as possibly cut.
+
+It is told not to write any of those sentences again, reworded or not: a
+fact from a cited bullet is restated in the bullet's own words, or the point
+is left out. The earlier drafts themselves are not passed on: a sentence no
+check flagged can still be a claim the checks cannot see, and it should not
+be carried forward. Of a draft that passed the fact check and then failed
+the authenticity review, only the ids of the bullets it cited go forward.
+Every draft is checked from scratch.
+
+**Nothing is repaired in code.** A letter is never shortened or edited by
+jobkit to make it pass. An earlier version deleted the flagged sentences of
+the last draft. That saved few letters, and deleting a sentence can change
+what the sentence next to it means, so it was removed on 2026-10-23. The
+prompt (`prompts/cover_letter.md`) now steers the first draft away from what
+failed most: writing about the company applied to from the inside ("our
+customers"), retelling a bullet in stronger words than it uses, using the
+posting's own names about the candidate, and a close that promises something
+or asks a question ("When can we talk?").
+
+If the last draft still fails:
 
 - no `cover.pdf` or `cover.txt` is written, and `cover_rejected.md` holds the
   violations and the last draft, marked NOT FOR SENDING;
@@ -431,8 +476,9 @@ rule-based check passes (`src/jobkit/validate/claim_judge.py`, prompt
   never sees, and can't rescue, a draft the rules rejected. A `fail` verdict, a
   `pass` that still lists a claim, and a reply that isn't the expected JSON all
   fail the draft.
-- **A judge failure is a fact-check failure.** A letter is written again up to
-  twice with the judge's reasons fed back. If it still fails, `cover_rejected.md`
+- **A judge failure is a fact-check failure.** A letter is written again,
+  up to `tailoring.cover_attempts` drafts in all (default 5), with the judge's
+  reasons fed back. If it still fails, `cover_rejected.md`
   lists them as `claim_judge_unsupported` (or `claim_judge_unparseable`)
   violations with the sentence each is in, the application stays at
   `approved`, and a `cover_provenance_failed` event is recorded. A drafted
@@ -556,7 +602,8 @@ bullet selection, the cover letter and each drafted form answer.
 - **A draft that failed its checks** has its violations passed to the review,
   and that review is reported only. The regeneration includes the check feedback
   and nothing from the review, inside the existing cap (resume 2 attempts,
-  letter 3, answer 2), and is checked as before. A letter that fails the fact
+  letter `tailoring.cover_attempts`, default 5, answer 2), and is checked as
+  before. A letter that fails the fact
   check is rejected (one that fails only the critic is rendered with its
   critique for you), a resume fails loudly, and an answer's field stays open for
   you with the reason.

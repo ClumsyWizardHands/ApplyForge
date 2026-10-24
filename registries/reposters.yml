@@ -1,0 +1,60 @@
+# Repost sites: jobkit keeps them out (discovery/reposters.py).
+#
+# CRITERION. A repost site publishes other employers' jobs under its own name.
+# Its postings hide or stand in for the real employer ("Our partner is looking
+# for...", "on behalf of our client", "Jobs via ..."), carry the reposter's
+# own apply flow, and usually no pay range. Applying there does not reach the
+# employer's own application form, so a jobkit row from it can never be the
+# canonical record (CLAUDE.md hard rule 10). A site belongs here only when that
+# is how it publishes jobs under its own company name, on an ATS board jobkit
+# could poll or on the aggregators and LinkedIn cards jobkit reads. A staffing
+# agency recruiting for a named client, or a job site hiring its own staff on
+# its own board, does not qualify by itself.
+#
+# What jobkit does with an entry (by company name or by board):
+#   * discovery (registry.resolve_discovery_queue) never adds its board;
+#   * board resolution never looks it up, and never picks a posting on it;
+#   * polling and add-url never poll it: a board already in jobkit is set
+#     stale and its open, undecided jobs are rejected (reason reposter:<name>);
+#   * the filter rejects any job filed under its name (reposter:<name>);
+#   * the digest says so ("Repost sites kept out").
+#
+# A board NOT listed here is also kept out when most of its postings read
+# like reposts (the heuristic below), unless the person listed that board in
+# config/targets.yaml: an owner-listed board is never second-guessed by the
+# heuristic. To add a site, add an entry with a short note saying how it
+# reposts; keep `boards` to tokens seen on the site's own ATS board.
+
+heuristic:
+  # judged only on boards with at least this many postings that have a description
+  min_postings: 3
+  # kept out when MORE than this share of those postings use repost wording
+  # ("our partner is looking for", "our client is seeking", "on behalf of a
+  # partner company", "posted ... on behalf of"); 0.5 = "most postings"
+  share: 0.5
+
+reposters:
+  - name: Jobgether
+    boards:
+      - { ats: lever, token: jobgether }
+    note: >-
+      Reposts other companies' remote jobs on its own Lever board: "This
+      position is listed on behalf of a partner company ... Our partner is
+      looking for ...", employer unnamed, no pay range.
+  - name: Lensa
+    note: Job search site; its listings on aggregators and LinkedIn are other employers' jobs.
+  - name: Jobright.ai
+    aliases: [Jobright]
+    note: AI job-search site; reposts other employers' jobs under its own name.
+  - name: TieTalent
+    note: Talent platform; reposts other employers' jobs on LinkedIn and aggregators.
+  - name: Virtual Vocations
+    note: Remote-job listing service; reposts other employers' jobs behind its own sign-up.
+  - name: JobLeads
+    note: Job platform; reposts other employers' jobs under its own name.
+  - name: Jobs via Dice
+    note: LinkedIn's label for jobs reposted from Dice; the employer is someone else.
+  - name: Jobs via eFinancialCareers
+    note: LinkedIn's label for jobs reposted from eFinancialCareers; the employer is someone else.
+  - name: Jobs for Humanity
+    note: Nonprofit job platform; lists partner employers' jobs under its own name.

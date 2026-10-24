@@ -31,7 +31,7 @@ from jobkit.pipeline import digest as digest_mod
 from jobkit.pipeline import halts, nightly, questions
 from jobkit.pipeline.dedup import follow_merges
 from jobkit.pipeline.digest import freshness_banner, write_digest
-from jobkit.rules import run_standing_rules
+from jobkit.rules import employer_site_note, run_standing_rules
 from jobkit.track import job_alerts, responses
 from jobkit.track.applications import record_submission
 from jobkit.track.applications import repair as repair_application_rows
@@ -148,16 +148,23 @@ def _fmt_job_line(n: int, r: sqlite3.Row) -> str:
     gaps = ", ".join(json.loads(r["gaps"] or "[]")[:3]) or "none"
     fr = f" · friction {r['friction']}" if r["friction"] is not None else ""
     warn = f"  ⚠ {'; '.join(f[:80] for f in flags)}" if flags else ""
+    # a feed job with no employer posting found: no form jobkit can fill,
+    # never approved automatically; the person can still approve it
+    where = employer_site_note(r["board_id"], r["apply_url"])
     return (
         f"{n}. {r['company_name']} — {r['title']} — {comp} — {remote} — "
-        f"{r['fit_score']}{fr} — gaps: {gaps}{warn}"
+        f"{r['fit_score']}{fr} — gaps: {gaps}{where}{warn}"
     )
 
 
 @mcp.tool()
 def get_queue(min_score: int = 0, limit: int = 25, max_friction: int = 100) -> str:
     """Numbered pending jobs with score, comp, remote verdict, friction, gaps,
-    sanity flags. Numbering is pinned until the next get_queue call. Opens
+    sanity flags. A job from a job feed whose employer posting was not found
+    is marked "no employer form found: apply on the employer's site (found
+    via <link>)", the link being the feed's page: it has no form to fill
+    and is never approved automatically, but approve still takes it.
+    Numbering is pinned until the next get_queue call. Opens
     with the freshness banner, then a warning naming every approved job a
     staging run stopped on before filling anything (CAPTCHA, ID/payment
     field, assessment, no form): those wait on you, and schedule_status or
@@ -170,6 +177,7 @@ def get_queue(min_score: int = 0, limit: int = 25, max_friction: int = 100) -> s
     run_standing_rules(conn)  # pre-decide the obvious before rendering
     rows = conn.execute(
         """SELECT j.id, j.title, j.company_name, j.comp_min, j.comp_max, j.remote,
+                  j.board_id, j.apply_url,
                   sc.fit_score, sc.gaps, s.flags, fs.friction_score AS friction
            FROM jobs j JOIN scores sc ON sc.job_id = j.id
            LEFT JOIN sanity s ON s.job_id = j.id
@@ -1128,7 +1136,8 @@ def get_artifacts(n: int) -> str:
         else:
             lines.append(
                 f"not advancing to staging: the cover letter failed. Background runs will not "
-                f"re-tailor it until the JD, corpus or prompts change — edit the corpus, then "
+                f"re-tailor it until the JD, corpus or prompts change or tailoring.cover_attempts "
+                f"rises — edit the corpus, then "
                 f"call retailor({n})"
             )
     return "\n".join(lines)
@@ -1137,8 +1146,9 @@ def get_artifacts(n: int) -> str:
 @mcp.tool()
 def retailor(n: int) -> str:
     """Re-run tailoring (resume + cover letter) for queue item n. Background
-    runs skip a job whose cover letter failed (fact check, or authenticity
-    after two regenerations) until its JD, the corpus or the prompts change;
+    runs skip a job whose cover letter failed (fact check, or authenticity on
+    every one of its tailoring.cover_attempts drafts, default 5) until its JD,
+    the corpus or the prompts change, or the draft count rises;
     this retries it now, e.g. after editing the corpus. Only for an
     application that has not been staged yet."""
     conn = _conn()
@@ -1649,7 +1659,9 @@ def rejudge(job_ids: str = "", confirm: bool = False) -> str:
 def doctor() -> str:
     """Read-only setup check for this jobkit checkout: Python 3.12 and uv,
     Playwright's Chromium, the LLM backend (ANTHROPIC_API_KEY or the `claude`
-    CLI), the checkout not under an iCloud-synced folder, every personal config
+    CLI; with the CLI, one tiny call checks the login: an expired one is fixed
+    by running `claude`, then /login, and an unknown or old model by
+    `claude update`), the checkout not under an iCloud-synced folder, every personal config
     file (config/*.yaml), the career corpus and answer bank, the database and
     the MCP registration, plus two warnings (a User-Agent contact email, and a
     commute time for every allowed place). Each problem comes with its exact

@@ -24,8 +24,18 @@ cover letter is never revised: its review is reported only, and the letter
 that passed the fact check and the critic ships (fifth review of the
 self-review: rewritten prose cannot be checked against the corpus simply). A
 failing draft's violations feed a review that is reported only; its
-regeneration carries the same check feedback as at aca26cc and nothing from
-the review. out/<job>/self_review.md records it.
+regeneration carries the check feedback and nothing from the review.
+out/<job>/self_review.md records it.
+
+Cover drafts (2026-10-23): a letter gets filters.yaml
+`tailoring.cover_attempts` drafts in all (default 5). Every draft goes through
+the whole unchanged check chain (the rules, the claim judge, the authenticity
+passes); each regeneration is a new letter from the same prompt, told every
+violation of every earlier draft of the run, each with its kind, its sentence
+and its rule in plain words (pipeline/cover_feedback.py; the earlier drafts
+themselves are not passed on, so a claim no check flagged does not ride
+along). A letter is never repaired by editing it in code: the draft that
+passes is the model's, whole.
 
 Claim judge (package 4, 2026-10-10, validate/claim_judge.py): a letter the
 rule-based fact check passed is read by an LLM judge for claims the rules
@@ -61,7 +71,7 @@ from jobkit.config import Filters, load_filters
 from jobkit.log import log
 from jobkit.normalize import MIN_JD_CHARS, jd_is_missing
 from jobkit.paths import HOME as PROJECT_ROOT
-from jobkit.pipeline import self_review
+from jobkit.pipeline import cover_feedback, self_review
 from jobkit.pipeline.triage import month_index, record_jd_missing, render_once
 from jobkit.render.pdf import page_count, render_pdf, rendered_pages
 from jobkit.validate import claim_judge
@@ -563,15 +573,34 @@ def _attempt_key(
     style: str,
     review: str = "",
     judge: str = "",
+    attempts: int | None = None,
 ) -> str:
     """Everything a tailoring run's letter depends on, the estimate_style the
     fact check ran under, the self-review (its prompt versions and the
-    max_revision_rounds knob, as `review`) and the claim judge's prompt
-    version (`judge`) included. A job whose cover failed is not re-tailored
-    automatically until one of these changes. With no `judge` this is the key
-    recorded before the claim judge existed (_unchanged_since_cover_failure)."""
+    max_revision_rounds knob, as `review`), the claim judge's prompt version
+    (`judge`) and the number of drafts the run could write (`attempts`,
+    filters.yaml `tailoring.cover_attempts`) included. A job whose cover
+    failed is not re-tailored automatically until one of these changes (more
+    drafts, not fewer: _unchanged_since_cover_failure). With no `judge` this
+    is the key recorded before the claim judge existed; with no `attempts`,
+    the key recorded when every run wrote LEGACY_COVER_ATTEMPTS drafts."""
     judged = f"cj{judge}:" if judge else ""
-    return f"{jd_hash}:{chash}:{tailor_version}:{cover_version}:{review}:{judged}{style}"
+    tries = f"ca{attempts}:" if attempts is not None else ""
+    return f"{jd_hash}:{chash}:{tailor_version}:{cover_version}:{review}:{judged}{tries}{style}"
+
+
+# the drafts every run wrote before tailoring.cover_attempts existed: what an
+# attempt key with no `ca` part was recorded under
+LEGACY_COVER_ATTEMPTS = 3
+
+
+def _recorded_attempts(key: str) -> tuple[int, str]:
+    """The drafts an attempt key's run could write, and the key without that
+    part (see _attempt_key). A key with no `ca` part is LEGACY_COVER_ATTEMPTS."""
+    m = re.search(r":ca(\d+):(?=[^:]*$)", key)
+    if m is None:
+        return LEGACY_COVER_ATTEMPTS, key
+    return int(m.group(1)), key[: m.start()] + ":" + key[m.end() :]
 
 
 def _review_tag(max_rounds: int) -> str:
@@ -638,7 +667,8 @@ def _authenticity_failure(rep: AuthenticityReport) -> list[dict[str, str]]:
         if f.get("figures")
     ]
     if rep.critic_notes:
-        out.append({"kind": "critic", "detail": rep.critic_notes[:400]})
+        notes = rep.critic_notes
+        out.append({"kind": "critic", "detail": notes[:400] + (" …" if len(notes) > 400 else "")})
     return out or [{"kind": "authenticity", "detail": f"verdict {rep.verdict}"}]
 
 
@@ -796,6 +826,7 @@ def tailor_job(conn: sqlite3.Connection, job_id: int) -> dict[str, str]:
     # ---- self-review context: the same for both artifacts of this job ----
     gaps = json.loads(job["gaps"] or "[]")
     max_rounds = filters.self_review_max_rounds
+    cover_attempts = filters.cover_attempts
     review_ctx = self_review.ReviewContext(
         job_id=job_id,
         company=str(job["company_name"]),
@@ -1014,6 +1045,7 @@ def tailor_job(conn: sqlite3.Connection, job_id: int) -> dict[str, str]:
         style,
         _review_tag(max_rounds),
         judge=claim_judge.version(),
+        attempts=cover_attempts,
     )
     cover_log = self_review.ArtifactLog("cover_letter", "Cover letter")
     cover_scope = _cover_scope(selected_ids)
@@ -1073,12 +1105,18 @@ def tailor_job(conn: sqlite3.Connection, job_id: int) -> dict[str, str]:
             cited=coerce_ids(draft.get("bullets_used")),
         )
 
-    critique = ""  # the feedback for the next attempt (as at aca26cc)
+    # the feedback for the next draft: every violation of every earlier draft,
+    # each with its sentence and its rule in plain words, so a fresh prompt
+    # never brings back a failure fixed drafts ago (pipeline/cover_feedback.py)
+    history = cover_feedback.DraftHistory(str(job["company_name"]))
     cover: dict[str, Any] = {}
     cover_rep = None
     cover_prov = None
-    for attempt in range(3):  # initial + up to 2 regenerations (SPEC 10b)
-        cover_text = render_cover(critique)
+    # every draft, the first and each regeneration, goes through the whole
+    # unchanged check chain: the rules, the claim judge, the authenticity
+    # passes (filters.yaml tailoring.cover_attempts drafts in all)
+    for attempt in range(cover_attempts):
+        cover_text = render_cover(history.render())
         cover = llm.call_json(
             conn, "cover", cover_text, cache_key=cover_key if attempt == 0 else None
         )
@@ -1090,10 +1128,11 @@ def tailor_job(conn: sqlite3.Connection, job_id: int) -> dict[str, str]:
             break
         if cover_rep is not None:
             violations: list[dict[str, str]] = _authenticity_failure(cover_rep)
-            critique = (
-                "\n\nYOUR PREVIOUS DRAFT FAILED AUTHENTICITY REVIEW. Specific "
-                f"problems: {cover_rep.lexical_flags + cover_rep.structural_flags} "
-                f"{cover_rep.critic_notes}. Rewrite avoiding these exactly."
+            history.add(
+                attempt + 1,
+                cover_feedback.AUTHENTICITY,
+                violations,
+                cited=coerce_ids(cover.get("bullets_used")),
             )
         else:
             violations = cover_prov.violations
@@ -1104,17 +1143,11 @@ def tailor_job(conn: sqlite3.Connection, job_id: int) -> dict[str, str]:
                 hard=has_hard(cover_prov),
                 violations=cover_prov.violations,
             )
-            critique = (
-                "\n\nYOUR PREVIOUS DRAFT FAILED THE FACT CHECK. Violations: "
-                f"{json.dumps(cover_prov.violations)}. State only facts from the candidate "
-                "facts above, with each number written as the FIGURE STYLE rule says, list "
-                "every bullet id you drew on in bullets_used, attach each fact only to the "
-                "employer its bullet is labeled with, and name no company other than "
-                f"{job['company_name']} and the candidate's own employers."
-            )
+            history.add(attempt + 1, cover_feedback.FACT_CHECK, cover_prov.violations)
         if attempt == 0:  # only the first draft is cached; never serve a failed one again
             llm.forget(conn, "cover", cover_text, cover_key)
-        log("cover.regenerating", job_id=job_id, attempt=attempt)
+        if attempt + 1 < cover_attempts:
+            log("cover.regenerating", job_id=job_id, attempt=attempt)
         # the violations feed a self-review that is reported only: its changes
         # never reach a regeneration (fifth review of the self-review: a change
         # list could endorse a fabricated sentence the fact check cannot see)
@@ -1198,7 +1231,7 @@ def tailor_job(conn: sqlite3.Connection, job_id: int) -> dict[str, str]:
         if cover_rep.verdict == "fail":
             critique_path = out / "cover_critique.md"
             critique_path.write_text(
-                "# Cover letter failed authenticity after 2 regenerations\n\n"
+                f"# Cover letter failed authenticity after {cover_attempts} drafts\n\n"
                 f"flags: {cover_rep.lexical_flags + cover_rep.structural_flags}\n\n"
                 f"critic: {cover_rep.critic_notes}\n\n## Last draft\n\n" + letter
             )
@@ -1295,7 +1328,8 @@ def tailor_job(conn: sqlite3.Connection, job_id: int) -> dict[str, str]:
 
     if not conn.execute("SELECT 1 FROM applications WHERE job_id=?", (job_id,)).fetchone():
         conn.execute("INSERT INTO applications (job_id, stage) VALUES (?, 'approved')", (job_id,))
-    # a cover that failed authenticity twice is rendered for HUMAN review, and one
+    # a cover that failed authenticity on every one of its tailoring.cover_attempts
+    # drafts (default 5) is rendered for HUMAN review, and one
     # that failed the fact check is not rendered at all; in both cases the
     # application does NOT advance to 'tailored' — staging only picks up 'tailored'
     cover_failed = not cover_prov.ok or (cover_rep is not None and cover_rep.verdict == "fail")
@@ -1345,10 +1379,11 @@ def _unchanged_since_cover_failure(
     conn: sqlite3.Connection, job_id: int, jd_hash: object, current: dict[str, str]
 ) -> bool:
     """True when the job's last tailoring ended in a cover failure (fact check,
-    or authenticity twice) and nothing it depends on has changed since. Without
-    this, every `jobkit run` re-tailored every such job from scratch: three
-    uncached strong-model cover calls plus a critic call, each time (review of
-    wp2). `current` is filled lazily with the corpus hash and prompt versions."""
+    or authenticity on every draft) and nothing it depends on has changed
+    since. Without this, every `jobkit run` re-tailored every such job from
+    scratch: every uncached strong-model cover call plus a critic call, each
+    time (review of wp2). `current` is filled lazily with the corpus hash,
+    the prompt versions and tailoring.cover_attempts."""
     ev = conn.execute(q.LAST_COVER_FAILURE_FOR_JOB, {"job_id": job_id}).fetchone()
     if ev is None:
         return False
@@ -1364,6 +1399,7 @@ def _unchanged_since_cover_failure(
             current["style"] = estimate_styles.configured_estimate_style()
             filters = load_filters()
             current["review"] = _review_tag(filters.self_review_max_rounds)
+            current["attempts"] = str(filters.cover_attempts)
             sel_name = selection_prompt_name(filters)
         except (OSError, ValueError):
             return False  # no corpus or a bad config: let tailor_job fail loudly as before
@@ -1378,11 +1414,18 @@ def _unchanged_since_cover_failure(
         current["style"],
         current["review"],
     )
+    # A run allowed more drafts than the failed one is retried, once: that
+    # run records its own count, and parks the job again if it fails. Fewer
+    # drafts than already failed retry nothing. A failure recorded before
+    # tailoring.cover_attempts existed was written under three drafts.
+    tried, rest = _recorded_attempts(str(recorded))
+    if int(current["attempts"]) > tried:
+        return False
     # A failure recorded before the claim judge existed carries no judge
-    # version. It still stands: the judge can only add a rejection to the
+    # version and still stands: the judge can only add a rejection to the
     # checks that failed it, so the same inputs would fail again. A failure
     # recorded with a judge version is retried when that version changes.
-    return recorded in (_attempt_key(*inputs, judge=current["judge"]), _attempt_key(*inputs))
+    return rest in (_attempt_key(*inputs, judge=current["judge"]), _attempt_key(*inputs))
 
 
 def tailor_approved(conn: sqlite3.Connection, limit: int | None = None) -> int:

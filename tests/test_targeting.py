@@ -244,7 +244,7 @@ def test_score_prompt_reanchored_on_target_roles() -> None:
 
 def test_cover_prompt_closes_on_a_win_not_a_gap() -> None:
     p = llm.PromptFile("cover_letter")
-    assert p.version == "1.16"
+    assert p.version == "1.17"
     assert "honest bridge across the largest gap" not in p.body
     assert "LARGEST GAP" not in p.body
     assert "concrete win" in p.body and "ends on strength" in p.body
@@ -865,7 +865,8 @@ def test_cover_repeating_an_earlier_letter_is_regenerated(
         )
     fake, jid, _ = env([_sel(*GOOD_SEL)])
     paths = tailor.tailor_job(conn, jid)
-    assert len(fake.prompts["cover"]) == 3
+    # every draft repeats it: tailoring.cover_attempts drafts (absent: 5)
+    assert len(fake.prompts["cover"]) == 5
     assert "cross-letter-repeat" in fake.prompts["cover"][1]
     assert "usually outruns the forecast first" in fake.prompts["cover"][1]
     out = Path(paths["resume"]).parent

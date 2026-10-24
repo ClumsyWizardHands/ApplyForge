@@ -163,7 +163,7 @@ CREATE TABLE IF NOT EXISTS discovery_queue (
   normalized_name TEXT NOT NULL UNIQUE,
   source TEXT,                                 -- which feed surfaced it
   first_seen_url TEXT,
-  status TEXT NOT NULL DEFAULT 'pending',      -- pending | found | not_found
+  status TEXT NOT NULL DEFAULT 'pending',      -- pending | found | not_found | skipped
   attempted_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -548,9 +548,10 @@ ORDER BY id DESC LIMIT 5
 """
 
 # The latest cover-letter failure tailoring recorded for a job (fact check, or
-# authenticity after two regenerations). Its detail carries the attempt key
-# (jd hash : corpus hash : prompt versions): tailor_approved does not retry the
-# job until one of those changes, or the human asks (MCP retailor).
+# authenticity on every one of its tailoring.cover_attempts drafts, default 5).
+# Its detail carries the attempt key (jd hash : corpus hash : prompt versions):
+# tailor_approved does not retry the job until one of those changes, or the
+# human asks (MCP retailor).
 LAST_COVER_FAILURE_FOR_JOB = """
 SELECT kind, detail, at FROM events
 WHERE job_id = :job_id AND kind IN ('cover_provenance_failed', 'cover_authenticity_failed')
@@ -1721,4 +1722,40 @@ BOARD_RESOLVE_RUNS_ON_DAY = """
 SELECT detail FROM events
 WHERE kind = 'board_resolve.run' AND date(at, 'localtime') = :day
 ORDER BY id
+"""
+
+
+# ---- repost sites (discovery/reposters.py, owner decision D5 2026-10-23) ----
+# A board that reposts other companies' jobs (Jobgether: "Our partner is
+# looking for...") is set stale and its undecided open jobs rejected; one
+# `board_reposter` event (job_id NULL) per board and day feeds the digest.
+
+BOARD_REPOSTER_EVENT = "board_reposter"
+
+SET_BOARD_STALE = "UPDATE boards SET status = 'stale' WHERE id = :board_id"
+
+# the board's open jobs no human has decided yet: new, filtered, and queued
+# (scored, waiting for the person or a standing rule; review 2026-10-23).
+# An approved job is the person's (or a rule's) decision and stays.
+UNDECIDED_OPEN_JOBS_ON_BOARD = """
+SELECT id FROM jobs
+WHERE board_id = :board_id AND closed_at IS NULL AND status IN ('new', 'filtered', 'queued')
+"""
+
+REJECT_JOB = "UPDATE jobs SET status = 'rejected' WHERE id = :job_id"
+
+INSERT_FILTER_REJECTION = """
+INSERT INTO rejections (job_id, layer, reason) VALUES (:job_id, 'filter', :reason)
+"""
+
+BOARD_REPOSTER_EVENTS_ON_DAY = """
+SELECT detail FROM events
+WHERE kind = 'board_reposter' AND date(at, 'localtime') = :day
+ORDER BY id
+"""
+
+# a discovery-queue company that is never looked up: a repost site, or on the
+# person's blocklist (status 'skipped')
+MARK_DISCOVERY_SKIPPED = """
+UPDATE discovery_queue SET status = 'skipped', attempted_at = datetime('now') WHERE id = :id
 """

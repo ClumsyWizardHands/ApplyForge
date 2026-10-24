@@ -8,6 +8,11 @@ normalize.MIN_JD_CHARS: rejected, layer=sanity, reason=jd_missing. A JD-less job
 gives the model nothing to read but the title, and once let 133 feed jobs share
 one cached answer (audit 2026-10-08 §2 item 2).
 
+There is no fixed cap on how many jobs a stage takes: every job that passes
+the filters is extracted, checked and scored in the run (owner decision D2, 2026-10-22).
+The person may set one, filters.yaml triage.max_jobs_per_stage
+(stage_limit); `jobkit triage --limit N` overrides it for one run.
+
 LLM calls run on a small thread pool (each worker gets its own SQLite
 connection to the same DB for the cache); table writes stay on the caller's
 connection. One bad response skips that job and is logged — it never kills
@@ -40,6 +45,13 @@ from jobkit.validate.provenance import constraints, corpus_hash
 CORPUS_PATH = str(paths.HOME / "data" / "career_corpus.yaml")  # project root (paths.py)
 COMMUTE_TABLE = "config/commute_table.yaml"
 LLM_WORKERS = 4
+
+
+def stage_limit(filters: Filters | None = None) -> int | None:
+    """The most jobs each LLM stage takes in one run (run-all, nightly,
+    same-day): filters.yaml triage.max_jobs_per_stage, or None for no limit
+    (the default)."""
+    return (filters or load_filters()).max_jobs_per_stage
 
 
 def _int(v: object, default: int) -> int:

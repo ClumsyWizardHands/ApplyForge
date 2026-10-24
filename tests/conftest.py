@@ -227,7 +227,12 @@ def jobkit_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Pat
     monkeypatch.setattr(socket.socket, "connect", _guarded_sock_connect)
     monkeypatch.setattr(socket.socket, "connect_ex", _guarded_sock_connect_ex)
     monkeypatch.setattr(socket, "getaddrinfo", _guarded_getaddrinfo)
+    # the "Claude login expired" latch is process-wide (llm.py): no test inherits it
+    from jobkit import llm
+
+    llm.reset_backend_problem()
     yield home
+    llm.reset_backend_problem()
 
 
 class SpawnRecorder:

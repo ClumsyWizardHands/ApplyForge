@@ -6,6 +6,9 @@ from __future__ import annotations
 import hashlib
 import html
 import re
+from dataclasses import dataclass
+
+from jobkit.autofill.options import state_code
 
 _COMPANY_NOISE = re.compile(r"\b(inc|llc|ltd|corp|corporation|co|the)\b\.?", re.I)
 _WS = re.compile(r"\s+")
@@ -231,3 +234,320 @@ def cluster_key(company: str, title: str, location_raw: str, remote: bool | None
     return "|".join(
         (normalize_company(company), normalize_title(title), location_bucket(location_raw, remote))
     )
+
+
+# ---- the place a job title names (owner decision D4, 2026-10-23) ----
+#
+# "Account Executive - Denver, CO" on a board whose feed location says
+# "Boston, MA", "Chief of Staff | Colombia" with "Cambridge, MA": the title
+# names where the job is, and the filter uses it (pipeline/filter.py). This
+# parser is conservative: a title segment counts only when ALL of it is a
+# place ("Account Executive - Strategic" and "- German Speaking" name none),
+# the head of the title (the role, before the first separator or comma) is
+# never read as a place, and a lone two-letter code is never a state ("ME",
+# "IN", "OR" are words). A title that names places both inside and outside
+# the US ("US/Canada"), or several US places ("NYC or SF"), gives None.
+
+# work modes and filler around a place: "(Remote - Canada)", "DACH Territory",
+# "US-Based", "Greater Boston Area"
+_TITLE_FILLER = re.compile(
+    r"(?<![a-z])(remote|hybrid|on-?site|in-office|office|offices|based|only|territory"
+    r"|territories|region|area|greater|metro|hq|headquarters|first|friendly|preferred)(?![a-z])",
+    re.I,
+)
+_TITLE_REMOTE = re.compile(r"(?<![a-z])remote(?![a-z])", re.I)
+# directions that may precede a non-US region ("Central EMEA", "Northern Europe")
+_DIRECTIONS = re.compile(
+    r"(?<![a-z])(central|east|west|north|south|eastern|western|northern|southern)(?![a-z])", re.I
+)
+_BRACKETS = re.compile(r"[\(\[]([^\)\]]*)[\)\]]")
+# segment separators: a pipe, a colon, or a dash with a space on at least one
+# side ("Mid-Market" and "Full-Cycle" are words, "Engineer- Strategic" is not)
+_TITLE_SEP = re.compile(r"\s*\|\s*|\s*:\s+|\s+[-–—]+\s*|\s*[-–—]+\s+")
+_CONNECTORS = re.compile(r"\s*(?:&|/|\+|(?<![a-z])(?:and|or)(?![a-z]))\s*", re.I)
+_CITYISH = re.compile(r"[A-Z][\w.'’-]*(?:\s+[A-Za-z][\w.'’-]*){0,3}")
+# capitalised words a "<word>, <code>" pair must not read as a city
+_NOT_CITY = frozenset(
+    {
+        "federal",
+        "enterprise",
+        "commercial",
+        "strategic",
+        "public sector",
+        "sled",
+        "smb",
+        "mid-market",
+        "state",
+        "local",
+        "government",
+        "healthcare",
+        "mid market",
+        "majors",
+        "select",
+        "central",
+        "east",
+        "west",
+        "north",
+        "south",
+    }
+)
+# US cities and metros a title may name on their own ("- Denver", "[NYC]"),
+# with their state. Names shared with a place abroad ("Cambridge", "Richmond")
+# or with a state ("Washington") are left out: they count only with their state.
+US_CITY_STATES: dict[str, str] = {
+    "new york": "NY",
+    "new york city": "NY",
+    "nyc": "NY",
+    "manhattan": "NY",
+    "brooklyn": "NY",
+    "jersey city": "NJ",
+    "hoboken": "NJ",
+    "san francisco": "CA",
+    "sf": "CA",
+    "sf bay area": "CA",
+    "bay area": "CA",
+    "silicon valley": "CA",
+    "oakland": "CA",
+    "palo alto": "CA",
+    "mountain view": "CA",
+    "san jose": "CA",
+    "san mateo": "CA",
+    "menlo park": "CA",
+    "redwood city": "CA",
+    "sunnyvale": "CA",
+    "santa clara": "CA",
+    "seattle": "WA",
+    "bellevue": "WA",
+    "boston": "MA",
+    "los angeles": "CA",
+    "santa monica": "CA",
+    "irvine": "CA",
+    "san diego": "CA",
+    "sacramento": "CA",
+    "chicago": "IL",
+    "austin": "TX",
+    "dallas": "TX",
+    "houston": "TX",
+    "san antonio": "TX",
+    "plano": "TX",
+    "denver": "CO",
+    "boulder": "CO",
+    "miami": "FL",
+    "orlando": "FL",
+    "tampa": "FL",
+    "atlanta": "GA",
+    "washington dc": "DC",
+    "washington d.c.": "DC",
+    "dc": "DC",
+    "d.c.": "DC",
+    "philadelphia": "PA",
+    "pittsburgh": "PA",
+    "phoenix": "AZ",
+    "scottsdale": "AZ",
+    "salt lake city": "UT",
+    "lehi": "UT",
+    "minneapolis": "MN",
+    "detroit": "MI",
+    "nashville": "TN",
+    "charlotte": "NC",
+    "raleigh": "NC",
+    "durham": "NC",
+    "indianapolis": "IN",
+    "st. louis": "MO",
+    "st louis": "MO",
+    "kansas city": "MO",
+    "las vegas": "NV",
+    "baltimore": "MD",
+    "cleveland": "OH",
+    "cincinnati": "OH",
+    "columbus": "OH",
+    "milwaukee": "WI",
+    "stamford": "CT",
+    "reston": "VA",
+    "mclean": "VA",
+}
+_US_COUNTRY_WORDS = frozenset(
+    {"us", "u.s.", "u.s", "usa", "u.s.a.", "united states", "united states of america"}
+    | {"america", "north america", "americas", "amer"}
+    # North America as a sales region: "Technical Recruiter (Remote EU, LATAM,
+    # NAMER)" is open to the US (review 2026-10-23)
+    | {"namer", "noram", "nam", "n. america", "n america", "na"}
+)
+# regions outside the US that _NON_US does not list
+_NON_US_EXTRA = re.compile(r"\b(anz|uki|uk&i|uk and ireland|dach region|cee|sea)\b")
+# Regions, as opposed to countries and cities: in a sales title they often
+# name the territory covered, not where the job sits ("Channel Account
+# Executive, LATAM" based in Miami), so a region in the title overrides only
+# a feed location that names no place (filter.title_location_override).
+_REGIONS = re.compile(
+    r"(?<![a-z])(emea|apac|apj|europe|eu|mena|latam|latin america|south america"
+    r"|central america|nordics|dach|dach region|benelux|anz|uki|uk&i|uk and ireland|cee|sea)"
+    r"(?![a-z])"
+)
+# Cities abroad whose name a US city shares ("Melbourne", Florida; "Paris",
+# Texas; "Athens", Georgia): in a title they count only with their country
+# ("Melbourne, Australia"), as "Cambridge" and "Richmond" count only with
+# their state in US_CITY_STATES.
+_AMBIGUOUS_ABROAD = frozenset(
+    {"melbourne", "paris", "athens", "rome", "dublin", "lima", "berlin", "delhi", "cairo"}
+)
+
+
+def is_region_only(place_text: str) -> bool:
+    """True when every place of a title place's text ("EMEA / APAC",
+    "Central EMEA", "LATAM") is a region, not a country or a city."""
+    atoms = [a.strip() for a in place_text.lower().split(" / ") if a.strip()]
+    return bool(atoms) and all(
+        _LETTER.search(_DIRECTIONS.sub(" ", _REGIONS.sub(" ", a))) is None
+        and _REGIONS.search(a) is not None
+        for a in atoms
+    )
+
+
+@dataclass(frozen=True)
+class TitleLocation:
+    """The place a job title names. `text` as written ("Denver, CO",
+    "Colombia", "EMEA / APAC"); `us`: a US city, metro or state (False: a
+    country, city or region outside the US); `remote`: the title says remote."""
+
+    text: str
+    us: bool
+    remote: bool
+
+
+def _is_non_us(atom: str) -> bool:
+    a = atom.lower().strip(" .,")
+    if not a or not (_NON_US.search(a) or _NON_US_EXTRA.search(a)):
+        return False  # "West" alone names no region
+    rest = _NON_US_EXTRA.sub(" ", _NON_US.sub(" ", a))
+    if _LETTER.search(rest) is None:
+        return True
+    # "Central EMEA", "Northern Europe": a direction before a region
+    rest = _DIRECTIONS.sub(" ", rest)
+    return _LETTER.search(rest) is None and _DIRECTIONS.search(a) is not None
+
+
+def _atom_kind(atom: str) -> str | None:
+    """'us' (a US place), 'us-wide' (the US as a whole), 'abroad', or None
+    (not a place)."""
+    a = " ".join(atom.split()).strip(" .,;-–—")
+    low = a.lower()
+    if not low:
+        return None
+    if low in _US_COUNTRY_WORDS:
+        return "us-wide"
+    if len(a) > 2 and state_code(a):
+        return "us"  # a state's full name ("Texas", "New Mexico")
+    if low in US_CITY_STATES:
+        return "us"
+    if low in _AMBIGUOUS_ABROAD:
+        return None  # "Melbourne" alone may be Florida's
+    if _is_non_us(a):
+        return "abroad"
+    return None
+
+
+def _part_places(part: str) -> list[tuple[str, str]] | None:
+    """The places one comma part names, as (text, kind); [] when it is only a
+    work mode ("Remote"); None when it is not (all) a place."""
+    cleaned = " ".join(_TITLE_FILLER.sub(" ", part).split()).strip(" .,;-–—")
+    if not cleaned:
+        return []
+    atoms = [a for a in _CONNECTORS.split(cleaned) if a and a.strip(" .,;-–—")]
+    out: list[tuple[str, str]] = []
+    for atom in atoms:
+        kind = _atom_kind(atom)
+        if kind is None:
+            return None
+        out.append((atom.strip(" .,;-–—"), kind))
+    return out
+
+
+# words of a role or a line of business, never of a city: "Solutions
+# Architect, Platforms, UK" and "Professional Services, Sydney" pair no city
+# with the place after them (review 2026-10-23); the place alone still counts
+_NOT_CITY_WORDS = frozenset(
+    re.findall(
+        r"[a-z]+",
+        """services service platforms platform pursuits pursuit solutions solution partnerships
+    partnership partners partner accounts account sales operations ops products product
+    engineering marketing success support alliances alliance channels channel programs program
+    projects project strategy strategic enterprise commercial growth revenue business
+    development team teams segment segments verticals vertical industries industry markets
+    majors global named logos smb public sector healthcare financial fintech technology tech
+    cloud data security infrastructure networking digital customer customers client clients
+    consulting advisory delivery implementation professional technical field inside outbound
+    inbound recruiting talent finance legal""",
+    )
+)
+
+
+def _pair_place(city: str, region: str) -> tuple[str, str] | None:
+    """'Denver', 'CO' -> ('Denver, CO', 'us'); 'Bogotá', 'Colombia' ->
+    ('Bogotá, Colombia', 'abroad'); otherwise None. A work mode or filler
+    word is not part of the city ("Remote EU, LATAM" pairs nothing)."""
+    city = " ".join(_TITLE_FILLER.sub(" ", city).split()).strip(" .,;-–—")
+    region = region.strip()
+    if not _CITYISH.fullmatch(city) or city.lower() in _NOT_CITY:
+        return None
+    if any(w in _NOT_CITY_WORDS for w in re.findall(r"[a-z]+", city.lower())):
+        return None
+    if _atom_kind(city) in ("us-wide", "abroad"):
+        return None
+    # "VA, WV" lists states; "New York, NY" and "Washington, DC" are cities
+    if state_code(city) and city.lower() not in ("new york", "washington"):
+        return None
+    if state_code(region):  # "CO" (upper case) or "Colorado"
+        return f"{city}, {region}", "us"
+    if _is_non_us(region):
+        return f"{city}, {region}", "abroad"
+    return None
+
+
+def _segment_places(segment: str, head: bool) -> list[tuple[str, str]]:
+    """The places a title segment names. In the head segment the first comma
+    part is the role and is skipped."""
+    parts = [p.strip() for p in segment.split(",")]
+    start = 1 if head else 0
+    out: list[tuple[str, str]] = []
+    i = start
+    while i < len(parts):
+        if i + 1 < len(parts):
+            pair = _pair_place(parts[i], parts[i + 1])
+            if pair is not None:
+                out.append(pair)
+                i += 2
+                continue
+        places = _part_places(parts[i])
+        if places:
+            out.extend(places)
+        i += 1
+    return out
+
+
+def title_location(title: str) -> TitleLocation | None:
+    """The one place a job title names, or None (see the comment above)."""
+    text = html.unescape(title or "").strip()
+    if not text:
+        return None
+    remote = _TITLE_REMOTE.search(text) is not None
+    inner = _BRACKETS.findall(text)
+    outer = _BRACKETS.sub(" | ", text)
+    chunks = [s for s in _TITLE_SEP.split(outer) if s.strip()]
+    found: list[tuple[str, str]] = []
+    for n, chunk in enumerate(chunks):
+        found += _segment_places(chunk, head=n == 0)
+    for content in inner:
+        for chunk in _TITLE_SEP.split(content):
+            if chunk.strip():
+                found += _segment_places(chunk, head=False)
+    us = [t for t, k in found if k == "us"]
+    abroad = [t for t, k in found if k == "abroad"]
+    wide = any(k == "us-wide" for _, k in found)
+    if abroad:
+        if us or wide:
+            return None  # "US/Canada", "NYC or London": open to the US
+        return TitleLocation(text=" / ".join(dict.fromkeys(abroad)), us=False, remote=remote)
+    if len(set(us)) == 1:
+        return TitleLocation(text=us[0], us=True, remote=remote)
+    return None

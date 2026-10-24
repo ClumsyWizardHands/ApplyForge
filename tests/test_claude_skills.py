@@ -747,3 +747,58 @@ def test_scheduled_email_check_is_optional_and_records_only_clear_matches() -> N
     )
     heading = "## Replies recorded since the last digest"
     assert heading in inspect.getsource(responses)
+
+
+# ---------------------------------------------------------------------------
+# the 2026-10-23 round: the warning policy, no scoring cap, feed jobs with no
+# fillable form, and an expired Claude login
+# ---------------------------------------------------------------------------
+
+
+def test_setup_skill_names_the_rule_the_interview_writes_and_an_optional_scoring_limit() -> None:
+    """Step 4 describes the automatic-approval rule intake writes (only real
+    deal-breakers hold a job back) and asks for a scoring limit as optional,
+    with no number suggested; the answer is a field run_intake takes."""
+    step_4 = _flat(
+        _section(_skill("jobkit-setup"), "## Step 4 of 8 — What they want (preferences)")
+    )
+    when = intake.interview_rule(75)["when"]
+    for key, value in (
+        ("blocking_flags", "none"),
+        ("location_known", "true"),
+        ("employer_posting", "true"),
+    ):
+        assert f"`{key}: {value}`" in step_4, key
+        assert key in when
+    assert "A missing pay range or several roles in one posting does not hold a job back." in step_4
+    assert "scoring_limit" in intake.Preferences.model_fields
+    assert "per_stage" in intake.ScoringLimitAnswer.model_fields
+    assert "`scoring_limit: {per_stage: <their number>, said}`" in step_4
+    assert 'scored per run? By default there is none." Do not suggest a number.' in step_4
+
+
+def test_skills_say_how_to_fix_an_expired_claude_login() -> None:
+    from jobkit import llm
+
+    line = f"`{llm.LOGIN_EXPIRED}`"
+    failed = _flat(_section(_skill("jobkit-scheduled-run"), "## Step 9 — The summary"))
+    assert f"When the login expired, the first line is exactly {line}." in failed
+    queue = _flat(_section(_skill("jobkit-daily"), "## 1. What's in the queue"))
+    assert line in queue and "type `/login`" in queue
+    setup = _flat(_section(_skill("jobkit-setup"), "## Step 1 of 8 — Check the machine"))
+    assert "type `/login`" in setup and "`claude update`" in setup
+
+
+def test_skills_list_feed_jobs_with_no_form_as_apply_on_the_employers_site() -> None:
+    from jobkit import rules
+
+    note = rules.employer_site_note(None, "https://example.test/job")
+    assert "apply on the employer's site (found via https://example.test/job)" in note
+    for name, heading in (
+        ("jobkit-scheduled-run", "## Step 9 — The summary"),
+        ("jobkit-daily", "## 1. What's in the queue"),
+    ):
+        text = _flat(_section(_skill(name), heading))
+        assert "apply on the employer's site (found via <link>)" in text, name
+        assert "feed's page" in text, name
+        assert "can still approve it" in text, name

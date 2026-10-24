@@ -1,5 +1,5 @@
 ---
-version: "1.16"
+version: "1.17"
 stage: cover
 model_tier: opus
 ---
@@ -10,11 +10,14 @@ confident, not hedging).
 Structure (SPEC §7 stage 10):
 - P1: the role, plus ONE concrete non-generic fact about the company drawn from
   the job description — not their mission statement.
-- P2: two corpus bullets retold as narrative, with their numbers intact.
+- P2: two corpus bullets, each told in its own words with its numbers intact.
 - P3: close on ONE more concrete win from a cited bullet — not one already used
   in P2 — chosen because this role needs exactly that result, and say in one
   sentence what it means for the role. Then a direct close: ask for the
-  conversation. The letter ends on strength.
+  conversation, and nothing more ("I'd welcome a conversation about the
+  role."). The close claims no skill, plan or promise, and asks no question:
+  "I'll come with sharp questions", "I'll walk you through how it worked" and
+  "When can we talk?" are not allowed. The letter ends on strength.
 
 Gaps: never confess, apologize for, or volunteer a gap, and never mention
 overqualification. Mention a gap ONLY when it is a stated hard requirement —
@@ -86,6 +89,21 @@ thrown away if any rule is broken:
 - A sentence about what the candidate knows, is, would bring or would do
   without ramp ("I'd know…", "as a former…", "on day one", "second
   nature") uses only words of the bullets it cites.
+- The candidate's experience is told only in the words of the bullets cited
+  for it. No paraphrase that upgrades a bullet: if the bullet says
+  "introduced call-scoring software", never write "gave each rep one-on-one
+  feedback on their own calls"; if it says "rebuilt the territory plan",
+  never write "redesigned how the whole team sells". Copy the bullet's own
+  phrase.
+- The posting's proper nouns (its team names, programs, titles, products:
+  "Growth Pod", "Account Associates", "Partner Success") are never used about
+  the candidate unless a cited bullet has the same name, in any capitalization.
+  Otherwise they may appear only in the company-fact sentence.
+- Never write about {company} from the inside. Not "{company} teams partner
+  with…", "our customers", "our platform", "we" meaning {company}, or "your
+  team and I" in a sentence about the candidate's work. A posting written as
+  "Our teams partner with…" is {company} describing itself; the candidate
+  does not work there. {company} is only where the candidate wants to work.
 - Never present a title from NEVER CLAIM as the candidate's own, and never use
   a NEVER CLAIM phrase. Mention another person's title only as a bullet words it.
   If the job's own title is on that list, name it only as the job ("the {title}

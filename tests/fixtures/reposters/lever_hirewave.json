@@ -1,0 +1,82 @@
+[
+ {
+  "id": "hirewave-0001-0000-4000-8000-000000000001",
+  "text": "Director of Sales",
+  "categories": {
+   "commitment": "Full-Time",
+   "department": "Sales",
+   "location": "United States",
+   "team": "Sales"
+  },
+  "workplaceType": "remote",
+  "createdAt": 1792000000001,
+  "hostedUrl": "https://jobs.lever.co/hirewave/hirewave-0001-0000-4000-8000-000000000001",
+  "applyUrl": "https://jobs.lever.co/hirewave/hirewave-0001-0000-4000-8000-000000000001/apply",
+  "description": "<p><strong>This position is listed on behalf of a partner company, which manages all applications and next steps. Our partner is looking for a Director of Sales based in the United States.</strong></p><p>You will lead a regional sales team.</p>",
+  "descriptionPlain": ""
+ },
+ {
+  "id": "hirewave-0002-0000-4000-8000-000000000002",
+  "text": "Account Executive",
+  "categories": {
+   "commitment": "Full-Time",
+   "department": "Sales",
+   "location": "Remote - US",
+   "team": "Sales"
+  },
+  "workplaceType": "remote",
+  "createdAt": 1792000000002,
+  "hostedUrl": "https://jobs.lever.co/hirewave/hirewave-0002-0000-4000-8000-000000000002",
+  "applyUrl": "https://jobs.lever.co/hirewave/hirewave-0002-0000-4000-8000-000000000002/apply",
+  "description": "<p>Our client is seeking an Account Executive to grow new business in the Midwest.</p>",
+  "descriptionPlain": ""
+ },
+ {
+  "id": "hirewave-0003-0000-4000-8000-000000000003",
+  "text": "Sales Operations Manager",
+  "categories": {
+   "commitment": "Full-Time",
+   "department": "Sales",
+   "location": "United States",
+   "team": "Sales"
+  },
+  "workplaceType": "remote",
+  "createdAt": 1792000000003,
+  "hostedUrl": "https://jobs.lever.co/hirewave/hirewave-0003-0000-4000-8000-000000000003",
+  "applyUrl": "https://jobs.lever.co/hirewave/hirewave-0003-0000-4000-8000-000000000003/apply",
+  "description": "<p>Posted by Hirewave on behalf of a fast-growing software company.</p><p>Own the forecast and the CRM.</p>",
+  "descriptionPlain": ""
+ },
+ {
+  "id": "hirewave-0004-0000-4000-8000-000000000004",
+  "text": "Deal Desk Lead",
+  "categories": {
+   "commitment": "Full-Time",
+   "department": "Sales",
+   "location": "Remote",
+   "team": "Sales"
+  },
+  "workplaceType": "remote",
+  "createdAt": 1792000000004,
+  "hostedUrl": "https://jobs.lever.co/hirewave/hirewave-0004-0000-4000-8000-000000000004",
+  "applyUrl": "https://jobs.lever.co/hirewave/hirewave-0004-0000-4000-8000-000000000004/apply",
+  "description": "<p>Our partner company is hiring a Deal Desk Lead to run pricing approvals.</p>",
+  "descriptionPlain": ""
+ },
+ {
+  "id": "hirewave-0005-0000-4000-8000-000000000005",
+  "text": "Customer Success Manager",
+  "categories": {
+   "commitment": "Full-Time",
+   "department": "Sales",
+   "location": "United States",
+   "team": "Sales"
+  },
+  "workplaceType": "remote",
+  "createdAt": 1792000000005,
+  "hostedUrl": "https://jobs.lever.co/hirewave/hirewave-0005-0000-4000-8000-000000000005",
+  "applyUrl": "https://jobs.lever.co/hirewave/hirewave-0005-0000-4000-8000-000000000005/apply",
+  "description": "<p>Hirewave's own team: help job seekers find roles. We work with our partners every day.</p>",
+  "descriptionPlain": ""
+ }
+]

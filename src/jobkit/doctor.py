@@ -9,7 +9,12 @@ Checks, in order:
 * Playwright's Chromium installed for the installed Playwright version
   (staging opens a headed Chromium);
 * an LLM backend: ANTHROPIC_API_KEY, or the `claude` CLI on PATH (the
-  fallback that runs on a Claude subscription);
+  fallback that runs on a Claude subscription). For the CLI, one tiny call
+  (llm.probe_cli: the haiku tier, isolated, 60 s timeout, never cached)
+  checks that it is logged in (an expired login fails with "run claude,
+  then /login") and which model answers (an unknown-model warning, or an
+  answer from another model than jobkit's haiku, is a warning with "run
+  claude update"). Tests pass no probe, so they report "not checked";
 * the checkout is not under ~/Desktop, ~/Documents, ~/Downloads or iCloud
   Drive (iCloud sets the macOS hidden flag on files, Python then skips the
   hidden .pth file and `import jobkit` fails; launchd cannot read there
@@ -57,7 +62,7 @@ from typing import Any
 
 import yaml
 
-from jobkit import config, contact, paths
+from jobkit import config, contact, llm, paths
 from jobkit import db as q
 from jobkit.normalize import location_bucket, names_no_specific_place
 from jobkit.schedule import PROTECTED_DIRS
@@ -125,6 +130,8 @@ class Env:
     which: Callable[[str], str | None]
     python: tuple[int, int]
     site_packages: Path | None
+    # one tiny live `claude -p` call (llm.probe_cli); None: login not checked
+    llm_probe: Callable[[], llm.ProbeResult] | None = None
 
 
 def _site_packages() -> Path | None:
@@ -134,6 +141,7 @@ def _site_packages() -> Path | None:
 
 
 def current_env(root: Path | None = None) -> Env:
+    probe = llm.probe_cli if shutil.which("claude") else None
     return Env(
         root=(root or paths.resolve_home()).resolve(),
         home=Path.home(),
@@ -142,6 +150,7 @@ def current_env(root: Path | None = None) -> Env:
         which=shutil.which,
         python=(sys.version_info.major, sys.version_info.minor),
         site_packages=_site_packages(),
+        llm_probe=probe,
     )
 
 
@@ -230,12 +239,71 @@ def check_playwright(env: Env) -> Check:
     return Check("playwright chromium", True, f"{installed[-1]} under {where}")
 
 
-def check_llm(env: Env) -> Check:
+LOGIN_FIX = "run `claude` in a terminal, then type /login (your Claude subscription)"
+
+
+def _probe_checks(found: str, probe: llm.ProbeResult) -> list[Check]:
+    """The llm backend check from one tiny live call, plus a model warning
+    when the CLI warned about the model or answered with another one."""
+    at = f"`claude` CLI at {found}"
+    version = f" ({probe.version})" if probe.version else ""
+    if probe.kind == "auth":
+        return [Check("llm backend", False, f"{at}: Claude login expired{version}", LOGIN_FIX)]
+    if probe.kind == "timeout":
+        return [
+            Check(
+                "llm backend",
+                False,
+                f"{at}: {probe.message}",
+                "run `claude -p hello` in a terminal to see what it is waiting for",
+            )
+        ]
+    if probe.kind == "model":
+        return [Check("llm backend", False, f"{at}: {probe.message}{version}", "claude update")]
+    if probe.kind != "ok":
+        return [
+            Check(
+                "llm backend",
+                False,
+                f"{at}: the check call failed: {probe.message}{version}",
+                "run `claude -p hello` in a terminal to see the error",
+            )
+        ]
+    expected = llm.TIER_MODEL_ID[llm.STAGE_TIER[llm.PROBE_STAGE]]
+    served = ", ".join(probe.served_by) or "an unnamed model"
+    out = [Check("llm backend", True, f"{at}, logged in, answered with {served}{version}")]
+    wrong = bool(probe.served_by) and not any(s.startswith(expected) for s in probe.served_by)
+    if probe.warning or wrong:
+        alias = llm.STAGE_TIER[llm.PROBE_STAGE]
+        said = (
+            f"claude CLI served {served} for {alias!r}, expected {expected}"
+            if wrong
+            else f"claude CLI warned: {probe.warning}"
+        )
+        out.append(
+            Check(
+                "claude model",
+                False,
+                f"{said}. An old Claude Code serves older models under the same name",
+                "claude update",
+                required=False,
+            )
+        )
+    return out
+
+
+def check_llm(env: Env) -> Check | list[Check]:
     if env.environ.get("ANTHROPIC_API_KEY", "").strip():
         return Check("llm backend", True, "ANTHROPIC_API_KEY is set (Anthropic SDK)")
     found = env.which("claude")
     if found:
-        return Check("llm backend", True, f"`claude` CLI at {found} (your Claude subscription)")
+        if env.llm_probe is None:
+            return Check(
+                "llm backend",
+                True,
+                f"`claude` CLI at {found} (your Claude subscription; login not checked)",
+            )
+        return _probe_checks(found, env.llm_probe())
     return Check(
         "llm backend",
         False,

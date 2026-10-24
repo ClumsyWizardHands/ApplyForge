@@ -104,7 +104,15 @@ path. If the jobkit MCP tools are connected, get_digest() returns it.
   `uv run --directory REPO jobkit doctor` and quote each failing check with
   its fix. Do not apply the fixes. Setup is the
   person's: they open the jobkit folder and say "continue jobkit setup".
-- "every LLM call failed": the LLM backend is down or logged out. Say so.
+- "Claude login expired" in a failed stage's error, in `schedule status` or
+  at the top of the digest: the first line of the summary is exactly
+  `Claude login expired: run claude, then /login`. Logging in is the
+  person's: they run `claude` in a terminal and type `/login`. Jobs that
+  needed Claude were not scored, checked or written; the next run does them.
+- "does not know the model" or "run claude update" in an error: say "Claude
+  Code is out of date: run claude update".
+- "every LLM call failed" with any other reason: the LLM backend is down.
+  Say so, with the reason the stage gives.
 
 ## Step 6 — Check email (only when it is turned on)
 
@@ -230,7 +238,8 @@ One short message. Lead with what needs the person. Use these headings, in
 this order, and leave out a heading that has nothing under it:
 
 1. **Failed**: the ⚠ lines at the top of the digest (stale data, stale
-   nightly, failed stages) and anything from steps 5 and 7.
+   nightly, failed stages) and anything from steps 5 and 7. When the login
+   expired, the first line is exactly `Claude login expired: run claude, then /login`.
 2. **Ready for you**: the applications waiting for review and submit, by
    company and title (the list step 8 got back when it opened them; else the
    count from the digest's Staging section, with "say 'open my
@@ -257,7 +266,11 @@ this order, and leave out a heading that has nothing under it:
    the one-line summary. Answering is the person's.
 7. **Queue**: the jobs waiting for their decision:
    the count, then the top 5 by fit: score, company, title, comp, remote.
-   Mention any line with a ⚠ sanity flag.
+   Mention any line with a ⚠ sanity flag. A job from a job feed that jobkit
+   could not match to the employer's own board has no form to fill: its
+   queue line ends "no employer form found: apply on the employer's site
+   (found via <link>)". The link is the feed's page, where the person finds
+   the employer; give it as written. The person can still approve it.
 8. **Questions for you**: each question from "Questions for you" as written,
    with its key and the jobs it helps. Do not answer them.
 9. One closing line: "Review the open applications and click submit. Open

@@ -309,7 +309,9 @@ def test_tailor_ships_nothing_when_the_judge_cannot_be_reached(
 # ---- the cover attempt key carries the judge's version ----
 
 
-def _record_failure(conn: sqlite3.Connection, job_id: int, attempt: str) -> None:
+def _record_failure(
+    conn: sqlite3.Connection, job_id: int, attempt: str, kind: str = "cover_provenance_failed"
+) -> None:
     if conn.execute("SELECT 1 FROM companies WHERE id = 1").fetchone() is None:
         conn.execute("INSERT INTO companies (id, name, normalized_name) VALUES (1, 'Acme', 'acme')")
     conn.execute(
@@ -324,7 +326,7 @@ def _record_failure(conn: sqlite3.Connection, job_id: int, attempt: str) -> None
         q.RECORD_EVENT,
         {
             "job_id": job_id,
-            "kind": "cover_provenance_failed",
+            "kind": kind,
             "detail": json.dumps({"attempt": attempt}),
         },
     )
@@ -333,32 +335,66 @@ def _record_failure(conn: sqlite3.Connection, job_id: int, attempt: str) -> None
 def test_attempt_key_names_the_judge_version() -> None:
     legacy = tailor._attempt_key("h", "c", "1.4", "1.5", "confident", "sr")
     judged = tailor._attempt_key("h", "c", "1.4", "1.5", "confident", "sr", judge="1.0")
+    counted = tailor._attempt_key(
+        "h", "c", "1.4", "1.5", "confident", "sr", judge="1.0", attempts=5
+    )
     assert legacy == "h:c:1.4:1.5:sr:confident"
     assert judged == "h:c:1.4:1.5:sr:cj1.0:confident"
+    assert counted == "h:c:1.4:1.5:sr:cj1.0:ca5:confident"
 
 
-def test_a_failure_before_the_judge_existed_still_parks_the_job(conn: sqlite3.Connection) -> None:
-    current = {
-        "chash": "c",
-        "style": "confident",
-        "review": "sr",
-        "tailor": "1.4",
-        "cover": "1.5",
-        "judge": "2.0",
-    }
-    inputs = ("h", "c", "1.4", "1.5", "confident", "sr")
-    # recorded before the judge: the judge only adds rejections, so it stands
-    _record_failure(conn, 1, tailor._attempt_key(*inputs))
-    assert tailor._unchanged_since_cover_failure(conn, 1, "h", dict(current))
-    # recorded under this judge version: parked
-    _record_failure(conn, 2, tailor._attempt_key(*inputs, judge="2.0"))
-    assert tailor._unchanged_since_cover_failure(conn, 2, "h", dict(current))
+CURRENT = {
+    "chash": "c",
+    "style": "confident",
+    "review": "sr",
+    "tailor": "1.4",
+    "cover": "1.5",
+    "judge": "2.0",
+    "attempts": "3",
+}
+INPUTS = ("h", "c", "1.4", "1.5", "confident", "sr")
+
+
+@pytest.mark.parametrize("kind", ["cover_provenance_failed", "cover_authenticity_failed"])
+def test_a_failure_before_the_judge_existed_still_parks_the_job(
+    conn: sqlite3.Connection, kind: str
+) -> None:
+    # recorded before the judge (and under the three drafts every run wrote
+    # then): the judge only adds rejections, so it stands under three drafts
+    _record_failure(conn, 1, tailor._attempt_key(*INPUTS), kind)
+    assert tailor._unchanged_since_cover_failure(conn, 1, "h", dict(CURRENT))
+    # recorded under this judge version, with or without a draft count: parked
+    _record_failure(conn, 2, tailor._attempt_key(*INPUTS, judge="2.0"), kind)
+    assert tailor._unchanged_since_cover_failure(conn, 2, "h", dict(CURRENT))
+    _record_failure(conn, 5, tailor._attempt_key(*INPUTS, judge="2.0", attempts=3), kind)
+    assert tailor._unchanged_since_cover_failure(conn, 5, "h", dict(CURRENT))
     # recorded under an older judge version: retried
-    _record_failure(conn, 3, tailor._attempt_key(*inputs, judge="1.0"))
-    assert not tailor._unchanged_since_cover_failure(conn, 3, "h", dict(current))
+    _record_failure(conn, 3, tailor._attempt_key(*INPUTS, judge="1.0", attempts=3), kind)
+    assert not tailor._unchanged_since_cover_failure(conn, 3, "h", dict(CURRENT))
     # any other input changed: retried, as before
-    _record_failure(conn, 4, tailor._attempt_key("h", "OLD", *inputs[2:], judge="2.0"))
-    assert not tailor._unchanged_since_cover_failure(conn, 4, "h", dict(current))
+    _record_failure(conn, 4, tailor._attempt_key("h", "OLD", *INPUTS[2:], judge="2.0"), kind)
+    assert not tailor._unchanged_since_cover_failure(conn, 4, "h", dict(CURRENT))
+
+
+@pytest.mark.parametrize("kind", ["cover_provenance_failed", "cover_authenticity_failed"])
+def test_a_failure_is_retried_when_more_drafts_are_allowed(
+    conn: sqlite3.Connection, kind: str
+) -> None:
+    five = {**CURRENT, "attempts": "5"}
+    # recorded before tailoring.cover_attempts existed (three drafts), with
+    # or without a judge version: retried under five
+    _record_failure(conn, 1, tailor._attempt_key(*INPUTS, judge="2.0"), kind)
+    assert not tailor._unchanged_since_cover_failure(conn, 1, "h", dict(five))
+    _record_failure(conn, 2, tailor._attempt_key(*INPUTS), kind)
+    assert not tailor._unchanged_since_cover_failure(conn, 2, "h", dict(five))
+    _record_failure(conn, 3, tailor._attempt_key(*INPUTS, judge="2.0", attempts=3), kind)
+    assert not tailor._unchanged_since_cover_failure(conn, 3, "h", dict(five))
+    # recorded under five: parked (the retry happens once)
+    _record_failure(conn, 4, tailor._attempt_key(*INPUTS, judge="2.0", attempts=5), kind)
+    assert tailor._unchanged_since_cover_failure(conn, 4, "h", dict(five))
+    # fewer drafts than already failed retry nothing
+    _record_failure(conn, 6, tailor._attempt_key(*INPUTS, judge="2.0", attempts=8), kind)
+    assert tailor._unchanged_since_cover_failure(conn, 6, "h", dict(five))
 
 
 def test_the_judge_prompt_is_versioned_and_strong_tier() -> None:

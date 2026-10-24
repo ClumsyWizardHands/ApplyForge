@@ -23,7 +23,7 @@ from jobkit.pipeline import filter as filter_mod
 from jobkit.pipeline import nightly, same_day, triage
 from jobkit.track import job_alerts
 from tests import test_board_resolver as tbr
-from tests.test_filter import FILTERS, _insert
+from tests.test_filter import FILTERS, _insert, clear_for_auto_approve
 from tests.test_job_alert_emails import ALERT, _email_boards
 from tests.test_triage import CANNED, REAL_JD
 
@@ -65,6 +65,9 @@ def test_only_the_given_jobs_go_through_the_stages_and_one_is_approved(
 ) -> None:
     found = _new_job(conn, "found-by-search")
     other = _new_job(conn, "polled-with-the-board")
+    # the employer's own posting: a feed row is never approved automatically (D6)
+    conn.execute("INSERT INTO boards (id, company_id, ats, token) VALUES (1, 1, 'greenhouse', 'a')")
+    conn.execute("UPDATE jobs SET board_id = 1 WHERE id = ?", (found,))
     lines: list[str] = []
     rep = same_day.run(conn, [found], echo=lines.append)
     assert rep.failed == []
@@ -159,8 +162,11 @@ def test_triage_and_the_nightly_queue_stage_keep_todays_behaviour(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Only the same-day run holds a job whose checks did not finish. The
-    run-all/nightly 'queue' stage and `jobkit triage` queue it as before, and
-    an owner-shaped rule (score 85+, no sanity flag) then approves it."""
+    run-all/nightly 'queue' stage and `jobkit triage` queue it as before. An
+    owner-shaped rule (score 85+, no sanity flag) no longer approves it: a job
+    whose location is not known (no remote check verdict) or with no employer
+    posting is held for the person whatever the rule says (D4/D6, review
+    2026-10-23); with both, the same rule approves it."""
     from jobkit import cli
 
     path = tmp_path / "owner.yaml"
@@ -181,8 +187,12 @@ def test_triage_and_the_nightly_queue_stage_keep_todays_behaviour(
     stages["queue"](conn)
     assert _status(conn, no_sanity) == "queued" and _status(conn, no_demand) == "queued"
     stats = rules.run_standing_rules(conn)
-    assert stats["auto_approved"] == 2
-    assert _status(conn, no_sanity) == "approved" and _status(conn, no_demand) == "approved"
+    assert stats["auto_approved"] == 0
+    assert _status(conn, no_sanity) == "queued" and _status(conn, no_demand) == "queued"
+    clear_for_auto_approve(conn, no_demand)
+    conn.commit()
+    assert rules.run_standing_rules(conn)["auto_approved"] == 1
+    assert _status(conn, no_sanity) == "queued" and _status(conn, no_demand) == "approved"
     # `jobkit triage` queues it too
     later = _new_job(conn, "triage-no-sanity")
     conn.execute("UPDATE jobs SET status = 'filtered' WHERE id = ?", (later,))
@@ -213,11 +223,21 @@ def test_the_interview_rule_never_approves_a_job_whose_checks_did_not_finish(
     no_sanity = _new_job(conn, "no-sanity")
     no_demand = _new_job(conn, "no-demand")
     checked = _new_job(conn, "checked")
+    # employer postings (the interview rule also asks employer_posting: true)
+    conn.execute("INSERT INTO boards (id, company_id, ats, token) VALUES (1, 1, 'greenhouse', 'a')")
     for jid in (no_sanity, no_demand, checked):
-        conn.execute("UPDATE jobs SET status = 'filtered' WHERE id = ?", (jid,))
+        conn.execute("UPDATE jobs SET status = 'filtered', board_id = 1 WHERE id = ?", (jid,))
         conn.execute("INSERT INTO scores (job_id, fit_score) VALUES (?, 90)", (jid,))
-    conn.execute("INSERT INTO sanity (job_id, flags) VALUES (?, '[]')", (no_demand,))
-    conn.execute("INSERT INTO sanity (job_id, flags, demand_score) VALUES (?, '[]', 3)", (checked,))
+    conn.execute(
+        "INSERT INTO sanity (job_id, flags, remote_stated, remote_actual) "
+        "VALUES (?, '[]', 'remote', 'remote')",
+        (no_demand,),
+    )
+    conn.execute(
+        "INSERT INTO sanity (job_id, flags, demand_score, remote_stated, remote_actual) "
+        "VALUES (?, '[]', 3, 'remote', 'remote')",
+        (checked,),
+    )
     conn.commit()
     dict(cli._run_all_stages())["queue"](conn)
     stats = rules.run_standing_rules(conn)

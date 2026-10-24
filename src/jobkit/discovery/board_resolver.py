@@ -105,7 +105,15 @@ committed before each request, so no SQLite write lock is held across a
 request or the delay (MCP and `tailor` write to the same DB meanwhile). HTTP
 429 stops the run's probing; any other failure leaves the company unprobed
 (not cached), so the next run tries again. The careers-page crawl of SPEC §2.4 does not exist in
-jobkit and is not done here: a known domain only adds its label as a slug."""
+jobkit and is not done here: a known domain only adds its label as a slug.
+
+Kept out (owner decision D5, 2026-10-23): a company on the person's
+filters.blocklist_companies, or a repost site on the built-in list
+(discovery/reposters.py, registries/reposters.yml), is never looked up; a
+listed repost board is never read or picked, and a board whose postings mostly
+read like reposts (when the list API carries descriptions) is dropped and,
+when jobkit holds it, set stale. A board the person listed in
+config/targets.yaml is never judged by that wording check."""
 
 from __future__ import annotations
 
@@ -126,7 +134,7 @@ from jobkit import db as q
 from jobkit.adapters import ADAPTERS
 from jobkit.config import BoardResolution, Filters, load_filters, load_targets
 from jobkit.contact import user_agent
-from jobkit.discovery import ingest, registry
+from jobkit.discovery import ingest, registry, reposters
 from jobkit.discovery.url_resolver import resolve as resolve_url
 from jobkit.discovery.url_resolver import resolve_for_board_matching
 from jobkit.log import log
@@ -139,7 +147,7 @@ from jobkit.normalize import (
     normalize_company,
 )
 from jobkit.pipeline.dedup import follow_merges, merge_feed_row, merged_target, posting_key
-from jobkit.pipeline.filter import reject_reason_now
+from jobkit.pipeline.filter import blocklist_match, reject_reason_now
 
 ATS_ORDER = ("greenhouse", "lever", "ashby")
 # the list endpoints the probe reads (no JD content where the API allows it)
@@ -1506,6 +1514,7 @@ class _Run:
         self.polled: dict[tuple[str, str], ingest.BoardPoll] = {}
         self.carried: list[int] = []  # ATS rows that took a human status in a merge
         self.owner = owner_boards()  # (ats, token) the user listed in targets.yaml
+        self.reposts: dict[tuple[str, str], str] = {}  # boards kept out: why
 
     # ---- requests ----
 
@@ -1540,6 +1549,11 @@ class _Run:
             if cached is None or cached.origin == origin:
                 return cached
             return replace(cached, origin=origin)
+        why = reposters.built_in(ats, token, None)
+        if why:  # a listed repost board: never read
+            self._keep_out(ats, token, "", why)
+            self.fetched[key] = None
+            return None
         self._pace()
         url = LIST_URLS[ats].format(token=token)
         try:
@@ -1566,6 +1580,17 @@ class _Run:
                 if isinstance(j, dict) and j.get("company_name"):
                     company = str(j["company_name"])
                     break
+        why = reposters.verdict(
+            ats,
+            token,
+            company or None,
+            (j.jd_html for j in jobs),
+            owner_listed=key in self.owner,
+        )
+        if why:  # its postings are other companies' jobs
+            self._keep_out(ats, token, company, why)
+            self.fetched[key] = None
+            return None
         board = _Board(
             ats=ats,
             token=token,
@@ -1587,6 +1612,25 @@ class _Run:
         )
         self.fetched[key] = board
         return board
+
+    def _keep_out(self, ats: str, token: str, company: str, why: str) -> None:
+        """A repost board: never picked; jobkit's row for it (if any) is set
+        stale (reposters.keep_out), once per run, not in a dry run."""
+        key = (ats, token.lower())
+        if key in self.reposts:
+            return
+        self.reposts[key] = why
+        self.rep.lines.append(f"{ats}/{token}: kept out, {why}")
+        log("board_resolve.reposter_board", ats=ats, token=token, why=why)
+        if not self.dry_run:
+            reposters.keep_out(
+                self.conn,
+                ats=ats,
+                token=token,
+                company=company,
+                why=why,
+                where="board resolution",
+            )
 
     def poll(self, ats: str, token: str, company: str) -> ingest.BoardPoll:
         """discovery/ingest.py's poll of one board (added when new), once per run."""
@@ -1620,6 +1664,8 @@ class _Run:
                 except _Failed as e:
                     failed.append(f"{ats}/{token} ({e})")
                     continue
+                if found is None and (ats, token.lower()) in self.reposts:
+                    continue  # a repost board: not the company's
                 if found is None:
                     failed.append(f"{ats}/{token} (no such board: HTTP 404)")
                 else:
@@ -2126,7 +2172,14 @@ class _Run:
             ingest.ingest_url(self.conn, it.apply_url, it.company, transport=self.ats_transport)
         )
         if res.job is None:
-            if res.status == "job_not_in_feed":
+            if res.status == "reposter":
+                assert res.poll is not None
+                self._outcome(
+                    it,
+                    "no_board",
+                    f"its apply URL is on a repost site ({res.poll.note}): kept out",
+                )
+            elif res.status == "job_not_in_feed":
                 self._outcome(it, "no_title_match", "the posting its apply URL names is closed")
             else:
                 self._error([it], f"{res.status} for {it.apply_url}")
@@ -2289,6 +2342,21 @@ def resolve(
                 ):
                     rep.skipped += 1
                     rep.lines.append(f"{it.head()}: no company name, or blocklisted: skipped")
+                    continue
+                blocked = blocklist_match(it.company, filters)
+                if blocked is not None:
+                    rep.skipped += 1
+                    rep.lines.append(
+                        f"{it.head()}: on your blocklist ({blocked}, filters.blocklist_companies): "
+                        "skipped"
+                    )
+                    continue
+                reposter = reposters.named(it.company)
+                if reposter:
+                    rep.skipped += 1
+                    rep.lines.append(
+                        f"{it.head()}: {reposter} is a repost site, not the employer: skipped"
+                    )
                     continue
                 # pinned to the systems this skip has always used: a row whose
                 # link is on a newly recognised system (Taleo, Jobvite, ...) is
@@ -2497,7 +2565,9 @@ def queue_line(conn: sqlite3.Connection) -> str | None:
 
 
 def digest_lines(conn: sqlite3.Connection, day: str | None = None) -> list[str]:
-    """The digest section: today's runs summed, and every standing flag."""
+    """The digest section: today's runs summed, and every standing flag; then
+    the repost sites kept out today (reposters.digest_lines: discovery, board
+    resolution and polling all record them)."""
     standing = flags(conn)
     day = day or datetime.date.today().isoformat()
     runs = [
@@ -2508,8 +2578,9 @@ def digest_lines(conn: sqlite3.Connection, day: str | None = None) -> list[str]:
         k: sum(int(r.get(k, 0)) for r in runs)
         for k in ("merged", "ingested", "no_board", "no_title_match", "errors", "deferred")
     }
+    kept_out = reposters.digest_lines(conn, day)
     if not standing and not any(total.values()):
-        return []  # nothing resolved, nothing waiting: no section
+        return kept_out  # nothing resolved, nothing waiting: no section
     lines = ["## Aggregator jobs → the employer's own board"]
     if any(total.values()):
         line = (
@@ -2532,7 +2603,7 @@ def digest_lines(conn: sqlite3.Connection, day: str | None = None) -> list[str]:
         )
         lines.extend(f"- {f.line()}" for f in standing)
     lines.append("")
-    return lines
+    return lines + kept_out
 
 
 def overview(conn: sqlite3.Connection, filters: Filters | None = None) -> str:

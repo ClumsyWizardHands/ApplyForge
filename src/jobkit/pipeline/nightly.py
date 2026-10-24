@@ -52,6 +52,7 @@ from collections.abc import Callable
 from typing import Any
 
 from jobkit import db as q
+from jobkit import llm
 from jobkit.autofill.browser import stage_jobs
 from jobkit.log import log
 from jobkit.pipeline import halts, letter_gate
@@ -233,8 +234,10 @@ def run_nightly(
 
 
 def report(conn: sqlite3.Connection) -> str:
-    """The latest nightly run, stage by stage, the last successful one, and
-    the jobs a staging run stopped on that wait on the human."""
+    """The latest nightly run, stage by stage (a failed stage with its
+    error), the last successful one, and the jobs a staging run stopped on
+    that wait on the human. When the run's Claude login had expired, the
+    first line says so with the fix (D7)."""
     latest = latest_nightly(conn)
     if latest is None:
         return "\n".join(["last nightly run: none on record", *halts.report_lines(conn)])
@@ -249,12 +252,17 @@ def report(conn: sqlite3.Connection) -> str:
             "  did not finish: its process is gone (stopped, crashed, or the Mac shut down); "
             "see logs/nightly.err.log"
         )
-    for r in stage_rows(conn, latest.run):
+    rows = stage_rows(conn, latest.run)
+    login = [r for r in rows if llm.LOGIN_EXPIRED in str(r["error"] or "")]
+    if login:  # D7: the one thing the person must do, first
+        lines.insert(0, f"⚠ {llm.LOGIN_EXPIRED}")
+    for r in rows:
         status = str(r["status"])
-        what = str(r["error"] or "") if status == "error" else str(r["summary"] or "")
+        error = " ".join(str(r["error"] or "").split())
+        what = error if status in ("error", "llm_backend_down") else str(r["summary"] or "")
         if status == "llm_all_failed":
-            what = f"every LLM call failed; {what}"
-        lines.append(f"    {r['stage']}: {status} ({r['seconds']}s) {what[:160]}".rstrip())
+            what = f"every LLM call failed{': ' + error if error else ''}; {what}"
+        lines.append(f"    {r['stage']}: {status} ({r['seconds']}s) {what[:200]}".rstrip())
     ok = last_successful_nightly(conn)
     lines.append(
         f"last successful nightly run: {ok[0]} UTC ({ago(ok[1])})"

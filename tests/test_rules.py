@@ -10,7 +10,7 @@ import yaml
 from jobkit import rules as rules_mod
 from jobkit.rules import _title_class, run_standing_rules
 from tests.conftest import SpawnRecorder
-from tests.test_filter import _insert
+from tests.test_filter import _insert, clear_for_auto_approve
 
 # an invented rule set that exercises every condition key
 RULES = {
@@ -66,6 +66,7 @@ def _queued(
     conn.execute("UPDATE companies SET tier=? WHERE id=1", (tier,))
     conn.execute("INSERT OR REPLACE INTO scores (job_id, fit_score) VALUES (?, ?)", (jid, score))
     conn.execute("INSERT OR REPLACE INTO sanity (job_id, flags) VALUES (?, ?)", (jid, flags))
+    clear_for_auto_approve(conn, jid)
     if friction is not None:
         conn.execute(
             "INSERT OR REPLACE INTO form_specs (job_id, friction_score) VALUES (?, ?)",

@@ -28,6 +28,7 @@ from jobkit import cli, config, contact, doctor, mcp_server, rules
 from jobkit import db as q
 from jobkit.adapters.ats.base import get_json
 from jobkit.config import PERSONAL_CONFIG_FILES, ConfigMissing, Filters, load_filters
+from jobkit.onboarding import intake
 from jobkit.pipeline import triage
 from jobkit.pipeline.filter import _reject_reason
 from jobkit.pipeline.triage import geo_restriction_acceptable
@@ -138,6 +139,9 @@ def _rule_job(**kw: Any) -> dict[str, Any]:
         "comp_basis": "unknown",
         "sanity_job_id": 1,
         "demand_score": 3,
+        "remote_stated": "remote",
+        "remote_actual": "remote",
+        "board_id": 1,
     }
     job.update(kw)
     return job
@@ -145,13 +149,21 @@ def _rule_job(**kw: Any) -> dict[str, Any]:
 
 def test_autoapprove_template_recommends_one_rule_and_no_limit() -> None:
     cfg = yaml.safe_load((TEMPLATES / "autoapprove.example.yaml").read_text())
-    # the recommended start: approve what clears the bar, with no sanity flag
+    # the recommended start: approve what clears the bar, with no deal-breaker
+    # flag, a clear location and the employer's own posting (the interview's rule)
     assert cfg["auto_approve"] == [
         {
-            "when": {"score_gte": 75, "sanity_flags": "none", "sanity_checked": True},
+            "when": {
+                "score_gte": 75,
+                "sanity_checked": True,
+                "blocking_flags": "none",
+                "location_known": True,
+                "employer_posting": True,
+            },
             "reason": "clears-your-bar",
         }
     ]
+    assert cfg["auto_approve"][0] == intake.interview_rule(75)
     # nothing is rejected without asking until you add a rule yourself (feed
     # companies are tier 3: an active tier-3 rule would reject feed jobs under
     # a track's lower min_score)

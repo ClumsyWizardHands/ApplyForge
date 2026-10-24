@@ -67,11 +67,23 @@ def _queued(
         "ON CONFLICT(id) DO UPDATE SET tier = excluded.tier",
         (company, f"Co{company}", f"co{company}", tier),
     )
+    # the employer's own posting with a clear location: a job without them is
+    # never approved automatically, whatever the rule (D4/D6)
+    conn.execute(
+        "INSERT INTO boards (id, company_id, ats, token) VALUES (?, ?, 'greenhouse', ?) "
+        "ON CONFLICT(id) DO NOTHING",
+        (company, company, f"co{company}"),
+    )
+    kw.setdefault("board_id", company)
     jid = _insert(conn, external_id=ext, company_id=company, **kw)
     conn.execute("UPDATE jobs SET status='queued' WHERE id=?", (jid,))
     if score is not None:
         conn.execute("INSERT INTO scores (job_id, fit_score) VALUES (?, ?)", (jid, score))
-    conn.execute("INSERT INTO sanity (job_id, flags) VALUES (?, ?)", (jid, flags))
+    conn.execute(
+        "INSERT INTO sanity (job_id, flags, remote_stated, remote_actual) "
+        "VALUES (?, ?, 'remote', 'remote')",
+        (jid, flags),
+    )
     conn.execute("INSERT INTO form_specs (job_id, friction_score) VALUES (?, ?)", (jid, friction))
     conn.commit()
     return jid

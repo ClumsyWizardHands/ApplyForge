@@ -13,10 +13,11 @@ DAILY RUN (`jobkit nightly`, from the Claude app's scheduled task, or a
   read employer boards (Greenhouse, Lever, Ashby) and job feeds
     (+ logged-out LinkedIn search for company names, if you turned it on)
     → dedupe              one row per posting; the employer's own record wins
-    → filters             title, place, pay floor, age, blocklist; free, every
-                          rejection logged with its reason
+    → filters             title, place, pay floor, age, blocklist, repost
+                          sites; free, every rejection logged with its reason
     → triage (small model) extract requirements, check the remote claim,
-                          check the pay, score fit 0-100
+                          check the pay, score fit 0-100; every job that
+                          passed the filters, unless you set a limit
     → form capture        each application form read, matched against your
                           answer bank, new questions drafted (its friction
                           feeds the rules)
@@ -199,6 +200,56 @@ No place is built in. The filter accepts the location buckets of
   `hybrid-office-unknown` flag and an unclear one a `remote-policy-unclear`
   flag. A hybrid office in a named city with no commute-table entry (and not a
   relocation city) is rejected as `sanity:commute:unknown`.
+- **A place in the job title wins over the feed's location**
+  (`normalize.title_location`, `filter.title_location_override`). Feeds often
+  file a job under the company's head office. A title such as "Account
+  Manager - Denver, CO" with the feed location "Boston, MA", or "Chief of
+  Staff | Colombia" with "Cambridge, MA", is filtered by the place in the
+  title. A country outside the US in the title is treated as that country
+  (with a remote word, as `remote-intl`), unless the feed itself names a
+  place outside the US. A US place in the title wins only when the feed names
+  a different specific place: the same metro, a shared state or the same city
+  agree, and "United States" or "Remote - US" in the feed is never replaced
+  by a city. A title naming several places, or both US and non-US places,
+  changes nothing. A region in the title ("LATAM", "EMEA", "Central EMEA")
+  often names the territory a seller covers, not where the job is, so it
+  wins only when the feed names no place (blank, "Remote", "Hybrid",
+  "Distributed"): "Channel Account Executive, LATAM" filed under "Miami, FL -
+  Remote" stays a US remote job. A city abroad whose name a US city shares
+  ("Melbourne", "Paris", "Athens", "Dublin") counts only with its country
+  ("Melbourne, Australia"). A rejection decided this way ends in `:title`
+  (`location:denver-metro:title`), and each override is logged as a
+  `filter.title_location` event with both locations. The stored location is
+  not changed, so duplicate detection is unaffected. `refilter` leaves a
+  rejection alone when the only change is the added `:title`.
+
+### Repost sites
+
+Some sites repost other companies' jobs under their own name ("Our partner is
+looking for…", usually with no pay range). One such site can file thousands
+of jobs on its own Lever board. Their postings have no employer form and hide
+who is hiring, so ApplyForge keeps them out:
+
+- **The built-in list** (`registries/reposters.yml`): Jobgether, Lensa,
+  Jobright.ai, TieTalent, Virtual Vocations, JobLeads, Jobs via Dice, Jobs via
+  eFinancialCareers and Jobs for Humanity, by name and, where known, by board.
+  A listed board is never fetched, and a job filed under a listed name is
+  rejected by the filter as `reposter:<name>`.
+- **The wording check** (`discovery/reposters.py`): a board where most
+  postings (more than half, from 3 postings up; both settings are in the same
+  file) say the partner or client is the one hiring, or that the job is listed
+  on someone's behalf, is treated the same way. "We work with our partners"
+  or "we serve our clients" doesn't count. A board you listed in
+  `config/targets.yaml` is exempt from the wording check, not from the list.
+- **Where it applies:** polling, `add-url`, discovery and board lookup. Such a
+  board is not added, or is set stale; its open jobs nobody has decided yet
+  (including scored jobs waiting in the queue) are rejected with the reason
+  `reposter:<name>`; a job on a stale or listed board is never approved
+  automatically (`employer_posting` is false for it); and the digest has a
+  "Repost sites kept out" section naming each one. `jobkit add-url` on a
+  repost link says "not added" and why.
+- Discovery and board lookup also skip the companies in
+  `filters.blocklist_companies`, before any request.
 
 ### After a config change: `refilter`
 
@@ -318,19 +369,55 @@ on your yes, writes one rule:
 
 ```yaml
 auto_approve:
-  - when: { score_gte: 75, sanity_flags: none, sanity_checked: true }
+  - when: { score_gte: 75, sanity_checked: true, blocking_flags: none,
+            location_known: true, employer_posting: true }
     reason: "clears-your-bar"
 ```
 
-Every queued job with a fit score at or above the number, both sanity checks
-finished, and no sanity flag (remote conflict, pay) is approved as if you had
-approved it, with a decision marked automatic. A job whose remote or pay check
-did not finish waits in your queue until it does. The same run tailors it and
+Every queued job with a fit score at or above the number is approved as if you
+had approved it, with a decision marked automatic, when all of these hold:
+
+- **Both sanity checks finished** (`sanity_checked: true`). A job whose remote
+  or pay check did not finish waits in your queue until it does.
+- **No deal-breaker flag** (`blocking_flags: none`). Only a real deal-breaker
+  holds a job back: a doubt about remote work or the location
+  (`remote-conflict`, `remote-policy-unclear`, `hybrid-office-unknown`, `geo`,
+  `office-days`, `onsite`) or pay the posting can't back up
+  (`ote-unrealistic`). A missing pay range (`no-range-where-required`), a wide
+  one (`range-dodge`), several roles in one posting (`role-sprawl`) and an
+  unclear base-vs-OTE basis (`ote-basis-unclear`) are shown in your queue but
+  don't hold the job back. A low ceiling (`underpriced`) is in neither list,
+  so it holds the job back until you add it to `non_blocking_flags`. The
+  two lists are `auto_approve.blocking_flags` and
+  `auto_approve.non_blocking_flags` in `config/filters.yaml`; a list you set
+  replaces its default, a flag named in both is a load error, and a flag in
+  neither list blocks, so a new kind of flag is never waved through unseen.
+  The older condition `sanity_flags: none` still means no flag at all.
+- **The location is clear** (`location_known: true`): the remote check ran
+  and neither what the posting states nor what its fine print says is
+  unclear.
+- **It is the employer's own posting** (`employer_posting: true`). A job-feed
+  row that board lookup could not match to the employer's Greenhouse, Lever
+  or Ashby posting has no form to fill. It waits in your queue, and its line
+  in `get_queue` and the digest ends "no employer form found: apply on the
+  employer's site (found via <link>)"; the link is the feed's page for the
+  job (tracking parameters such as `utm_source` removed), where you can find
+  the employer. A job on a board that is no longer polled, or on a repost
+  site, counts as no employer posting too.
+  You can still approve it yourself.
+- These last two hold for every rule in the file, even one that does not
+  name them: no rule approves a job whose location is unclear or that is
+  not the employer's own posting. Rules that reject still apply to it.
+
+When a job clears the bar it is approved: the same run tailors it and
 fills its form, and, when `staging.open_after_daily_run` is on, the scheduled
 task opens it for you. Jobs below the bar stay in your queue, and
 you can approve or reject any job yourself at any time. Change the number to
 move your bar, or delete the rule to approve everything yourself.
 
+- A rule file you wrote yourself is never replaced by setup. To use this
+  policy in it, give your clears-your-bar rule the three conditions above in
+  place of `sanity_flags: none`.
 - **No daily limit by default.** `max_auto_approve_per_day: N` in
   `autoapprove.yaml` sets one, only if you want it. With a limit, the
   best-scoring jobs are approved first, and the rest stay in your queue (you
@@ -398,16 +485,26 @@ the [fact checks](validators.md) before you see it.
 - **Header location** comes from `location_strategy` in `filters.yaml`: the
   first rule whose `when` matches (`job_state`, `job_city_in`, `remote`), else
   `default`, else the corpus `identity.display_location`.
+- **Letter drafts.** A letter gets up to `tailoring.cover_attempts` drafts
+  (`config/filters.yaml`, default 5). Every draft gets the full fact check,
+  the claim judge and the authenticity review. Each new draft is a new letter,
+  told what failed in every draft before it (the kind, the sentence and the
+  rule in plain words), and not to write those sentences again. See
+  [When a letter fails](validators.md#when-a-letter-fails).
 - **A letter that fails stays failed until something changes.** A cover letter
-  that fails the fact check, or fails the critic after two regenerations,
-  leaves its job at `approved`. The failure event records the attempt key:
-  description hash, corpus hash and prompt versions (the selection prompt in
-  use, the self-review prompts, `self_review.max_revision_rounds` and the claim
-  judge prompt included). `jobkit tailor` and `run-all` skip that job, logging
-  `tailor.skipped_cover_failed`, until one of those changes, so a corpus edit
-  or a `prompt_set` switch retries every parked job once. To retry one job by
-  hand, use the `retailor(n)` tool or `jobkit tailor --job-id N`. `retailor`
-  refuses an application that is already filled or further along.
+  that fails the fact check, or fails the critic on every draft, leaves its
+  job at `approved`. The failure event records the attempt key: description
+  hash, corpus hash and prompt versions (the selection prompt in use, the
+  self-review prompts, `self_review.max_revision_rounds` and the claim judge
+  prompt included) and the number of drafts allowed. `jobkit tailor` and
+  `run-all` skip that job, logging `tailor.skipped_cover_failed`, until one of
+  those changes, so a corpus edit or a `prompt_set` switch retries every
+  parked job once. Raising `tailoring.cover_attempts` also retries it once
+  (lowering it does not); a failure recorded before the setting existed
+  counts as three drafts, so the default of 5 retries those jobs once. To
+  retry one job by hand, use the `retailor(n)` tool or `jobkit tailor
+  --job-id N`. `retailor` refuses an application that is already filled or
+  further along.
 
 ## Questions for you
 
@@ -633,12 +730,21 @@ rest of the digest and the queue render as usual. `answer` and
   form-specs, rules, form-specs-approved, tailor, ghost-close, digest) runs
   isolated: an exception is caught, that stage's uncommitted writes are rolled
   back, and the rest still run, so the digest is always written. A stage that
-  saw every one of its model calls fail counts as failed (`llm_all_failed`). A
+  saw every one of its live model calls fail counts as failed
+  (`llm_all_failed`, with the last failure's message; answers from the cache
+  don't hide a dead backend), and a stage whose calls failed because the
+  Claude login expired gets `llm_backend_down` (below). A
   `run_all.start` event (run id, mode, pid, stage names) opens the run; each
   stage writes a `run_all.stage` log line and event (run id, mode, status,
   seconds, model calls answered and failed, error); `run_all.done` (run id,
   mode, failed stages) closes it. `mode` is `run-all` or `nightly`. The command
   exits 1 when any stage failed.
+- **No scoring cap.** Every job that passes the filters is extracted, checked
+  and scored in the run. To cap each model stage, set
+  `triage.max_jobs_per_stage: N` in `config/filters.yaml` (the setup
+  interview asks; no limit is the default); the rest wait for the next run.
+  `jobkit triage --limit N` overrides it for one run. Form capture keeps its
+  own limit of 50 a run.
 - **`same-day`.** `jobkit same-day [--resolve-boards] [<id>...]` scores jobs
   from job-alert emails and web search without waiting for the night. With
   `--resolve-boards` it runs board lookup first. Then the given jobs, plus the
@@ -773,6 +879,14 @@ filled. An aggregator row is never canonical. Code:
   `discovery_queue`. `--dry-run` reads the board APIs and writes nothing;
   `resolve_boards()` without `confirm=true` reads only the database.
   `enabled: false` turns it off everywhere except `--pick`.
+- **Skipped before any request:** a company on
+  `filters.blocklist_companies`, and a repost site (by name, or an apply link
+  to one), each with a line in the report; a board whose postings read like
+  reposts is dropped and set stale ([Repost sites](#repost-sites)).
+- **No match, no automatic approval.** A feed job left unmatched stays in
+  your queue marked "no employer form found: apply on the employer's site
+  (found via <link>)", and the clears-your-bar rule (`employer_posting: true`) never approves it. You can
+  approve it yourself.
 - A known company domain contributes its label as a board slug. Crawling
   careers pages directly is on the [roadmap](roadmap.md#more-places-to-find-jobs).
 
@@ -797,6 +911,28 @@ judge use `claude-opus-5-5`. The authenticity critic uses `claude-sonnet-5-5`.
   `--mcp-config`, `--tools ""`, `--safe-mode`, `--no-session-persistence` and
   a short `--system-prompt`. The `claude` binary must be on `PATH`, including
   under launchd.
+
+**When the Claude login expires.** The `claude` command reports a lost login
+("Failed to authenticate", "OAuth session expired", "Not logged in") on its
+output, which `llm.py` reads and logs (`llm.cli_error`) with the CLI's own
+words. The call is not retried, nothing is cached, and every later call in the
+run fails at once without starting `claude` (for 15 minutes, so a long-lived
+tools server recovers after you log in; each run starts fresh). The stage
+status is `llm_backend_down` with the error "Claude login expired: run
+claude, then /login", and the same line opens the digest, the `get_queue` and
+`get_stats` banner and `jobkit schedule status`, and leads the scheduled
+run's summary. Run `claude` in a terminal, type `/login`, and the next run
+scores what was missed. A used-up usage limit stops the run the same way, and
+a rejected `ANTHROPIC_API_KEY` says so. A model the CLI doesn't know stops
+that model's calls with "run claude update"; a call answered by an older
+model than asked for is logged once per stage as `llm.model_mismatch`.
+
+`jobkit doctor` checks the login with one tiny `haiku` call (60-second
+timeout, never cached), and fails with the fix when the login expired, the
+call timed out or the model is unknown. When the CLI answers with an older
+model or warns that it doesn't recognise the model, doctor adds a warning
+telling you to run `claude update`. With `ANTHROPIC_API_KEY` set, or no
+`claude` on `PATH`, no call is made.
 
 Both backends send the same system prompt, from `prompts/system.md`. The cache
 key is a sha256 of the stage, the resolved model id, the caller's key, the

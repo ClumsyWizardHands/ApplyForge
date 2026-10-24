@@ -1,0 +1,82 @@
+[
+ {
+  "id": "northwind-0001-0000-4000-8000-000000000001",
+  "text": "Director of Sales",
+  "categories": {
+   "commitment": "Full-Time",
+   "department": "Sales",
+   "location": "Philadelphia, PA",
+   "team": "Sales"
+  },
+  "workplaceType": "remote",
+  "createdAt": 1792000000001,
+  "hostedUrl": "https://jobs.lever.co/northwind/northwind-0001-0000-4000-8000-000000000001",
+  "applyUrl": "https://jobs.lever.co/northwind/northwind-0001-0000-4000-8000-000000000001/apply",
+  "description": "<p>Northwind builds billing software. You will work with our partners to close enterprise deals.</p>",
+  "descriptionPlain": ""
+ },
+ {
+  "id": "northwind-0002-0000-4000-8000-000000000002",
+  "text": "Account Executive",
+  "categories": {
+   "commitment": "Full-Time",
+   "department": "Sales",
+   "location": "Remote - US",
+   "team": "Sales"
+  },
+  "workplaceType": "remote",
+  "createdAt": 1792000000002,
+  "hostedUrl": "https://jobs.lever.co/northwind/northwind-0002-0000-4000-8000-000000000002",
+  "applyUrl": "https://jobs.lever.co/northwind/northwind-0002-0000-4000-8000-000000000002/apply",
+  "description": "<p>Serve our clients across the East Coast. Our client success team is looking forward to working with you.</p>",
+  "descriptionPlain": ""
+ },
+ {
+  "id": "northwind-0003-0000-4000-8000-000000000003",
+  "text": "Partner Manager",
+  "categories": {
+   "commitment": "Full-Time",
+   "department": "Sales",
+   "location": "Remote - US",
+   "team": "Sales"
+  },
+  "workplaceType": "remote",
+  "createdAt": 1792000000003,
+  "hostedUrl": "https://jobs.lever.co/northwind/northwind-0003-0000-4000-8000-000000000003",
+  "applyUrl": "https://jobs.lever.co/northwind/northwind-0003-0000-4000-8000-000000000003/apply",
+  "description": "<p>Recruit and enable our reseller partners. Our partners are the heart of our channel.</p>",
+  "descriptionPlain": ""
+ },
+ {
+  "id": "northwind-0004-0000-4000-8000-000000000004",
+  "text": "Deal Desk Analyst",
+  "categories": {
+   "commitment": "Full-Time",
+   "department": "Sales",
+   "location": "Philadelphia, PA",
+   "team": "Sales"
+  },
+  "workplaceType": "remote",
+  "createdAt": 1792000000004,
+  "hostedUrl": "https://jobs.lever.co/northwind/northwind-0004-0000-4000-8000-000000000004",
+  "applyUrl": "https://jobs.lever.co/northwind/northwind-0004-0000-4000-8000-000000000004/apply",
+  "description": "<p>Approve non-standard terms on behalf of the sales team.</p>",
+  "descriptionPlain": ""
+ },
+ {
+  "id": "northwind-0005-0000-4000-8000-000000000005",
+  "text": "Sales Operations Manager",
+  "categories": {
+   "commitment": "Full-Time",
+   "department": "Sales",
+   "location": "Philadelphia, PA",
+   "team": "Sales"
+  },
+  "workplaceType": "remote",
+  "createdAt": 1792000000005,
+  "hostedUrl": "https://jobs.lever.co/northwind/northwind-0005-0000-4000-8000-000000000005",
+  "applyUrl": "https://jobs.lever.co/northwind/northwind-0005-0000-4000-8000-000000000005/apply",
+  "description": "<p>Own the forecast. You will present to our clients' finance teams.</p>",
+  "descriptionPlain": ""
+ }
+]

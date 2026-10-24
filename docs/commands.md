@@ -7,7 +7,7 @@ run and debugging use. Run them from your checkout with `uv run jobkit …`.
 ## Setup and checks
 
 ```bash
-uv run jobkit doctor          # setup check: tools, browser, model backend, config, data, database, Claude tools (read-only)
+uv run jobkit doctor          # setup check: tools, browser, model backend (one tiny call checks the Claude login), config, data, database, Claude tools
 uv run jobkit setup-status    # which setup steps are done, in order, and the next action
 uv run jobkit init            # create the SQLite database (the only command that does)
 uv run jobkit setup ingest <resume> [--text-file f] [--replace-draft]  # resume → corpus draft (resume text only) + critique
@@ -27,7 +27,7 @@ uv run jobkit setup status                              # same as setup-status
 ```bash
 uv run jobkit poll            # poll all configured boards once (repeat-safe, ETag-cached)
 uv run jobkit feeds           # job feeds (deduplicated against the employer boards)
-uv run jobkit add-url <url> [--no-score]  # a pasted job link; Greenhouse, Lever and Ashby jobs are polled, queued and scored
+uv run jobkit add-url <url> [--no-score]  # a pasted job link; Greenhouse, Lever and Ashby jobs are polled, queued and scored; a repost site's link is not added
 uv run jobkit score-jobs <id>...  # extract and score these jobs now (add_job_url runs it in the background)
 uv run jobkit same-day [--resolve-boards] [<id>...]  # jobs from job-alert emails: board lookup, then filter, checks, score, queue and standing rules today (exits 1 if a stage failed)
 uv run jobkit linkedin-discover [--dry-run]            # LinkedIn logged-out search, discovery only (off by default)
@@ -35,7 +35,7 @@ uv run jobkit resolve-boards [--job-id N] [--dry-run]  # aggregator and LinkedIn
 uv run jobkit resolve-boards --job-id N --pick <posting id|URL>  # your pick for a flagged job
 uv run jobkit filter          # deterministic filter pass (free, logged)
 uv run jobkit refilter [--dry-run]  # re-filter rejected open jobs after a config change
-uv run jobkit triage [--limit N]    # extract → remote check → pay check → score → queue
+uv run jobkit triage [--limit N]    # extract → remote check → pay check → score → queue; every filtered job unless triage.max_jobs_per_stage or --limit caps each stage
 uv run jobkit form-specs [--limit N]  # read application forms, match the answer bank, draft new answers; close dead postings
 uv run jobkit rescore [--job-ids 12,15] [--dry-run]  # re-score jobs whose score is stale
 ```
@@ -85,7 +85,7 @@ uv run jobkit email done [--checked-through ..]  # record that the mailbox was r
 ## Runs and reports
 
 ```bash
-uv run jobkit run-all         # the full background pipeline; exits 1 if a stage failed
+uv run jobkit run-all         # the full background pipeline; exits 1 if a stage failed (an expired Claude login says "Claude login expired: run claude, then /login")
 uv run jobkit nightly         # run-all + fill approved forms + digest (the scheduled entry point)
 uv run jobkit digest          # write out/digest/<today>.md
 uv run jobkit stats           # freshness banner + row counts
@@ -123,7 +123,7 @@ your reply can't misroute an approval.
 
 | tool | does |
 |---|---|
-| `get_queue(min_score, limit, max_friction)` | numbered jobs with score, company, title, pay, remote verdict, friction, top gaps and flags; the digest header and questions for you |
+| `get_queue(min_score, limit, max_friction)` | numbered jobs with score, company, title, pay, remote verdict, friction, top gaps and flags; a feed job with no employer posting ends "no employer form found: apply on the employer's site (found via <link>)", the link being the feed's page; the digest header and questions for you |
 | `get_job(n)` | full detail: description summary, requirements, gaps, pay analysis, latest form-filling run |
 | `approve(ids)` | `"1,3,7"`, `"all"` or `">85"`; starts tailoring in the background |
 | `reject(ids, reason)` | dismiss; the reason feeds filter tuning |
@@ -192,7 +192,7 @@ your reply can't misroute an approval.
 | `ghost_close(confirm=false)` | mark applications with no reply after N days as ghosted (lists them first) |
 | `get_digest(date)` | the daily digest |
 | `calibrate()` | numbered config proposals from your decisions |
-| `doctor()` | the setup check |
+| `doctor()` | the setup check, including the Claude login (`claude`, then `/login` when it expired) and an out-of-date Claude Code (`claude update`) |
 | `schedule_status()`, `schedule_install(confirm=false)`, `schedule_uninstall(confirm=false)` | the macOS LaunchAgent and the nightly run record; `schedule_status` ends with whether the daily run opens the filled forms, and how many are ready |
 | `repair_applications(confirm=false)` | repair application rows |
 | `purge_empty_jd_cache(confirm=false)` | the cache repair above |
@@ -207,7 +207,7 @@ your reply can't misroute an approval.
 | `confirm_bullets(decisions)` | keep, edit, add the number or drop; sets `metric_confidence` and `evidence` |
 | `update_corpus_draft(changes)` | identity, roles, education, positioning, skills, constraints, voice samples |
 | `promote_corpus(replace_existing)` | write `career_corpus.yaml` once everything is confirmed |
-| `run_intake(answers, replace_existing)` | write `filters.yaml` and the commute table from the interview; with `auto_approve`, the clears-your-bar rule in `autoapprove.yaml` (and a daily limit only when you give one); `open_forms` sets opening the forms after the daily run; `alert_search` turns on web search for alert jobs, with a limit per email check only when you give one |
+| `run_intake(answers, replace_existing)` | write `filters.yaml` and the commute table from the interview; with `auto_approve`, the clears-your-bar rule in `autoapprove.yaml` (and a daily limit only when you give one); `open_forms` sets opening the forms after the daily run; `alert_search` turns on web search for alert jobs, with a limit per email check only when you give one; `scoring_limit` caps how many jobs are scored per run (no limit unless you give one) |
 | `seed_targets(companies, probe, include_not_found, feed_only_said)` | find and verify boards; or record that you rely on the feeds |
 | `answer_bank_questions()` | the screening questions, with what is set |
 | `build_answer_bank(answers, replace_existing)` | write `answer_bank.yaml` |

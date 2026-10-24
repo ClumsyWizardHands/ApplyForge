@@ -101,7 +101,9 @@ uv run jobkit doctor                  # every check, with the exact fix for each
 
 - Python 3.12 and `uv`;
 - Playwright's Chromium (the revision the installed Playwright needs);
-- an LLM backend: `ANTHROPIC_API_KEY`, or the `claude` command on PATH;
+- an LLM backend: `ANTHROPIC_API_KEY`, or the `claude` command on PATH. With
+  the `claude` command, one tiny call (60-second timeout) checks the login:
+  when it expired, the fix is to run `claude` and type `/login`;
 - that the checkout is not in an iCloud-synced folder, and that no virtualenv
   `.pth` file is hidden;
 - every personal config file below, present and loading;
@@ -118,7 +120,9 @@ It also warns, without failing, about:
 - the template's placeholder track (`my_role`, `REPLACE ME`) still in place;
 - a standing rule whose `title_class` names no track;
 - Adzuna or USAJOBS turned on without their keys in the environment;
-- LinkedIn discovery turned on with no keywords and no sales track.
+- LinkedIn discovery turned on with no keywords and no sales track;
+- a `claude` command that answers with an older model than jobkit asks for,
+  or warns that it doesn't recognise the model: run `claude update`.
 
 It prints the no-reply rule it will use (the number of days, and where that
 number came from) as information. It exits 1 while anything needs fixing;
@@ -270,7 +274,9 @@ descriptions list every field. What each step does and checks:
   companies; companies you refuse go in `blocklist_companies`.
 - **Your bar** (`auto_approve`). On a yes it writes one rule in
   `config/autoapprove.yaml`: approve every job scoring your number or more
-  (75 suggested) with no sanity flag. A daily limit
+  (75 suggested), unless a deal-breaker holds it back: a doubt about remote
+  or location, pay that looks unrealistic, a location left unclear, or a feed
+  job with no employer form. A daily limit
   (`max_auto_approve_per_day`) is written only when you give a number; by
   default there is none. On a no, no rule is written and you approve every
   job yourself. A rule file you wrote yourself is kept, and the output names
@@ -284,6 +290,12 @@ descriptions list every field. What each step does and checks:
   with its direct link. A limit on searches per email check is written only
   when you give one. See
   [LinkedIn](why-no-linkedin.md#web-search-for-alert-jobs).
+- **A scoring limit** (`scoring_limit`). Every job that passes your filters
+  is scored in each run. Only when you give a number is
+  `triage.max_jobs_per_stage` written; the rest then wait for the next run.
+- **Cover letter drafts** (`tailoring.cover_attempts`, default 5). Copied
+  from the template with no question: how many drafts a cover letter gets
+  before it is set aside for you. Change the number in `config/filters.yaml`.
 
 ### Target companies
 

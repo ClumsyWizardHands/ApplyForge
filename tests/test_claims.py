@@ -17,6 +17,7 @@ import yaml
 
 from jobkit import llm
 from jobkit.autofill import form_spec
+from jobkit.config import DEFAULT_COVER_ATTEMPTS
 from jobkit.pipeline import tailor
 from jobkit.validate import authenticity, claim_judge
 from jobkit.validate.claims import (
@@ -690,8 +691,9 @@ def test_tailor_rejects_lumon_letter_for_fabrikam(
     assert not (out / "cover.pdf").exists() and not (out / "cover.txt").exists()
     rejected = (out / "cover_rejected.md").read_text()
     assert "wrong_company" in rejected and "NOT FOR SENDING" in rejected
-    # all three drafts were fact-checked; none reached the critic; cache dropped once
-    assert len(fake.prompts["cover"]) == 3
+    # every draft (tailoring.cover_attempts, absent: 5) was fact-checked; none
+    # reached the critic; cache dropped once
+    assert len(fake.prompts["cover"]) == DEFAULT_COVER_ATTEMPTS
     assert all("cover letter" not in p for p in fake.prompts.get("critic", []))
     # the resume critic DID run: the semicolons are the corpus's own (inherited)
     assert len(fake.prompts["critic"]) == 1 and "resume bullets" in fake.prompts["critic"][0]
@@ -2465,12 +2467,17 @@ def test_tailor_never_ships_a_letter_the_judge_fails(
     assert prov["cover_fact_check"]["ok"] is False
     assert _kinds(prov["cover_fact_check"]["violations"]) == {"claim_judge_unsupported"}
     assert prov["claim_judge_prompt"] == claim_judge.version()
-    # three drafts, each judged; the regenerations carry the judge's reason
-    assert len(fake.prompts["cover"]) == 3 and len(fake.prompts["claim_judge"]) == 3
+    # every draft judged; the regenerations carry the judge's reason
+    n = DEFAULT_COVER_ATTEMPTS
+    assert len(fake.prompts["cover"]) == n and len(fake.prompts["claim_judge"]) == n
     assert fake.forgotten.count("cover") == 1
     for regen in fake.prompts["cover"][1:]:
-        assert "YOUR PREVIOUS DRAFT FAILED THE FACT CHECK" in regen
+        assert "Draft 1 FAILED THE FACT CHECK" in regen
         assert "claim_judge_unsupported" in regen
+    # the same violation in every draft is listed once, with the drafts it failed in
+    last = fake.prompts["cover"][-1]
+    assert last.count("1. claim_judge_unsupported") == 1
+    assert f"failed in drafts: {', '.join(str(d) for d in range(1, n))}" in last
     # a letter that fails the judge never reaches the critic
     assert all("resume bullets" in p for p in fake.prompts["critic"])
     app = conn.execute("SELECT stage, cover_path FROM applications WHERE job_id=?", (jid,))
@@ -2581,7 +2588,8 @@ def test_tailor_judge_pass_cannot_rescue_a_rule_failure(
     assert paths["cover"] == "" and paths["cover_rejected"]
     rejected = (Path(paths["resume"]).parent / "cover_rejected.md").read_text()
     assert "wrong_company" in rejected and "claim_judge" not in rejected
-    assert "claim_judge" not in fake.prompts and len(fake.prompts["cover"]) == 3
+    assert "claim_judge" not in fake.prompts
+    assert len(fake.prompts["cover"]) == DEFAULT_COVER_ATTEMPTS
 
 
 def test_draft_novel_answer_judge_pass_cannot_rescue_a_rule_failure(
@@ -2634,8 +2642,9 @@ def test_tailor_unparseable_judge_output_fails_closed(
     assert paths["cover"] == "" and paths["cover_rejected"]
     rejected = (Path(paths["resume"]).parent / "cover_rejected.md").read_text()
     assert "claim_judge_unparseable" in rejected and "failed closed" in rejected
-    assert len(fake.prompts["claim_judge"]) == 3
-    assert fake.forgotten.count("claim_judge") == 3  # a bad reply is never served again
+    assert len(fake.prompts["claim_judge"]) == DEFAULT_COVER_ATTEMPTS
+    # a bad reply is never served again
+    assert fake.forgotten.count("claim_judge") == DEFAULT_COVER_ATTEMPTS
     app = conn.execute("SELECT stage FROM applications WHERE job_id=?", (jid,)).fetchone()
     assert app[0] == "approved"
 

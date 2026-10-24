@@ -28,7 +28,7 @@ import yaml
 
 from jobkit import llm, mcp_server
 from jobkit.autofill import form_spec
-from jobkit.config import Filters, load_filters
+from jobkit.config import DEFAULT_COVER_ATTEMPTS, Filters, load_filters
 from jobkit.pipeline import self_review, tailor
 from jobkit.validate import authenticity
 from jobkit.validate.claims import drafting_profile
@@ -745,7 +745,7 @@ def test_failing_letter_never_ships_and_its_review_is_reported_only(
     )
     paths = tailor.tailor_job(conn, jid)
     assert paths["cover"] == ""  # rejected, as before: no letter rendered
-    assert len(fake.prompts["cover"]) == 3  # the cap is unchanged
+    assert len(fake.prompts["cover"]) == DEFAULT_COVER_ATTEMPTS  # every draft, then rejected
     assert not _revisions(fake.prompts["cover"])
     assert _outcomes(conn, jid)["cover_letter"] == [("revise", "not_revised")]
     stage = conn.execute("SELECT stage FROM applications WHERE job_id=?", (jid,)).fetchone()[0]
@@ -1317,7 +1317,7 @@ def test_failing_letter_regenerations_carry_only_check_feedback(
 
     out = Path(paths["resume"]).parent
     assert (out / "cover.txt").read_text() == GOOD_LETTER
-    assert len(fake.prompts["cover"]) == 3  # the cap is unchanged
+    assert len(fake.prompts["cover"]) == 3  # it ships on the third draft
     first_regen, second_regen = fake.prompts["cover"][1:]
     assert "FAILED THE FACT CHECK" in first_regen
     assert "FAILED AUTHENTICITY REVIEW" in second_regen
@@ -1349,7 +1349,7 @@ def test_failing_letter_whose_every_regeneration_fails_is_sent_to_human(
     paths = tailor.tailor_job(conn, jid)
 
     assert paths["cover"] == ""
-    assert len(fake.prompts["cover"]) == 3
+    assert len(fake.prompts["cover"]) == DEFAULT_COVER_ATTEMPTS
     assert not _revisions(fake.prompts["cover"])
     out = Path(paths["resume"]).parent
     assert not (out / "cover.txt").exists()

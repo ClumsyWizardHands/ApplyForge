@@ -207,8 +207,10 @@ def test_an_auto_approve_never_adds_a_second_row(
     conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from jobkit import rules
+    from tests.test_filter import clear_for_auto_approve
 
     jid = _job(conn, "auto", status="queued")
+    clear_for_auto_approve(conn, jid)
     _app(conn, jid, "approved")  # e.g. approved once, then sent back to the queue
     conn.execute("INSERT INTO scores (job_id, fit_score) VALUES (?, 99)", (jid,))
     conn.commit()

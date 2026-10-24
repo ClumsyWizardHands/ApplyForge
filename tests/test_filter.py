@@ -63,6 +63,26 @@ def _insert(conn: sqlite3.Connection, **kw: object) -> int:
     return cur.lastrowid
 
 
+def clear_for_auto_approve(conn: sqlite3.Connection, jid: int) -> None:
+    """Make job `jid` the employer's own posting (a board of its own) with a
+    clear location (remote check verdicts 'remote'): a job without both is
+    never approved automatically, whatever the rule (owner decisions D4/D6),
+    so a test of another rule condition sets both. Keeps a sanity row's
+    flags; adds a row with no flags when there is none."""
+    company = conn.execute("SELECT company_id FROM jobs WHERE id = ?", (jid,)).fetchone()[0]
+    board = conn.execute(
+        "INSERT INTO boards (company_id, ats, token) VALUES (?, 'greenhouse', ?)",
+        (company, f"test-board-{jid}"),
+    ).lastrowid
+    conn.execute("UPDATE jobs SET board_id = ? WHERE id = ?", (board, jid))
+    conn.execute(
+        """INSERT INTO sanity (job_id, flags, remote_stated, remote_actual)
+           VALUES (?, '[]', 'remote', 'remote')
+           ON CONFLICT(job_id) DO UPDATE SET remote_stated = 'remote', remote_actual = 'remote'""",
+        (jid,),
+    )
+
+
 def test_filters_log_every_rejection(conn: sqlite3.Connection) -> None:
     ids = {
         "pass": _insert(conn, external_id="1"),

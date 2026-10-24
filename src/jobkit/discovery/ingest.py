@@ -16,6 +16,10 @@ page it was found on (hard rule 10).
   used to run the full poll, which also re-polled up to 150 discovered boards.
 * ingest_url: url_resolver.resolve, then poll_board for a supported ATS, then
   the posting the URL names (when it names one).
+* A repost site (discovery/reposters.py, owner decision D5) is kept out: a
+  board on the built-in list, or filed under a listed reposter's name, is
+  neither added nor polled; a board whose postings mostly read like reposts
+  is set stale by the poll. Both come back as status `reposter` (not ok).
 
 Nothing here changes a job's status. The add-url command puts the job a human
 pasted in the queue itself (db.QUEUE_PASTED_JOB); discovered jobs go through
@@ -31,6 +35,7 @@ import httpx
 
 from jobkit import db as q
 from jobkit.adapters import ADAPTERS
+from jobkit.discovery import reposters
 from jobkit.discovery.url_resolver import ResolvedUrl, resolve
 from jobkit.log import log
 from jobkit.normalize import normalize_company
@@ -44,15 +49,18 @@ class BoardPoll:
     board_id: int
     company_id: int
     board_added: bool  # the board row did not exist before
-    status: str  # ok | not_modified | failed
+    status: str  # ok | not_modified | failed | reposter
     jobs_seen: int
     jobs_new: int
+    note: str = ""  # status reposter: why
 
     @property
     def ok(self) -> bool:
-        return self.status != "failed"
+        return self.status not in ("failed", "reposter")
 
     def describe(self) -> str:
+        if self.status == "reposter":
+            return f"{self.ats}/{self.token}: kept out, {self.note}; apply on the employer's site"
         added = " (board added)" if self.board_added else ""
         return (
             f"{self.ats}/{self.token}{added}: {self.status}, "
@@ -102,9 +110,41 @@ async def poll_board(
     ATS (adapters.ADAPTERS)."""
     if ats not in ADAPTERS:
         raise ValueError(f"no board adapter for {ats!r} (supported: {sorted(ADAPTERS)})")
+    existing = conn.execute(q.BOARD_BY_ATS_TOKEN, {"ats": ats, "token": token}).fetchone()
+    why = reposters.built_in(
+        ats, token, existing["company_name"] if existing is not None else company_name
+    ) or reposters.built_in(ats, token, company_name)
+    if why:  # never added, never fetched
+        board_id = int(existing["board_id"]) if existing is not None else 0
+        reposters.keep_out(
+            conn,
+            ats=ats,
+            token=token,
+            company=str(existing["company_name"]) if existing is not None else company_name,
+            why=why,
+            where="ingest",
+            board_id=board_id or None,
+        )
+        result = BoardPoll(
+            ats=ats,
+            token=token,
+            board_id=board_id,
+            company_id=int(existing["company_id"]) if existing is not None else 0,
+            board_added=False,
+            status="reposter",
+            jobs_seen=0,
+            jobs_new=0,
+            note=why,
+        )
+        log("ingest.board_polled", **asdict(result))
+        return result
     board, added = ensure_board(conn, ats, token, company_name)
     stats = await poll_selected(conn, [board], transport=transport)
-    if stats["failed"]:
+    note = ""
+    if stats.get("reposters"):
+        status = "reposter"
+        note = "its postings read like reposts of other companies' jobs"
+    elif stats["failed"]:
         status = "failed"
     elif stats["not_modified"]:
         status = "not_modified"
@@ -121,6 +161,7 @@ async def poll_board(
         status=status,
         jobs_seen=stats["jobs_seen"],
         jobs_new=stats["jobs_new"],
+        note=note,
     )
     log("ingest.board_polled", **asdict(result))
     return result
@@ -146,6 +187,8 @@ class UrlIngest:
             return "unrecognized"
         if self.poll is None:
             return "manual_ats"
+        if self.poll.status == "reposter":
+            return "reposter"
         if not self.poll.ok:
             return "poll_failed"
         if not self.resolved.external_id:

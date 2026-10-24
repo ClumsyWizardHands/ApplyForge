@@ -23,10 +23,33 @@
 # Conditions in `when` (all must hold):
 #   tier: 1|2|3               company tier from targets.yaml
 #   score_gte: N / score_lt: N    fit score 0-100
-#   sanity_flags: none        no sanity flag on the job
+#   sanity_flags: none        no sanity flag at all on the job
+#   blocking_flags: none      no sanity flag that is a deal-breaker: by default a
+#                             doubt about remote work or the location
+#                             (remote-conflict, remote-policy-unclear,
+#                             hybrid-office-unknown, geo, office-days, onsite) or
+#                             pay that is not realistic (ote-unrealistic). A
+#                             missing range, role sprawl, an unclear base-vs-OTE
+#                             basis or a wide range does not hold a job back.
+#                             The lists are `auto_approve` in filters.yaml; a
+#                             flag in neither list (such as underpriced) blocks.
+#   location_known: true      the remote check ran and where the work happens is
+#                             clear: neither what the posting states nor what
+#                             its fine print implies is "unclear"
+#   employer_posting: true    the employer's own Greenhouse/Lever/Ashby posting,
+#                             not a job-feed row whose employer posting was not
+#                             found (that one has no form to fill; it waits in
+#                             your queue marked "apply on the employer's site"),
+#                             nor a job on a stale board or a listed repost site
+#                             (registries/reposters.yml)
+#                             location_known and employer_posting hold for
+#                             every rule, written or not: no rule approves a job
+#                             whose location is unclear or that has no employer
+#                             posting; it waits in your queue
 #   sanity_checked: true      both sanity checks finished (the remote check and
 #                             the comp check); a job whose check failed has no
 #                             flags yet, so pair this with sanity_flags: none
+#                             or blocking_flags: none
 #   friction_lte: N           application-form friction score
 #   remote: true|false
 #   comp_min_gte: N           published minimum (base; an OTE minimum never matches)
@@ -43,12 +66,14 @@
 
 version: "1.0"
 
-# The recommended start: every job that clears your bar (fit score 75 or more)
-# with no sanity flag, once both sanity checks have run, is approved and its
-# form filled for you. Raise or lower the score to move your bar. Delete the
-# rule to approve every job yourself.
+# The recommended start (the setup interview writes it on a yes): every job
+# that clears your bar (fit score 75 or more), once both sanity checks have
+# run, with no deal-breaker flag, a clear location and the employer's own
+# posting, is approved and its form filled for you. Raise or lower the score
+# to move your bar. Delete the rule to approve every job yourself.
 auto_approve:
-  - when: { score_gte: 75, sanity_flags: none, sanity_checked: true }
+  - when: { score_gte: 75, sanity_checked: true, blocking_flags: none,
+            location_known: true, employer_posting: true }
     reason: "clears-your-bar"
   # More examples:
   # - when: { tier: 1, score_gte: 80, sanity_flags: none, friction_lte: 40 }

@@ -106,7 +106,7 @@ from jobkit import paths
 from jobkit.adapters import ADAPTERS
 from jobkit.autofill import answer_bank
 from jobkit.config import Filters, LinkedInGuest, LinkedInLocation, load_filters
-from jobkit.discovery import ingest, registry
+from jobkit.discovery import ingest, registry, reposters
 from jobkit.discovery.url_resolver import resolve as resolve_url
 from jobkit.log import log
 from jobkit.normalize import normalize_company, normalize_title
@@ -416,6 +416,9 @@ def card_verdict(card: Card, filters: Filters) -> str | None:
     for name in f.get("blocklist_companies", []) or []:
         if str(name).lower() in card.company.lower():
             return f"blocklist_company:{name}"
+    reposter = reposters.named(card.company)  # a repost site, not the employer (D5)
+    if reposter:
+        return f"reposter:{reposter}"
     for pat in filters.exclude_titles:
         if re.search(pat, card.title):
             return f"exclude_title:{pat[:40]}"

@@ -67,6 +67,11 @@ target-version = "py312"
 # Claude Code worktrees nest full repo copies (src/jobkit/.claude/worktrees/...)
 extend-exclude = [".claude"]
 
+[tool.ruff.format]
+# ruff 0.16 formats Python code blocks inside Markdown; the spec and docs keep
+# their own layout
+exclude = ["*.md"]
+
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 

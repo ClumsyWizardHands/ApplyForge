@@ -93,6 +93,8 @@ def test_generated_filters_load_and_filter(fresh: Path) -> None:
     assert f.accept_remote
     assert f.raw["filters"]["blocklist_companies"] == ["Harbor Health"]
     assert f.raw["remote_policy"]["max_office_days_per_week"] == 2
+    # the letter-drafts setting is copied from the template, with its default
+    assert f.cover_attempts == 5 and f.raw["tailoring"] == {"cover_attempts": 5}
     # the seniority floor and the named exclusion reject; the tracks pass
     assert _reject_reason(_job("Junior Customer Success Manager"), f) is not None
     assert _reject_reason(_job("Associate Customer Success Manager"), f) is not None
@@ -927,7 +929,13 @@ def test_yes_to_auto_approval_writes_one_rule_and_no_limit(fresh: Path) -> None:
     cfg = _auto(fresh)
     assert cfg["auto_approve"] == [
         {
-            "when": {"score_gte": 75, "sanity_flags": "none", "sanity_checked": True},
+            "when": {
+                "score_gte": 75,
+                "sanity_checked": True,
+                "blocking_flags": "none",
+                "location_known": True,
+                "employer_posting": True,
+            },
             "reason": "clears-your-bar",
         }
     ]
@@ -936,11 +944,26 @@ def test_yes_to_auto_approval_writes_one_rule_and_no_limit(fresh: Path) -> None:
     assert rules.MAX_PER_DAY_KEY not in cfg and rules.MAX_PER_DAY_KEY not in text
     assert "automatic approval at a fit score of 75 or more, no daily limit" in out
     # the rule uses only known condition keys
-    checked = {"fit_score": 80, "flags": [], "sanity_job_id": 1, "demand_score": 3}
+    checked = {
+        "fit_score": 80,
+        "flags": ["no-range-where-required"],  # not a deal-breaker
+        "sanity_job_id": 1,
+        "demand_score": 3,
+        "remote_stated": "remote",
+        "remote_actual": "remote",
+        "board_id": 4,
+    }
     assert rules._cond_matches(cfg["auto_approve"][0]["when"], checked)
     # a job whose sanity checks did not finish is never approved by it
-    unchecked = {"fit_score": 80, "flags": [], "sanity_job_id": None, "demand_score": None}
+    unchecked = {**checked, "sanity_job_id": None, "demand_score": None}
     assert not rules._cond_matches(cfg["auto_approve"][0]["when"], unchecked)
+    # nor one with a deal-breaker flag, an unclear location or no employer posting
+    for held in (
+        {"flags": ["remote-conflict: says remote, needs 4 office days"]},
+        {"remote_actual": "unclear"},
+        {"board_id": None},
+    ):
+        assert not rules._cond_matches(cfg["auto_approve"][0]["when"], {**checked, **held})
 
 
 def test_a_daily_limit_is_written_only_when_given(
@@ -953,8 +976,10 @@ def test_a_daily_limit_is_written_only_when_given(
     cfg = _auto(fresh)
     assert cfg["auto_approve"][0]["when"] == {
         "score_gte": 82,
-        "sanity_flags": "none",
         "sanity_checked": True,
+        "blocking_flags": "none",
+        "location_known": True,
+        "employer_posting": True,
     }
     assert cfg[rules.MAX_PER_DAY_KEY] == 6
     assert "at most 6 a day" in out
@@ -1130,3 +1155,48 @@ def test_mcp_run_intake_takes_the_search_answer(fresh: Path) -> None:
 
     mcp_tools.run_intake(json.dumps({**ANSWERS, "alert_search": {"enabled": True}}))
     assert load_filters(fresh / "config" / "filters.yaml").alert_web_search is True
+
+
+# ---- scoring limit and the auto-approve flag lists (owner decisions D2, D3) ----
+
+
+def test_no_scoring_limit_unless_the_person_names_one(fresh: Path) -> None:
+    run_intake(ANSWERS)
+    filters = load_filters(fresh / "config" / "filters.yaml")
+    assert filters.max_jobs_per_stage is None
+    # the flag lists that hold a job back from automatic approval come with
+    # their documentation, at the owner's defaults
+    assert filters.auto_approve_flags == config.AutoApproveFlags(
+        blocking=config.AUTO_APPROVE_BLOCKING_FLAGS,
+        non_blocking=filters.auto_approve_flags.non_blocking,
+    )
+    assert set(filters.auto_approve_flags.non_blocking) == set(
+        config.AUTO_APPROVE_NON_BLOCKING_FLAGS
+    )
+    text = (fresh / "config" / "filters.yaml").read_text()
+    assert "blocking_flags: none" in text  # the comment naming the rule condition
+
+
+def test_a_scoring_limit_is_written_when_given(fresh: Path) -> None:
+    run_intake({**ANSWERS, "scoring_limit": {"per_stage": 40, "said": "40 a night is plenty"}})
+    text = (fresh / "config" / "filters.yaml").read_text()
+    assert '# you said: "40 a night is plenty"' in text
+    assert load_filters(fresh / "config" / "filters.yaml").max_jobs_per_stage == 40
+    assert [ln for ln in text.splitlines() if ln.startswith("triage:")] == ["triage:"]
+
+
+@pytest.mark.parametrize("bad", [0, -2, True, "40"])
+def test_a_bad_scoring_limit_is_refused(fresh: Path, bad: object) -> None:
+    with pytest.raises(SetupError, match="per_stage"):
+        run_intake({**ANSWERS, "scoring_limit": {"per_stage": bad}})
+
+
+def test_the_note_for_a_kept_rule_file_names_the_new_rule(fresh: Path) -> None:
+    (fresh / "config" / "autoapprove.yaml").write_text(
+        'version: "1.0"\nauto_approve:\n  - when: { tier: 1 }\n    reason: "mine"\n'
+    )
+    out = run_intake({**ANSWERS, "auto_approve": {"enabled": True, "min_score": 78}})
+    assert (
+        "{ score_gte: 78, sanity_checked: true, blocking_flags: none, location_known: true, "
+        "employer_posting: true }" in out
+    )

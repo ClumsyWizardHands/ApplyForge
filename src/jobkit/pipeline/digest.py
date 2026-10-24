@@ -58,7 +58,7 @@ import sqlite3
 from pathlib import Path
 
 from jobkit import db as q
-from jobkit import paths, rules
+from jobkit import llm, paths, rules
 from jobkit.config import load_filters
 from jobkit.discovery import board_resolver, linkedin_guest
 from jobkit.pipeline import halts, letter_gate, questions
@@ -110,14 +110,43 @@ def _nightly_lines(conn: sqlite3.Connection, limit: float) -> list[str]:
     return lines
 
 
+def _backend_down_line(failed: list[sqlite3.Row]) -> str | None:
+    """The one top line when the last run's LLM backend refused every call
+    (D7): an expired Claude login, else any other backend-down reason."""
+    errors = [str(r["error"] or "") for r in failed if r["status"] == "llm_backend_down"]
+    errors += [str(r["error"] or "") for r in failed if llm.LOGIN_EXPIRED in str(r["error"] or "")]
+    if not errors:
+        return None
+    reason = llm.LOGIN_EXPIRED if any(llm.LOGIN_EXPIRED in e for e in errors) else errors[0]
+    reason = reason or "the LLM backend refused every call"
+    return f"⚠ {reason}. Jobs that needed Claude were not scored, checked or written in this run."
+
+
+def _failure_reasons(failed: list[sqlite3.Row]) -> str:
+    """'stage: error; ...' for the failed stages that recorded an error,
+    each shortened to one line."""
+    out: list[str] = []
+    for r in failed:
+        err = " ".join(str(r["error"] or "").split())
+        if err:
+            out.append(f"{r['stage']}: {err[:160]}")
+    return "; ".join(out)
+
+
 def freshness_banner(conn: sqlite3.Connection, stale_after_hours: float | None = None) -> str:
     """A few lines: the last successful board poll and how long ago it was (a
     warning past the threshold, or when no poll ever succeeded), the last
     successful nightly run (same threshold), a nightly run that has not
     finished, and the stages of the latest run (run-all or nightly) that
-    failed, if any."""
+    failed, if any, with each one's error. When the latest run's LLM backend
+    refused every call (an expired Claude login), that comes first, as one
+    line: "⚠ Claude login expired: run claude, then /login. ..." (D7)."""
     limit = load_filters().stale_after_hours if stale_after_hours is None else stale_after_hours
     lines: list[str] = []
+    failed = conn.execute(q.LAST_RUN_FAILED_STAGES).fetchall()
+    login = _backend_down_line(failed)
+    if login:
+        lines.append(login)
     row = conn.execute(q.LAST_SUCCESSFUL_POLL).fetchone()
     if row is None or row["at"] is None:
         lines.append(
@@ -136,15 +165,17 @@ def freshness_banner(conn: sqlite3.Connection, stale_after_hours: float | None =
         else:
             lines.append(seen[0].upper() + seen[1:] + ".")
     lines.extend(_nightly_lines(conn, limit))
-    failed = conn.execute(q.LAST_RUN_FAILED_STAGES).fetchall()
     if failed:
-        why = {"llm_all_failed": "all LLM calls failed"}
+        why = {"llm_all_failed": "all LLM calls failed", "llm_backend_down": "LLM backend down"}
         parts = [f"{r['stage']} ({why.get(r['status'], 'error')})" for r in failed]
         which = "nightly run" if failed[0]["mode"] == NIGHTLY else "run-all"
         lines.append(
             f"⚠ The last {which} ({failed[0]['at']} UTC) had failed stages: "
             f"{', '.join(parts)}. See logs/jobkit.jsonl (run_all.stage)."
         )
+        reasons = _failure_reasons(failed)
+        if reasons:
+            lines.append(f"  Why: {reasons}")
     return "\n".join(lines)
 
 
@@ -245,7 +276,7 @@ def write_digest(conn: sqlite3.Connection, date: str | None = None) -> Path:
 
     queue = conn.execute(
         """SELECT j.id, j.title, j.company_name, j.comp_min, j.comp_max, j.remote,
-                  sc.fit_score, sc.gaps, s.flags
+                  j.board_id, j.apply_url, sc.fit_score, sc.gaps, s.flags
            FROM jobs j JOIN scores sc ON sc.job_id = j.id
            LEFT JOIN sanity s ON s.job_id = j.id
            WHERE j.status = 'queued'
@@ -262,9 +293,12 @@ def write_digest(conn: sqlite3.Connection, date: str | None = None) -> Path:
         gaps = ", ".join(json.loads(r["gaps"] or "[]")[:3]) or "none"
         flags = json.loads(r["flags"] or "[]") if r["flags"] else []
         flag_str = f"  ⚠ {'; '.join(flags)}" if flags else ""
+        # a feed job with no employer posting found: no form jobkit can fill,
+        # never approved automatically (rules.py employer_posting)
+        where = rules.employer_site_note(r["board_id"], r["apply_url"])
         lines.append(
             f"- **{r['fit_score']}** · {r['company_name']} — {r['title']} · "
-            f"{comp} · {remote} · gaps: {gaps}{flag_str}"
+            f"{comp} · {remote} · gaps: {gaps}{where}{flag_str}"
         )
     lines.append("")
     # employer replies recorded from the person's mailbox since the last digest

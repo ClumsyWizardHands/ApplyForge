@@ -39,7 +39,7 @@ from jobkit.pipeline.filter import (
 from jobkit.pipeline.triage import geo_restriction_acceptable, run_remote_check
 from jobkit.rules import _title_class, run_standing_rules
 from tests.conftest import load_fixture
-from tests.test_filter import _insert
+from tests.test_filter import _insert, clear_for_auto_approve
 from tests.test_rules import _queued
 
 
@@ -874,6 +874,7 @@ def test_auto_approve_never_fires_on_an_ote_minimum(
         )
         conn.execute("UPDATE jobs SET status='queued' WHERE id=?", (jid,))
         conn.execute("INSERT INTO scores (job_id, fit_score) VALUES (?, 97)", (jid,))
+        clear_for_auto_approve(conn, jid)
         ids[label] = jid
     conn.commit()
     stats = run_standing_rules(conn)

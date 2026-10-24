@@ -903,7 +903,7 @@ def test_critic_prompt_does_not_treat_a_plain_number_as_a_tell() -> None:
 
 @pytest.mark.parametrize(
     ("name", "version"),
-    [("select_bullets", "1.8"), ("cover_letter", "1.16"), ("novel_question", "1.8")],
+    [("select_bullets", "1.8"), ("cover_letter", "1.17"), ("novel_question", "1.8")],
 )
 def test_prompts_carry_both_rules_keyed_by_the_knob(name: str, version: str) -> None:
     p = llm.PromptFile(name)

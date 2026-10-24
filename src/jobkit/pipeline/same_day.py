@@ -71,6 +71,7 @@ def stages(job_ids: Sequence[int]) -> list[tuple[str, StageFn]]:
         run_queue,
         run_remote_check,
         run_score,
+        stage_limit,
     )
     from jobkit.rules import run_standing_rules
 
@@ -84,10 +85,11 @@ def stages(job_ids: Sequence[int]) -> list[tuple[str, StageFn]]:
 
     return [
         ("filter", lambda c: run_filters(c, job_ids=ids)),
-        ("extract", lambda c: run_extract(c, job_ids=ids)),
-        ("remote", lambda c: run_remote_check(c, job_ids=ids)),
-        ("comp", lambda c: run_comp_check(c, job_ids=ids)),
-        ("score", lambda c: run_score(c, job_ids=ids)),
+        # every one of these jobs, unless the person set triage.max_jobs_per_stage
+        ("extract", lambda c: run_extract(c, stage_limit(), job_ids=ids)),
+        ("remote", lambda c: run_remote_check(c, stage_limit(), job_ids=ids)),
+        ("comp", lambda c: run_comp_check(c, stage_limit(), job_ids=ids)),
+        ("score", lambda c: run_score(c, stage_limit(), job_ids=ids)),
         ("queue", lambda c: run_queue(c, job_ids=ids, require_sanity=True)),
         ("form-specs", form_specs),
         ("rules", run_standing_rules),

@@ -8,7 +8,34 @@ There is no daily limit on automatic approval unless the person sets one:
 With it, at most that many jobs are approved automatically per local calendar
 day, highest fit score first. A job over the limit stays queued, gets one
 `auto_approve_waiting` event that day, and is tried again on the next run.
-Without the key nothing here changes."""
+Without the key nothing here changes.
+
+Three conditions keep the doubtful jobs for the person (owner decisions D3, D4 and D6, 2026-10-22):
+
+* `blocking_flags: none` — no sanity flag that is a real deal-breaker:
+  doubts about remote work or the location, and unrealistic pay. Which flag
+  classes block is set in filters.yaml `auto_approve` (config.AutoApproveFlags);
+  a flag of a class no list names blocks. Unlike `sanity_flags: none`, a
+  missing pay range, role sprawl, an unclear base-vs-OTE basis or a wide
+  range does not keep a job from being approved.
+* `location_known: true` — the remote check ran and its verdict is clear:
+  both what the posting states and what its fine print implies are remote,
+  hybrid or onsite, never unclear.
+* `employer_posting: true` — the job is the employer's own Greenhouse, Lever
+  or Ashby posting, not a feed (aggregator) row that board resolution could
+  not match to one. Such a row has no form to fill; it stays in the queue
+  marked "no employer form found: apply on the employer's site (found via
+  <link>)" (employer_site_note), and
+  the person can still approve it by hand. A job on a stale board or a
+  listed repost site is not an employer posting either (D5).
+
+D4 and D6 say "never", so the last two hold whatever a rule says
+(review 2026-10-23): run_standing_rules approves no job whose location is
+not known or that is not an employer posting, even under a rule that lacks
+those conditions (an owner's older rules). Such a job stays queued for the
+person, logged as `standing_rules.held_for_person`; auto_reject rules still
+apply to it. Writing the two conditions into a rule states this; leaving
+them out does not weaken it."""
 
 from __future__ import annotations
 
@@ -21,7 +48,9 @@ from typing import Any
 import yaml
 
 from jobkit.adapters.ats.greenhouse import comp_basis
-from jobkit.config import Filters, load_filters, read_config_yaml
+from jobkit.config import AutoApproveFlags, Filters, load_filters, read_config_yaml
+from jobkit.discovery import reposters
+from jobkit.links import strip_tracking
 from jobkit.log import log
 
 RULES_PATH = "config/autoapprove.yaml"
@@ -63,6 +92,67 @@ def max_auto_approve_per_day(rules: Mapping[str, Any]) -> int | None:
             f"more, got {value!r}. Delete the line for no daily limit."
         )
     return value
+
+
+# the remote check's verdicts that say where the work happens
+KNOWN_REMOTE_VERDICTS = frozenset({"remote", "hybrid", "onsite"})
+
+
+def location_known(job: Mapping[str, Any]) -> bool:
+    """The remote check ran (a sanity row) and neither its stated nor its
+    actual verdict is unclear (or missing)."""
+    if job.get("sanity_job_id") is None:
+        return False
+    return (
+        job.get("remote_stated") in KNOWN_REMOTE_VERDICTS
+        and job.get("remote_actual") in KNOWN_REMOTE_VERDICTS
+    )
+
+
+def is_employer_posting(job: Mapping[str, Any]) -> bool:
+    """The job came from an employer's own board (it has a board). A feed
+    (aggregator) row has none until board resolution merges it into the
+    employer's posting (rule 10), which closes the feed row.
+
+    Fail closed on a repost site (D5, review 2026-10-23): a board no longer
+    polled (`board_status` 'stale': gone, or kept out as a repost site by
+    discovery/reposters.keep_out) and a board or company on the built-in
+    repost list (registries/reposters.yml) are not the employer's own
+    posting, so a job on one already queued is never approved automatically."""
+    if job.get("board_id") is None:
+        return False
+    if job.get("board_status") == "stale":
+        return False
+    ats, token = str(job.get("board_ats") or ""), str(job.get("board_token") or "")
+    if ats and token and reposters.listed_board(ats, token):
+        return False
+    return reposters.named(str(job.get("company_name") or "")) is None
+
+
+def employer_site_note(board_id: object, apply_url: object) -> str:
+    """' · no employer form found: apply on the employer's site (found via
+    <link>)' for a feed row with no employer posting found (no form jobkit
+    can fill), else ''. The link is the feed's page for the job, not the
+    employer's site. The queue (MCP get_queue) and the digest's review queue
+    add it to the job's line."""
+    if board_id is not None:
+        return ""
+    link = strip_tracking(str(apply_url or ""))  # no utm_* or click ids (SPEC §16.6)
+    note = " · no employer form found: apply on the employer's site"
+    return note + (f" (found via {link})" if link else "")
+
+
+def _blocking(job: dict[str, Any], flags_cfg: AutoApproveFlags | None) -> list[str]:
+    if "blocking_flags" in job:
+        return list(job["blocking_flags"])
+    cfg = flags_cfg or load_filters().auto_approve_flags
+    return cfg.blocking_in(list(job.get("flags") or []))
+
+
+def _true_or_false(key: str, want: object) -> bool:
+    if not isinstance(want, bool):
+        raise ValueError(f"standing-rule key {key} takes true or false, got {want!r}")
+    return want
 
 
 _FOUNDING_PAT = re.compile(r"\b(founding|first)\b", re.I)
@@ -165,6 +255,18 @@ def _cond_matches(when: dict[str, Any], job: dict[str, Any]) -> bool:
         elif key == "comp_unpublished":
             if bool(job["comp_max"] is None) != bool(want):
                 return False
+        elif key == "blocking_flags":
+            # only the flags filters.yaml auto_approve counts as deal-breakers
+            if want != "none":
+                raise ValueError(f"standing-rule key blocking_flags takes only none, got {want!r}")
+            if _blocking(job, None):
+                return False
+        elif key == "location_known":
+            if location_known(job) != _true_or_false(key, want):
+                return False
+        elif key == "employer_posting":
+            if is_employer_posting(job) != _true_or_false(key, want):
+                return False
         else:
             raise ValueError(f"unknown standing-rule key: {key} (one knob, one owner)")
     return True
@@ -244,6 +346,7 @@ def run_standing_rules(conn: sqlite3.Connection) -> dict[str, int]:
     rules = _load_rules()
     cap = max_auto_approve_per_day(rules)
     filters = load_filters()
+    flags_cfg = filters.auto_approve_flags
     unknown = unknown_title_classes(rules, filters)
     if unknown:
         log(
@@ -253,12 +356,16 @@ def run_standing_rules(conn: sqlite3.Connection) -> dict[str, int]:
             note="a rule naming one of these never matches",
         )
     rows = conn.execute(
-        """SELECT j.id, j.title, j.remote, j.comp_min, j.comp_max, c.tier,
+        """SELECT j.id, j.title, j.remote, j.comp_min, j.comp_max, c.tier, j.board_id,
+                  j.company_name, b.status AS board_status, b.ats AS board_ats,
+                  b.token AS board_token,
                   sc.fit_score, s.flags, s.job_id AS sanity_job_id, s.demand_score,
+                  s.remote_stated, s.remote_actual,
                   fs.friction_score AS friction,
                   CASE WHEN j.comp_max IS NOT NULL THEN j.jd_html END AS jd_html
            FROM jobs j
            JOIN companies c ON c.id = j.company_id
+           LEFT JOIN boards b ON b.id = j.board_id
            LEFT JOIN scores sc ON sc.job_id = j.id
            LEFT JOIN sanity s ON s.job_id = j.id
            LEFT JOIN form_specs fs ON fs.job_id = j.id
@@ -281,6 +388,7 @@ def run_standing_rules(conn: sqlite3.Connection) -> dict[str, int]:
         job["flags"] = json.loads(row["flags"] or "[]") if row["flags"] else []
         job["title_class"] = _title_class(row["title"], filters)
         job["comp_basis"] = comp_basis(row["jd_html"], row["comp_min"], row["comp_max"])
+        job["blocking_flags"] = flags_cfg.blocking_in(job["flags"])
         decided = False
         for rule in rules.get("auto_reject", []):
             if _cond_matches(rule["when"], job):
@@ -298,6 +406,19 @@ def run_standing_rules(conn: sqlite3.Connection) -> dict[str, int]:
                 decided = True
                 break
         if decided:
+            continue
+        if not (location_known(job) and is_employer_posting(job)):
+            # D4/D6 hold whatever a rule says: a job whose location is not
+            # known, or with no employer form, is never approved automatically
+            # (review 2026-10-23: a rule without these conditions approved
+            # one); it stays queued for the person
+            if rules.get("auto_approve"):
+                log(
+                    "standing_rules.held_for_person",
+                    job_id=row["id"],
+                    location_known=location_known(job),
+                    employer_posting=is_employer_posting(job),
+                )
             continue
         for rule in rules.get("auto_approve", []):
             if _cond_matches(rule["when"], job):

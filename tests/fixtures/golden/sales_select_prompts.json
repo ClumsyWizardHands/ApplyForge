@@ -1,7 +1,7 @@
 {
  "Manager, Sales Development": {
   "attempt_keys": [
-   "h-fabrikam:eed28dd6cce345ea:1.8:1.16:sr1.2+1.5x1:cj1.7:confident"
+   "h-fabrikam:eed28dd6cce345ea:1.8:1.17:sr1.2+1.5x1:cj1.7:ca5:confident"
   ],
   "provenance_tailor_prompt": "1.8",
   "tailor_calls": [
@@ -14,7 +14,7 @@
  },
  "Mid-Market Account Executive": {
   "attempt_keys": [
-   "h-fabrikam:eed28dd6cce345ea:1.8:1.16:sr1.2+1.5x1:cj1.7:confident"
+   "h-fabrikam:eed28dd6cce345ea:1.8:1.17:sr1.2+1.5x1:cj1.7:ca5:confident"
   ],
   "provenance_tailor_prompt": "1.8",
   "tailor_calls": [
@@ -27,7 +27,7 @@
  },
  "Revenue Operations Manager": {
   "attempt_keys": [
-   "h-fabrikam:eed28dd6cce345ea:1.8:1.16:sr1.2+1.5x1:cj1.7:confident"
+   "h-fabrikam:eed28dd6cce345ea:1.8:1.17:sr1.2+1.5x1:cj1.7:ca5:confident"
   ],
   "provenance_tailor_prompt": "1.8",
   "tailor_calls": [

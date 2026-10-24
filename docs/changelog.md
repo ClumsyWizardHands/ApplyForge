@@ -3,6 +3,73 @@
 ApplyForge changes often. This page lists the changes someone already using it
 might notice, newest first. To update, see [Updating](setup.md#updating).
 
+## 2026-10-23: fewer false holds
+
+The first automatic runs held back good jobs and letters for the wrong
+reasons. This round fixes that without loosening the fact check.
+
+- **A letter that fails gets more drafts, each told exactly what failed.**
+  Letters failed the fact check on everyday words such as "talk", "part",
+  "point" and "work", read as claims of experience. The fact check was not
+  loosened: `src/jobkit/validate/` is unchanged. A letter now gets up to 5
+  drafts instead of 3 (`tailoring.cover_attempts` in `config/filters.yaml`).
+  Every draft gets the full fact check, the claim judge and the authenticity
+  review. Each new draft is written as a new letter and is told every problem
+  of every earlier draft (its kind, the sentence and the rule in plain words),
+  so it cannot bring back a problem an earlier draft had fixed. It is told not
+  to write those sentences again. The letter prompt also now warns against
+  what failed most:
+  writing about the company you apply to as if you worked there ("our
+  customers"), retelling a bullet in stronger words than it uses, using the
+  posting's own names about you, and a close that promises something ("I'll
+  bring sharp questions") or asks a question ("When can we talk?"). jobkit never deletes or edits sentences of a letter
+  to make it pass. Jobs whose letter failed before this update are tailored
+  once more on the next run, because they had only 3 drafts. See
+  [When a letter fails](validators.md#when-a-letter-fails).
+- **Every job is scored.** Each run scores every job that passes your
+  filters; the fixed cap of 100 a stage is gone. To set a limit, add
+  `triage.max_jobs_per_stage: N` to `config/filters.yaml` (setup asks).
+  `jobkit triage --limit N` still works for one run.
+- **Only deal-breakers hold a job back.** The new rule condition
+  `blocking_flags: none` holds back a job only for a doubt about remote work or
+  the location, or for pay that looks unrealistic. A missing pay range, a wide
+  one, several roles in one posting or an unclear base-vs-OTE basis no longer
+  does. A low ceiling (`underpriced`) still holds a job back unless you add it
+  to `non_blocking_flags`. Two more conditions: `location_known: true` (a job whose location is
+  unclear waits for you) and `employer_posting: true` (a feed job with no
+  employer form waits for you, marked "no employer form found: apply on the
+  employer's site (found via <link>)", the link being the feed's page, with
+  tracking parameters such as `utm_source` removed).
+  The flag lists are `auto_approve` in `config/filters.yaml`. See
+  [Your bar](how-it-works.md#your-bar-automatic-approval).
+- **A place in the job title wins.** "Account Manager - Denver, CO" filed
+  under Boston, or "Chief of Staff | Colombia" filed under Cambridge, MA, is
+  filtered by the place in the title. A region in the title ("LATAM",
+  "EMEA") is often the territory covered, so it wins only when the feed names
+  no place: "Channel Account Executive, LATAM" in Miami, FL stays a Miami job.
+  See [Locations](how-it-works.md#locations).
+- **Repost sites are kept out.** Sites such as Jobgether that repost other
+  companies' jobs ("Our partner is looking for…") are recognised from a
+  built-in list and from their wording, and the digest names each one it kept
+  out. Their jobs still waiting in the queue are taken out too, and a job from
+  one is never approved automatically. Discovery and board lookup also skip
+  the companies on your blocklist.
+  See [Repost sites](how-it-works.md#repost-sites).
+- **An expired Claude login says so.** When the Claude login expires, the run
+  stops calling Claude at once, and the digest, `jobkit schedule status` and
+  the daily summary say "Claude login expired: run claude, then /login".
+  `jobkit doctor` checks the login with one tiny call, and tells you to run
+  `claude update` when Claude Code is out of date.
+
+**What changes in an existing setup.** Scoring has no cap now, so a run after
+a long gap may make more model calls than before. The rest is opt-in: a
+`config/autoapprove.yaml` you wrote is never changed, so to use the new policy,
+give your clears-your-bar rule `sanity_checked: true, blocking_flags: none,
+location_known: true, employer_posting: true` in place of
+`sanity_flags: none` (see `config/autoapprove.example.yaml`). Title locations,
+repost sites and the login check apply to everyone. The 5 letter drafts apply to everyone; add
+`tailoring: {cover_attempts: 3}` to `config/filters.yaml` to keep 3.
+
 ## 2026-10-22: automatic by default
 
 ApplyForge now runs your search for you: every day it finds and scores jobs,

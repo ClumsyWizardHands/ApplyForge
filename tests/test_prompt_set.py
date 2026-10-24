@@ -40,7 +40,7 @@ from jobkit.pipeline import rescore, triage
 from jobkit.rules import _title_class, run_standing_rules, unknown_title_classes
 from tests.conftest import FIXTURES
 from tests.test_claims import CORPUS
-from tests.test_filter import _insert
+from tests.test_filter import _insert, clear_for_auto_approve
 
 GOLDEN = FIXTURES / "golden"
 REGEN = os.environ.get("JOBKIT_REGEN_GOLDEN") == "1"
@@ -395,6 +395,7 @@ def test_golden_standing_rule_verdicts(conn: sqlite3.Connection) -> None:
         conn.execute("UPDATE jobs SET status='queued' WHERE id=?", (jid,))
         conn.execute("INSERT INTO scores (job_id, fit_score) VALUES (?, ?)", (jid, score))
         conn.execute("INSERT INTO sanity (job_id, flags) VALUES (?, '[]')", (jid,))
+        clear_for_auto_approve(conn, jid)
         conn.execute(
             "INSERT INTO form_specs (job_id, friction_score) VALUES (?, ?)", (jid, friction)
         )
@@ -876,6 +877,7 @@ def test_rn_standing_rule_matches_its_track(conn: sqlite3.Connection, jobkit_hom
         jid = _insert(conn, external_id=f"rn{i}", title=title, jd_html=JD)
         conn.execute("UPDATE jobs SET status='queued' WHERE id=?", (jid,))
         conn.execute("INSERT INTO scores (job_id, fit_score) VALUES (?, 80)", (jid,))
+        clear_for_auto_approve(conn, jid)
     conn.commit()
     stats = run_standing_rules(conn)
     # the unknown school_nurse rule never matches; the RN rule does

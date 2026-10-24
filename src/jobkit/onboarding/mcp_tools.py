@@ -177,8 +177,17 @@ def run_intake(answers: dict[str, Any] | str, replace_existing: bool = False) ->
     hedged|confident, said};
     auto_approve? {enabled, min_score (default 75), per_day?, said}: yes
       writes one standing rule, approve every job scoring min_score or more
-      with no sanity flag; per_day only when the person names a daily limit
-      (the default is no limit); no, or left out, writes no rule;
+      once both sanity checks ran, with no deal-breaker flag (a doubt about
+      remote work or the location, or unrealistic pay; a missing pay range
+      or several roles in one posting do not hold a job back), a clear
+      location verdict, and the employer's own posting (a feed job with no
+      employer posting found waits, marked "apply on the employer's site");
+      per_day only when the person names a daily limit (the default is no
+      limit); no, or left out, writes no rule;
+    scoring_limit? {per_stage, said}: only when the person wants a limit on
+      how many jobs each scoring stage takes per run
+      (triage.max_jobs_per_stage); left out, there is no limit and every
+      job that passes the filters is scored in the run;
     open_forms? {after_daily_run (default true), said}: whether the
       scheduled daily run ends by opening the filled forms for review
       (staging.open_after_daily_run);

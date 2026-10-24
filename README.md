@@ -45,13 +45,13 @@ resources allow, and what people run into decides what I work on next. The
     </td>
     <td width="50%" valign="top">
       <h3>📊 Scores them</h3>
-      Filters by title, place, commute, pay floor and remote policy, and logs why each job was dropped. Scores the rest 0 to 100 against your experience, lists the gaps, and checks the remote claim and the pay.
+      Filters by title, place (a city or country named in the job title counts), commute, pay floor and remote policy, keeps sites that repost other companies' jobs out, and logs why each job was dropped. Scores every job that is left 0 to 100 against your experience, lists the gaps, and checks the remote claim and the pay.
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <h3>✅ Approves what clears your bar</h3>
-      When you say yes in setup, every job at or above your score with no warning flag is approved automatically. You can still approve or reject any job yourself.
+      When you say yes in setup, every job at or above your score is approved automatically, unless a deal-breaker holds it back: a doubt about remote or location, or pay that looks unrealistic. A missing pay range doesn't. A feed job with no form to fill waits in your queue with the employer's link. You can still approve or reject any job yourself.
     </td>
     <td width="50%" valign="top">
       <h3>✍️ Writes from your facts</h3>
@@ -330,9 +330,10 @@ looking at for LinkedIn.
 - **Claude.** ApplyForge calls Claude to score jobs (a small, inexpensive
   model) and to write and check applications (a larger model). With a Claude
   subscription, these calls go through Claude Code and count toward your
-  plan's usage. With an API key in `.env`, you pay per call: expect roughly
-  $0.15 to $0.40 per tailored application, and a small fraction of that to
-  score a job.
+  plan's usage. If your Claude login expires, the run and `jobkit doctor` say
+  so: run `claude`, then type `/login`. With an API key in `.env`, you pay per
+  call: expect roughly $0.15 to $0.40 per tailored application, and a small
+  fraction of that to score a job.
 - **Job feeds.** Adzuna and USAJOBS need free keys. The other feeds and the
   company boards need none.
 

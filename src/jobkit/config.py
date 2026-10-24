@@ -136,6 +136,8 @@ _SALES_TRACK = re.compile(
 
 # ---- application tracking ----
 GHOST_AFTER_DAYS_DEFAULT = 30
+# tailoring.cover_attempts when absent: cover-letter drafts per tailoring run
+DEFAULT_COVER_ATTEMPTS = 5
 _LEGACY_GHOST_KIND = "close_as_ghosted"
 
 
@@ -211,6 +213,132 @@ def parse_comp_sanity(cfg: Any) -> CompSanity:
         ),
         ote_check=str(ote_check),
     )
+
+
+# ---- which sanity flags block automatic approval (filters.yaml `auto_approve:`) ----
+# Read by the standing-rules condition `blocking_flags: none` (rules.py). Only
+# real deal-breakers block (owner decision D3, 2026-10-22): doubts about remote work or the
+# location, and pay that is not realistic. A missing range, several roles in
+# one posting, an unclear base-vs-OTE basis and a wide range do not block; the
+# person still sees them in the queue. "underpriced" (a low ceiling) is in
+# neither list, so it blocks like any unclassified flag until the person
+# lists it (D3 named no rule for it).
+AUTO_APPROVE_BLOCKING_FLAGS = (
+    "remote-conflict",
+    "remote-policy-unclear",
+    "hybrid-office-unknown",
+    "geo",
+    "office-days",
+    "onsite",
+    "ote-unrealistic",
+)
+AUTO_APPROVE_NON_BLOCKING_FLAGS = (
+    "no-range-where-required",
+    "role-sprawl",
+    "ote-basis-unclear",
+    "range-dodge",
+)
+_FLAG_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+
+
+def flag_class(flag: str) -> str:
+    """A sanity flag's class: the text before its first colon, lowercased
+    ("remote-conflict: the JD says ..." -> "remote-conflict")."""
+    return str(flag).split(":", 1)[0].strip().lower()
+
+
+def _class_in(cls: str, entries: tuple[str, ...]) -> bool:
+    # an entry names a class, or a family of classes: "geo" also covers
+    # "geo-restriction"
+    return any(cls == e or cls.startswith(e + "-") for e in entries)
+
+
+@dataclass(frozen=True)
+class AutoApproveFlags:
+    """`auto_approve` in filters.yaml: which sanity flags keep a job from
+    being approved automatically (the rule condition `blocking_flags: none`).
+
+    * blocking_flags: a flag of one of these classes blocks.
+    * non_blocking_flags: a flag of one of these classes does not block.
+
+    A flag of a class in neither list blocks too, so a flag nobody has
+    classified yet (a new check, a typo) never lets a job through unseen, and
+    a class in both lists blocks. Each list given replaces its default. The
+    flags themselves are unchanged: every one is still shown in the queue."""
+
+    blocking: tuple[str, ...] = AUTO_APPROVE_BLOCKING_FLAGS
+    non_blocking: tuple[str, ...] = AUTO_APPROVE_NON_BLOCKING_FLAGS
+
+    def blocks(self, flag: str) -> bool:
+        cls = flag_class(flag)
+        if _class_in(cls, self.blocking):
+            return True
+        return not _class_in(cls, self.non_blocking)
+
+    def blocking_in(self, flags: list[str] | tuple[str, ...]) -> list[str]:
+        """The flags among these that block automatic approval."""
+        return [str(f) for f in flags if self.blocks(str(f))]
+
+
+def _flag_list(value: Any, key: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    if value is None:
+        return default
+    if not isinstance(value, list):
+        raise ValueError(f"auto_approve.{key} must be a list of flag names, got {value!r}")
+    out: list[str] = []
+    for v in value:
+        name = v.strip().lower() if isinstance(v, str) else ""
+        if not _FLAG_NAME.match(name):
+            raise ValueError(f"auto_approve.{key}: {v!r} is not a flag name (e.g. remote-conflict)")
+        out.append(name)
+    return tuple(dict.fromkeys(out))
+
+
+def parse_auto_approve_flags(cfg: Any) -> AutoApproveFlags:
+    """Validate `auto_approve` in filters.yaml. Absent or empty: the
+    defaults above. A class named in both lists given is an error."""
+    if cfg is None:
+        cfg = {}
+    if not isinstance(cfg, dict):
+        raise ValueError("auto_approve in filters.yaml must be a mapping")
+    unknown = sorted(str(k) for k in set(cfg) - {"blocking_flags", "non_blocking_flags"})
+    if unknown:
+        raise ValueError(
+            "auto_approve in filters.yaml takes blocking_flags and non_blocking_flags, "
+            f"not {unknown}"
+        )
+    blocking = _flag_list(cfg.get("blocking_flags"), "blocking_flags", AUTO_APPROVE_BLOCKING_FLAGS)
+    non_blocking = _flag_list(
+        cfg.get("non_blocking_flags"), "non_blocking_flags", AUTO_APPROVE_NON_BLOCKING_FLAGS
+    )
+    if "blocking_flags" in cfg and "non_blocking_flags" in cfg:
+        both = [f for f in blocking if f in non_blocking]
+        if both:
+            raise ValueError(
+                f"auto_approve: {both} is in both blocking_flags and non_blocking_flags"
+            )
+    return AutoApproveFlags(blocking=blocking, non_blocking=non_blocking)
+
+
+def parse_max_jobs_per_stage(cfg: Any) -> int | None:
+    """`triage.max_jobs_per_stage` in filters.yaml: the most jobs each LLM
+    triage stage (extract, the remote and comp checks, score) takes in one
+    run. Absent or null: no limit, so every job that passes the filters is
+    extracted, checked and scored in the run (owner decision D2, 2026-10-22). A value that
+    is not a whole number of 1 or more fails loudly."""
+    if cfg is None:
+        return None
+    if not isinstance(cfg, dict):
+        raise ValueError("triage in filters.yaml must be a mapping")
+    v = cfg.get("max_jobs_per_stage")
+    if v is None:
+        return None
+    if isinstance(v, bool) or not isinstance(v, int) or v < 1:
+        raise ValueError(
+            "triage.max_jobs_per_stage must be a whole number of 1 or more, or left out "
+            f"for no limit; got {v!r}"
+        )
+    return v
 
 
 # ---- location keys of the two all-industry feeds (read by pipeline/feeds.py) ----
@@ -551,6 +679,8 @@ class Filters(BaseModel):
             raise ValueError(f"filters.comp.ote_base_share must be in (0, 1], got {share}")
         # the newer keys fail at load too; each is a no-op when absent
         _ = (self.prompt_set, self.ghost_after, self.comp_sanity)
+        _ = (self.auto_approve_flags, self.max_jobs_per_stage)
+        _ = self.cover_attempts
         feeds = self.raw.get("feeds")
         if isinstance(feeds, dict):
             # adzuna.country is not checked here: it was written by older
@@ -802,6 +932,27 @@ class Filters(BaseModel):
     def comp_sanity(self) -> CompSanity:
         """`comp_sanity` (the sanity layer's knobs), with today's defaults."""
         return parse_comp_sanity(self.raw.get("comp_sanity"))
+
+    # ---- automatic approval: which flags block it (rules.py) ----
+
+    @property
+    def auto_approve_flags(self) -> AutoApproveFlags:
+        """`auto_approve` (blocking_flags, non_blocking_flags): which sanity
+        flags the standing-rules condition `blocking_flags: none` counts.
+        Absent: remote/location doubts and unrealistic pay block; a missing
+        range, role sprawl, an unclear OTE basis and a wide range do not. A
+        low ceiling ("underpriced") is in neither list, so it blocks until
+        listed in non_blocking_flags."""
+        return parse_auto_approve_flags(self.raw.get("auto_approve"))
+
+    # ---- triage: the optional per-stage limit (cli run-all, nightly, same-day) ----
+
+    @property
+    def max_jobs_per_stage(self) -> int | None:
+        """`triage.max_jobs_per_stage`: None (absent, the default) is no
+        limit: every job that passes the filters is extracted, checked and
+        scored in the run."""
+        return parse_max_jobs_per_stage(self.raw.get("triage"))
 
     # ---- feed locations (pipeline/feeds.py) ----
 
@@ -1102,6 +1253,24 @@ class Filters(BaseModel):
             raise ValueError(
                 f"self_review.max_revision_rounds must be a whole number >= 0, got {value!r}"
             )
+        return value
+
+    @property
+    def cover_attempts(self) -> int:
+        """`tailoring.cover_attempts` (default 5): how many drafts of a cover
+        letter tailoring writes in all, the first included, before the letter
+        is rejected (pipeline/tailor.py). Every draft goes through the whole
+        check chain; each regeneration is told every violation of every
+        earlier draft of the run (pipeline/cover_feedback.py). Absent means 5.
+        A non-integer or a value under 1 fails loudly."""
+        t = self.raw.get("tailoring") or {}
+        if not isinstance(t, dict):
+            raise ValueError(f"tailoring must be a mapping, got {t!r}")
+        value = t.get("cover_attempts")
+        if value is None:
+            return DEFAULT_COVER_ATTEMPTS
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ValueError(f"tailoring.cover_attempts must be a whole number >= 1, got {value!r}")
         return value
 
     @property

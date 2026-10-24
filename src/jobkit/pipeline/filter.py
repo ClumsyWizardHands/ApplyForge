@@ -19,6 +19,27 @@ Comp: the floor depends on the title's role track (config.Filters.comp_floor_for
 OTE-basis tracks accept a base (or unlabelled) figure at floor × ote_base_share,
 and compare a posted OTE figure with the full floor.
 
+Title location (owner decision D4, 2026-10-23): a place the title names
+("Account Executive - Denver, CO", "Chief of Staff | Colombia", "(Remote -
+Canada)"; normalize.title_location) that contradicts the feed's location is
+the location the filter reads (title_location_override), and the override is
+logged (`filter.title_location`); a location rejection it decides ends in
+":title". A country or city outside the US in the title is that place whenever the
+feed location names nothing outside the US (blank, "Remote", a US place); a
+region in the title ("LATAM", "EMEA", "Central EMEA") is often the
+territory covered, so it overrides only a feed location that names no place
+(blank, "Remote", "Hybrid", "Distributed"), never a US place or the US as a
+whole ("Channel Account Executive, LATAM" in "Miami, FL - Remote" stays a
+Miami job). A city abroad whose name a US city shares ("Melbourne") counts
+only with its country (normalize._AMBIGUOUS_ABROAD); a US
+place in the title wins over a feed location that names another specific
+place (a different city and state; "United States" or "Remote - US" is not
+contradicted by a US city).
+
+Repost sites (discovery/reposters.py, D5): a job filed under a listed repost
+site's name ("Jobgether") is rejected as `reposter:<name>`, after the
+blocklist.
+
 `refilter` puts filter-layer rejections back through this stage after the
 config changes (a retarget), because run_filters only ever reads status=new."""
 
@@ -37,15 +58,23 @@ from jobkit import db as q
 from jobkit.adapters.ats.greenhouse import comp_basis
 from jobkit.autofill.options import US_STATES, states_in
 from jobkit.config import Filters, load_filters
+from jobkit.discovery import reposters
 from jobkit.log import log
 from jobkit.normalize import (
+    METRO_STATES,
+    US_CITY_STATES,
+    TitleLocation,
     cluster_key,
+    is_region_only,
     location_bucket,
     mentions_non_us,
     mentions_us,
     mentions_us_country,
     names_no_specific_place,
+    title_location,
 )
+
+_REMOTE_WORD = re.compile(r"(?<![a-z])remote(?![a-z])", re.I)
 
 # Location buckets that say nothing about where the work is: blank, "Distributed".
 # They go to the LLM remote check instead of being rejected here.
@@ -114,7 +143,102 @@ def matched_place_bucket(location_raw: str | None, filters: Filters) -> str | No
     return None
 
 
+@dataclass(frozen=True)
+class TitleLocationOverride:
+    """The title's place, used instead of the feed's location."""
+
+    title_place: TitleLocation
+    feed_location: str
+    location_raw: str  # what the filter reads instead of the feed's location
+    remote: int | None  # ... and instead of the feed's remote flag
+
+
+def _states_named(location: str) -> frozenset[str]:
+    """The US states a location names or implies: its state segments, the
+    state of a US city normalize knows by name, the states of its metro."""
+    out = set(states_in(location))
+    # a feed listing several places ("Charleston, SC; Columbia, SC; Augusta,
+    # GA"): states_in reads one place, so each listed place is read too
+    for piece in re.split(r"[;|]", location):
+        if piece.strip():
+            out |= states_in(piece)
+    low = location.lower()
+    for city, state in US_CITY_STATES.items():
+        if re.search(rf"(?<![a-z]){re.escape(city)}(?![a-z])", low):
+            out.add(state)
+    out |= METRO_STATES.get(location_bucket(location, None), frozenset())
+    return frozenset(out)
+
+
+def _us_place_agrees(place: str, feed: str) -> bool:
+    """A US place from the title agrees with the feed's location: the same
+    metro bucket, a state in common, or the title's city named in the feed."""
+    a, b = location_bucket(place, None), location_bucket(feed, None)
+    if a == b and a != "other-unknown":
+        return True
+    if _states_named(place) & _states_named(feed):
+        return True
+    city = place.split(",")[0].strip().lower()
+    return (
+        bool(city) and re.search(rf"(?<![a-z]){re.escape(city)}(?![a-z])", feed.lower()) is not None
+    )
+
+
+def title_location_override(row: Mapping[str, Any]) -> TitleLocationOverride | None:
+    """The title's place when it contradicts the feed's location (module
+    docstring), else None. A remote word in the title or the feed, or the
+    remote flag, keeps the job remote: "Remote - Canada" is remote-intl."""
+    place = title_location(str(row.get("title") or ""))
+    if place is None:
+        return None
+    feed = str(row.get("location_raw") or "")
+    remote_said = row.get("remote") == 1 or place.remote or "remote" in feed.lower()
+    if not place.us:
+        if mentions_non_us(feed):
+            return None  # the feed already places it outside the US
+        if is_region_only(place.text) and (
+            mentions_us(feed) or not names_no_specific_place(_REMOTE_WORD.sub(" ", feed))
+        ):
+            # a region ("LATAM", "EMEA") is often the territory covered: it
+            # overrides only a feed that names no place ("", "Remote")
+            return None
+        loc = f"Remote - {place.text}" if remote_said else place.text
+        return TitleLocationOverride(place, feed, loc, 1 if remote_said else None)
+    if (
+        not feed.strip()
+        # the US as a whole, remote or not ("United States", "Remote - US"):
+        # no US city contradicts it (review 2026-10-23)
+        or names_no_specific_place(_REMOTE_WORD.sub(" ", feed))
+        or _us_place_agrees(place.text, feed)
+    ):
+        return None
+    loc = f"Remote - {place.text}" if remote_said else place.text
+    remote = row.get("remote")
+    return TitleLocationOverride(place, feed, loc, None if remote is None else int(remote))
+
+
+def _with_title_location(
+    row: Mapping[str, Any],
+) -> tuple[Mapping[str, Any], TitleLocationOverride | None]:
+    """The row as the location check reads it: the title's place in place of
+    a contradicted feed location."""
+    over = title_location_override(row)
+    if over is None:
+        return row, None
+    current = dict(row)
+    current["location_raw"] = over.location_raw
+    current["remote"] = over.remote
+    current["location_bucket"] = location_bucket(over.location_raw, over.remote == 1 or None)
+    return current, over
+
+
 def _location_reason(row: Mapping[str, Any], filters: Filters) -> str | None:
+    row, over = _with_title_location(row)
+    reason = _feed_location_reason(row, filters)
+    return f"{reason}:title" if reason and over else reason
+
+
+def _feed_location_reason(row: Mapping[str, Any], filters: Filters) -> str | None:
     """The accepted places come from config (Filters.accepted_location_buckets:
     filters.locations.allowed, remote_policy.relocation_cities, accept_remote).
     With filters.locations.match_state, a place written with its state also
@@ -156,13 +280,25 @@ def _comp_reason(row: Mapping[str, Any], filters: Filters) -> str | None:
     return f"comp_below_floor:{comp_max}<{effective}:{floor.describe()}{posted}"
 
 
+def blocklist_match(company: str | None, filters: Filters) -> str | None:
+    """The filters.blocklist_companies entry this company name contains
+    (case aside), or None. The filter, discovery and board resolution use it."""
+    f = filters.raw.get("filters", {}) or {}
+    for name in f.get("blocklist_companies", []) or []:
+        if str(name).lower() in str(company or "").lower():
+            return str(name)
+    return None
+
+
 def _reject_reason(row: Mapping[str, Any], filters: Filters) -> str | None:
-    f = filters.raw.get("filters", {})
     title = row["title"]
 
-    for name in f.get("blocklist_companies", []) or []:
-        if name.lower() in row["company_name"].lower():
-            return f"blocklist_company:{name}"
+    blocked = blocklist_match(row["company_name"], filters)
+    if blocked is not None:
+        return f"blocklist_company:{blocked}"
+    reposter = reposters.named(row["company_name"])
+    if reposter:
+        return f"reposter:{reposter}"
 
     for pat in filters.exclude_titles:
         if re.search(pat, title):
@@ -237,6 +373,16 @@ def run_filters(
     for row in rows:
         stats["examined"] += 1
         reason = _reject_reason(dict(row), filters)
+        over = title_location_override(dict(row))
+        if over is not None:
+            log(
+                "filter.title_location",
+                job_id=row["id"],
+                title=row["title"],
+                feed_location=over.feed_location,
+                title_location=over.location_raw,
+                verdict=reason or "passed",
+            )
         if reason:
             conn.execute("UPDATE jobs SET status='rejected' WHERE id=?", (row["id"],))
             conn.execute(
@@ -352,8 +498,10 @@ def refilter(
         verdict = _reject_reason(current, filters)
         if verdict is None:
             report.would_pass += 1
-        elif verdict == r["reason"] and bucket == r["location_bucket"]:
-            report.unchanged += 1  # resetting would only re-log the same rejection
+        elif verdict in (r["reason"], f"{r['reason']}:title") and bucket == r["location_bucket"]:
+            # resetting would only re-log the same rejection (a title place
+            # that agrees with it only adds ":title", D4)
+            report.unchanged += 1
             continue
         updates.append(
             {

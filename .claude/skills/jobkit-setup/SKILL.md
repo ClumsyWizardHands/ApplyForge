@@ -111,7 +111,10 @@ only the machine items now, one at a time, asking before each:
   about 150 MB; say so first). jobkit fills forms in a visible browser.
 - **LLM backend**: either the `claude` CLI on PATH (Claude Code, logged in;
   runs on their Claude subscription) or `ANTHROPIC_API_KEY` in `.env`. The
-  person pastes the key into `.env` themselves.
+  person pastes the key into `.env` themselves. Doctor makes one tiny call
+  to check the Claude login: if it says the login expired, they run
+  `claude` in a terminal and type `/login`; if it says the model is
+  unknown or old, they run `claude update`.
 - **Checkout location**: a plain folder such as ~/code/jobkit, not iCloud
   Drive, ~/Desktop, ~/Documents or ~/Downloads (on macOS, files there are
   hidden from scheduled jobs).
@@ -271,10 +274,17 @@ words for each `said` field.
     you? Each one gets its resume, letter and filled form, and you still
     review it and click submit. I suggest yes, at a fit score of 75." One
     line on what the score is: how well their confirmed experience meets the
-    job's must-haves, 0 to 100. Jobs below the bar, and any job with a
-    warning flag (remote claim, pay), wait in their queue for them. They pick
-    the number. Send `auto_approve: {enabled: true, min_score: 75, said}`, or
-    `{enabled: false, said}` on a no.
+    job's must-haves, 0 to 100. Then one line on what still waits for them
+    in the queue: jobs below the bar; jobs with a deal-breaker warning (a
+    doubt about remote or location, or pay that looks unrealistic); jobs
+    whose remote or location status is unclear; and job feed postings with
+    no form jobkit can fill (they apply on the employer's site). A missing
+    pay range or several roles in one posting does not hold a job back.
+    They pick the number. Send `auto_approve: {enabled: true, min_score: 75, said}`, or
+    `{enabled: false, said}` on a no. The rule intake writes carries those
+    checks (`blocking_flags: none`, `location_known: true`,
+    `employer_posting: true`); the flag lists are in `config/filters.yaml`
+    under `auto_approve`.
 15. **A daily limit (optional).** Only on a yes to 14, ask once and plainly:
     "Do you want a cap on how many jobs are approved in a day? By default
     there is none." Do not suggest a number or recommend a cap. Only when
@@ -295,6 +305,11 @@ words for each `said` field.
     fine; recency already limits it)?" No limit is the default. Only when
     they give a number, add `per_check` to `alert_search`; otherwise leave
     it out.
+19. **A scoring limit (optional).** Ask once: "Every job that passes your
+    filters is scored in each run. Do you want a limit on how many jobs are
+    scored per run? By default there is none." Do not suggest a number. Only
+    when they give one, send `scoring_limit: {per_stage: <their number>, said}`;
+    otherwise leave it out.
 
 Then run_intake(answers) (CLI: `uv run jobkit setup intake <file>`). The tool
 description lists every field. A yes to 14 writes one rule in
@@ -310,6 +325,10 @@ when every track is a software sales title (account executive, SDR/BDR,
 sales manager; not retail, insurance or device sales) and no track is marked
 as a change of field or given an emphasis, and `prompt_set: general` (scoring examples from many
 fields) otherwise.
+Also say in one line that each cover letter gets up to 5 drafts, every one
+fully checked and told every failure of every earlier draft of the run (its kind,
+sentence and rule) (`tailoring.cover_attempts`
+in `config/filters.yaml` changes the number). No question for it.
 
 ## Step 5 of 8 — Where postings come from
 

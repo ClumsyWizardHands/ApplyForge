@@ -117,6 +117,33 @@ gates:
   # A track's own min_score takes its place for that track.
   min_score_to_surface: 65
 
+# ---- triage: every job that passes the filters is scored ---------------------
+triage:
+  # The most jobs each LLM stage (extract, the remote and comp checks, score)
+  # takes in one run; the rest wait for the next run. null, or no line, is no
+  # limit: every job that passes the filters is extracted, checked and scored
+  # in the run. `jobkit triage --limit N` overrides it for one run.
+  max_jobs_per_stage: null
+
+# ---- automatic approval: which sanity flags hold a job back --------------------
+auto_approve:
+  # Read by the standing-rule condition `blocking_flags: none` (autoapprove.yaml).
+  # A job with a flag of a blocking class is never approved automatically; you
+  # decide. A flag of a non-blocking class is still shown in your queue but does
+  # not hold the job back. A flag of a class in neither list blocks, so a new
+  # kind of flag is never waved through unseen. Each list replaces its default.
+  #   remote-conflict, remote-policy-unclear, hybrid-office-unknown, geo,
+  #   office-days, onsite: doubts about remote work or where the job is
+  #   ote-unrealistic: on-target earnings the posting cannot back up
+  #   no-range-where-required, range-dodge: no pay range, or a very wide one
+  #   role-sprawl: several jobs in one posting
+  #   ote-basis-unclear: a big number, base-vs-OTE not stated
+  #   underpriced: a ceiling low for the demand in the posting (in neither
+  #     list, so it holds a job back; add it to non_blocking_flags to let it pass)
+  blocking_flags: [remote-conflict, remote-policy-unclear, hybrid-office-unknown, geo,
+                   office-days, onsite, ote-unrealistic]
+  non_blocking_flags: [no-range-where-required, range-dodge, role-sprawl, ote-basis-unclear]
+
 # ---- schedule -----------------------------------------------------------------
 schedule:
   # When the nightly run happens, local time, as a QUOTED "HH:MM" (an unquoted
@@ -205,6 +232,14 @@ self_review:
   # if it passes every check. Letters and answers are never revised. 0 =
   # review and report only.
   max_revision_rounds: 1
+
+tailoring:
+  # How many drafts of a cover letter are written in all, the first included,
+  # before the letter is rejected. Every draft gets the full fact check, the
+  # claim judge and the authenticity review; each new draft is told every
+  # failure of every earlier draft of the run (its kind, sentence and rule).
+  # Absent = 5.
+  cover_attempts: 5
 
 questions:
   # Facts only you know that would close gaps in open jobs, asked in the

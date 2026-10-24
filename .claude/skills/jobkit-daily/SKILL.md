@@ -25,8 +25,9 @@ their bar. Keep the rest short.
 ## The gates
 
 1. **The person approves**, directly or through the bar they set in setup
-   (a standing rule approves every job at or above their score with no
-   sanity flag). Call approve() only with the numbers they gave. Rejections
+   (a standing rule approves every job at or above their score unless it
+   has a deal-breaker flag: a doubt about remote or location, or unrealistic
+   pay; a missing pay range does not hold a job back). Call approve() only with the numbers they gave. Rejections
    and snoozes are theirs too. "approve everything above 85" works
    (approve(ids=">85")) only when they say it. If they ask to change their
    bar or to limit approvals per day, offer to make the edit in
@@ -59,10 +60,17 @@ everything when they set no bar) by number with score, comp, remote verdict,
 form friction and gaps. Numbers are pinned until the next get_queue(). Show:
 
 - The banner's ⚠ lines first (stale data, failed nightly stages, forms a
-  staging run stopped on: CAPTCHA, ID or payment field, assessment).
+  staging run stopped on: CAPTCHA, ID or payment field, assessment). When
+  it says `Claude login expired: run claude, then /login`, say that line
+  first: they run `claude` in a terminal and type `/login`, and the next
+  run scores what was missed.
 - The applications filled and waiting for review: the banner's staging line
   counts them; offer open_queue() if they are not open yet (section 4).
-- The top 10, one line each. Say how many more.
+- The top 10, one line each. Say how many more. A line ending "no employer
+  form found: apply on the employer's site (found via <link>)" is a job feed
+  posting jobkit could not match to the employer's own board: there is no
+  form to fill, so it is never approved automatically. The link is the
+  feed's page, not the employer's; give it. They can still approve it.
 - Today's questions for them (at the end of the output): count only, and
   offer to go through them (section 6).
 

@@ -73,6 +73,7 @@ import httpx
 import yaml
 
 from jobkit import db as q
+from jobkit import links
 from jobkit.config import Filters, load_filters
 from jobkit.discovery import ingest
 from jobkit.discovery.board_resolver import (
@@ -103,25 +104,7 @@ UNMATCHED = ("no_board", "no_title_match")
 URL_MAX = 500
 _REF = re.compile(r"^alert-[0-9a-f]{16}$")
 _LINKEDIN = re.compile(r"linkedin\.|lnkd\.in", re.I)
-_TRACKING = re.compile(r"linkedin|lnkd", re.I)
-# LinkedIn's tracking parameters, dropped from a stored link whatever their value
-_TRACKING_KEYS = frozenset({"trk", "refid", "trackingid", "lipi", "li_fat_id"})
-# click and campaign ids any site adds, dropped from a stored link too
-_CLICK_KEYS = frozenset(
-    {
-        "gclid",
-        "dclid",
-        "fbclid",
-        "msclkid",
-        "yclid",
-        "igshid",
-        "mc_cid",
-        "mc_eid",
-        "_hsenc",
-        "_hsmi",
-        "gh_src",
-    }
-)
+# tracking parameters (utm_*, click ids, LinkedIn's) are jobkit.links' to judge
 # LinkedIn named as a word in a link's path or query (after decoding)
 _LINKEDIN_WORD = re.compile(r"(?<![a-z0-9])(?:linkedin|lnkd)(?![a-z0-9])", re.I)
 # The host each recognised application system serves postings from. A found
@@ -514,11 +497,7 @@ def _clean_url(url: str) -> str:
     query = [
         (k, v)
         for k, v in parse_qsl(parts.query, keep_blank_values=True)
-        if not k.lower().startswith("utm_")
-        and k.lower() not in _TRACKING_KEYS
-        and k.lower() not in _CLICK_KEYS
-        and not v.lower().startswith("li-")
-        and not _TRACKING.search(f"{k}={v}")
+        if not links.tracking_param(k, v)
     ]
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), ""))
 
@@ -679,6 +658,12 @@ def _ingest(
     res = asyncio.run(ingest.ingest_url(conn, url, rec.company, transport=transport))
     if res.poll is None:
         raise ValueError("that link names no board, so nothing was added; pass the posting's link")
+    if res.poll.status == "reposter":
+        raise ValueError(
+            f"{res.poll.ats}/{res.poll.token} is a repost site, not the employer "
+            f"({res.poll.note}); nothing was added. Pass the employer's own posting link, "
+            "or record not_found"
+        )
     if not res.poll.ok:
         raise ValueError(
             f"the board {res.poll.ats}/{res.poll.token} could not be read right now; try again "
